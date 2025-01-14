@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Production
+dist/
+build/
+release/
+out/
+
+# Testing
+coverage/
+
+# Misc
+.cursorrules
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IDE - JetBrains
+.idea/
+*.iml
+*.iws
+.idea_modules/
+
+# TypeScript
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Electron-builder output
+dist_electron/
+
+# System Files
+Thumbs.db

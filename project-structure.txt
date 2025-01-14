@@ -1,0 +1,32 @@
+LanFile_PC/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── src/
+│   ├── main/
+│   │   ├── main.ts                 # Electron 主进程
+│   │   └── preload.ts              # 预加载脚本
+│   ├── renderer/
+│   │   ├── components/             # React 组件
+│   │   │   ├── common/            # 通用组件
+│   │   │   ├── layout/            # 布局组件
+│   │   │   └── features/          # 功能组件
+│   │   ├── hooks/                 # 自定义 Hooks
+│   │   ├── utils/                 # 工具函数
+│   │   ├── types/                 # TypeScript 类型定义
+│   │   ├── styles/                # 全局样式
+│   │   └── App.tsx                # 根组件
+│   └── shared/                    # 主进程和渲染进程共享的代码
+├── tests/
+│   ├── unit/                      # 单元测试
+│   └── integration/               # 集成测试
+├── public/
+│   └── index.html                 # HTML 模板
+├── .eslintrc.js                   # ESLint 配置
+├── .prettierrc                    # Prettier 配置
+├── jest.config.js                 # Jest 配置
+├── tailwind.config.js             # Tailwind 配置
+├── tsconfig.json                  # TypeScript 配置
+├── webpack.config.js              # Webpack 配置
+├── package.json
+└── README.md 

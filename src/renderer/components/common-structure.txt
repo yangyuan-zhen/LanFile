@@ -1,0 +1,16 @@
+common/
+├── Button/
+│   ├── Button.tsx
+│   └── index.ts
+├── Input/
+│   ├── Input.tsx
+│   └── index.ts
+├── Card/
+│   ├── Card.tsx
+│   └── index.ts
+├── Dropdown/
+│   ├── Dropdown.tsx
+│   └── index.ts
+└── Modal/
+    ├── Modal.tsx
+    └── index.ts 

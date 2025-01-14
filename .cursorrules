@@ -1,0 +1,76 @@
+# LanFile_PC
+
+## Project Overview
+
+LanFile_PC is a cross-platform desktop application built with React and Electron, designed for efficient file transfers within a local network. The application supports file upload, download, and automatic device discovery, offering a simple and intuitive user experience for file sharing.
+
+---
+
+## Coding Standards
+
+### Language
+
+- Use TypeScript for all new code.
+
+### Component Design
+
+- Prefer functional components and React Hooks over class components.
+- Define appropriate TypeScript types for all variables and functions.
+
+---
+
+## Style Guidelines
+
+- Follow the [Airbnb React/JSX Style Guide](https://github.com/airbnb/javascript/tree/master/react).
+- Use 2 spaces for indentation.
+- Limit maximum line length to 100 characters.
+
+---
+
+## Best Practices
+
+1. **Responsive Design**:
+
+   - Use Tailwind CSS for implementing responsive UI designs.
+
+2. **Performance Optimization**:
+
+   - Use `React.memo()` when applicable to improve component performance.
+
+3. **Asynchronous Operations**:
+   - Prefer `async/await` over `.then()` for handling promises.
+
+---
+
+## Testing Requirements
+
+- Write unit tests for all new components and utility functions.
+- Aim for a minimum of 80% code coverage in tests.
+
+---
+
+## Documentation Standards
+
+- Use JSDoc comments for all functions and components.
+- Keep the `README.md` file updated with project setup instructions and contribution guidelines.
+
+---
+
+## Key Considerations
+
+- Always consider **accessibility** (a11y) and **performance** when implementing new features.
+- All code must pass review to ensure adherence to coding standards and style guidelines.
+
+---
+
+---
+
+## Development Tools
+
+- **Frameworks**: React, Electron
+- **Styling**: Tailwind CSS
+- **Testing Framework**: Jest
+- **Build Tool**: Webpack
+- **Packaging Tool**: Electron-builder
+
+---
