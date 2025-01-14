@@ -19,10 +19,14 @@
   "dependencies": {
     "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.1.1",
+    "@types/ws": "^8.5.13",
     "chokidar": "^4.0.3",
     "electron": "^28.0.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@svgr/webpack": "^8.1.0",
@@ -56,6 +60,8 @@
     "webpack-dev-server": "^5.0.2"
   },
   "optionalDependencies": {
-    "fsevents": "^2.3.3"
+    "bufferutil": "^4.0.9",
+    "fsevents": "^2.3.3",
+    "utf-8-validate": "^6.0.5"
   }
 }

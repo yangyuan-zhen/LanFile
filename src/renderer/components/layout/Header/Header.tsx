@@ -22,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({
       <div className="flex justify-between items-center px-4 py-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
         <div className="flex items-center">
           <img src={icon} alt="LanFile" className="mr-3 w-8 h-8" />
-          <h1 className="text-2xl font-bold text-gray-900">LanFile_PC</h1>
+          <h1 className="text-2xl font-bold text-gray-900">LanFile</h1>
         </div>
 
         <div className="flex items-center space-x-4">

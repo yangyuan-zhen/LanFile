@@ -37353,7 +37353,7 @@ const Header = ({ currentDevice, onSettingsClick, onHelpClick, }) => {
         react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { className: "flex justify-between items-center px-4 py-4 mx-auto max-w-7xl sm:px-6 lg:px-8" },
             react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { className: "flex items-center" },
                 react__WEBPACK_IMPORTED_MODULE_0___default().createElement("img", { src: _assets_images_icon_svg__WEBPACK_IMPORTED_MODULE_2__["default"], alt: "LanFile", className: "mr-3 w-8 h-8" }),
-                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h1", { className: "text-2xl font-bold text-gray-900" }, "LanFile_PC")),
+                react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h1", { className: "text-2xl font-bold text-gray-900" }, "LanFile")),
             react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", { className: "flex items-center space-x-4" },
                 react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", { className: "text-sm text-gray-600" },
                     "\u5F53\u524D\u8BBE\u5907: ",
