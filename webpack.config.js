@@ -1,19 +1,17 @@
-import path from "path";
-import HtmlWebpackPlugin from "html-webpack-plugin";
-import MiniCssExtractPlugin from "mini-css-extract-plugin";
-import { Configuration as WebpackConfig } from "webpack";
-import { Configuration as WebpackDevServerConfig } from "webpack-dev-server";
-
-interface Configuration extends WebpackConfig {
-    devServer?: WebpackDevServerConfig;
-}
-
-const rendererConfig: Configuration = {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+var path_1 = __importDefault(require("path"));
+var html_webpack_plugin_1 = __importDefault(require("html-webpack-plugin"));
+var mini_css_extract_plugin_1 = __importDefault(require("mini-css-extract-plugin"));
+var rendererConfig = {
     mode: process.env.NODE_ENV === "development" ? "development" : "production",
     entry: "./src/renderer/index.tsx",
     target: "web",
     output: {
-        path: path.resolve(__dirname, "dist/renderer"),
+        path: path_1.default.resolve(__dirname, "dist/renderer"),
         filename: "renderer.js",
         publicPath: "/",
     },
@@ -35,7 +33,7 @@ const rendererConfig: Configuration = {
             {
                 test: /\.css$/,
                 use: [
-                    MiniCssExtractPlugin.loader,
+                    mini_css_extract_plugin_1.default.loader,
                     "css-loader",
                     {
                         loader: "postcss-loader",
@@ -58,29 +56,28 @@ const rendererConfig: Configuration = {
         ],
     },
     plugins: [
-        new HtmlWebpackPlugin({
-            template: path.resolve(__dirname, "src/renderer/index.html"),
+        new html_webpack_plugin_1.default({
+            template: path_1.default.resolve(__dirname, "src/renderer/index.html"),
         }),
-        new MiniCssExtractPlugin({
+        new mini_css_extract_plugin_1.default({
             filename: "styles.css",
         }),
     ],
     devServer: {
         static: {
-            directory: path.join(__dirname, "dist/renderer"),
+            directory: path_1.default.join(__dirname, "dist/renderer"),
         },
         port: 3001,
         hot: true,
         historyApiFallback: true,
     },
 };
-
-const mainConfig: Configuration = {
+var mainConfig = {
     mode: process.env.NODE_ENV === "development" ? "development" : "production",
     entry: "./src/main/main.ts",
     target: "electron-main",
     output: {
-        path: path.resolve(__dirname, "dist/main"),
+        path: path_1.default.resolve(__dirname, "dist/main"),
         filename: "main.js",
     },
     resolve: {
@@ -101,13 +98,12 @@ const mainConfig: Configuration = {
         ],
     },
 };
-
-const preloadConfig: Configuration = {
+var preloadConfig = {
     mode: process.env.NODE_ENV === "development" ? "development" : "production",
     entry: "./src/main/preload.ts",
     target: "electron-preload",
     output: {
-        path: path.resolve(__dirname, "dist/main"),
+        path: path_1.default.resolve(__dirname, "dist/main"),
         filename: "preload.js",
     },
     resolve: {
@@ -128,5 +124,4 @@ const preloadConfig: Configuration = {
         ],
     },
 };
-
-export default [rendererConfig, mainConfig, preloadConfig]; 
+exports.default = [rendererConfig, mainConfig, preloadConfig];

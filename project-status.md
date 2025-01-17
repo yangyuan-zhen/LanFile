@@ -7,10 +7,15 @@
 - 完成了主题系统的搭建
 - 实现了基础 UI 组件的响应式布局
 - 集成了文件选择功能
+- 选择了 MDNS 作为局域网设备发现方案
+- 安装了 MDNS 依赖 (multicast-dns)
+- 配置完成 TailwindCSS 和 PostCSS
 
 ## 下一步计划
 
-开始实现核心功能
+- 实现 HTTP 服务器
+- 配置 MDNS 服务广播
+- 开发设备发现功能
 
 ## 技术栈
 
@@ -19,6 +24,7 @@
 - TypeScript
 - TailwindCSS
 - Headless UI
+- MDNS (multicast-dns)
 - WebRTC (计划中)
 - WebTorrent (计划中)
 
@@ -46,3 +52,16 @@
 - 问题: 样式管理和响应式设计
 - 解决: 使用 TailwindCSS 实现统一的样式系统
 - 创建统一的主题系统，包含颜色、间距和排版规范
+- 解决了 TailwindCSS 的 @apply 和 @tailwind 指令问题
+- 配置了 PostCSS 以支持 TailwindCSS 的所有功能
+
+### 5. 设备发现方案选择
+
+- 问题: 需要在局域网内实现自动设备发现
+- 解决: 选择 MDNS (Multicast DNS) 协议
+- 实现: 使用 multicast-dns 包实现 MDNS 服务
+- 原因:
+  - 无需中心服务器，完全点对点
+  - 原生支持局域网服务发现
+  - 跨平台兼容性好
+  - 低延迟，实时性强

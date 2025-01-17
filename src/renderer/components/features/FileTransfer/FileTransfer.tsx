@@ -28,7 +28,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
         <h2 className="text-xl font-semibold">文件传输</h2>
         <div className="flex space-x-4">
           <Button onClick={onUpload} className="flex items-center">
-            <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
+            <ArrowUpTrayIcon className="mr-2 w-5 h-5" />
             上传
           </Button>
           <Button
@@ -36,7 +36,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
             onClick={onDownload}
             className="flex items-center"
           >
-            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+            <ArrowDownTrayIcon className="mr-2 w-5 h-5" />
             下载
           </Button>
         </div>
@@ -46,7 +46,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
         {files.map((file, index) => (
           <div
             key={index}
-            className="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-md"
+            className="flex justify-between items-center px-4 py-2 bg-gray-50 rounded-md"
           >
             <span className="text-gray-900">{file.name}</span>
             <span
