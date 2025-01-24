@@ -1,9 +1,40 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { NetworkService } from './services/NetworkService';
 
 let mainWindow: BrowserWindow | null = null;
 let networkService: NetworkService | null = null;
+
+function setupIpcHandlers() {
+    if (!networkService) return;
+
+    // 移除可能存在的旧处理程序
+    ipcMain.removeHandler('network:getLocalService');
+    ipcMain.removeHandler('network:startDiscovery');
+    ipcMain.removeHandler('network:stopDiscovery');
+
+    // 注册新的处理程序
+    ipcMain.handle('network:getLocalService', () => {
+        console.log('Handling getLocalService request');
+        return networkService?.getLocalService();
+    });
+
+    ipcMain.handle('network:startDiscovery', () => {
+        console.log('Handling startDiscovery request');
+        return networkService?.startDiscovery();
+    });
+
+    ipcMain.handle('network:stopDiscovery', () => {
+        console.log('Handling stopDiscovery request');
+        return networkService?.stopDiscovery();
+    });
+
+    // 设置设备发现事件监听
+    networkService.on('deviceFound', (device) => {
+        console.log('Device found:', device);
+        mainWindow?.webContents.send('network:deviceFound', device);
+    });
+}
 
 function createWindow() {
     console.log('Creating window...');
@@ -33,7 +64,7 @@ function createWindow() {
     });
 
     networkService = new NetworkService();
-    networkService.start();
+    setupIpcHandlers();
 
     if (process.env.NODE_ENV === 'development') {
         console.log('Loading development URL...');

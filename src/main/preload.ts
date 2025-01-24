@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { Device } from '../renderer/types/electron';
 
 console.log('Preload script starting...');
 
@@ -8,11 +9,22 @@ try {
             ping: () => 'pong'
         },
         network: {
-            getLocalService: async () => {
-                console.log('Calling getLocalService from preload');
-                const result = await ipcRenderer.invoke('network:getLocalService');
-                console.log('getLocalService result:', result);
-                return result;
+            getLocalService: () => ipcRenderer.invoke('network:getLocalService'),
+            startDiscovery: () => ipcRenderer.invoke('network:startDiscovery'),
+            stopDiscovery: () => ipcRenderer.invoke('network:stopDiscovery'),
+            onDeviceFound: (callback: (device: Device) => void) => {
+                const subscription = (_: any, device: Device) => callback(device);
+                ipcRenderer.on('network:deviceFound', subscription);
+                return () => {
+                    ipcRenderer.removeListener('network:deviceFound', subscription);
+                };
+            },
+            onDeviceLeft: (callback: (device: Device) => void) => {
+                const subscription = (_: any, device: Device) => callback(device);
+                ipcRenderer.on('network:deviceLeft', subscription);
+                return () => {
+                    ipcRenderer.removeListener('network:deviceLeft', subscription);
+                };
             }
         }
     });
