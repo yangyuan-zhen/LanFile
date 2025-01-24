@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import { DeviceList } from "./components/DeviceList/DeviceList";
 import { FileTransfer } from "./components/FileTransfer/FileTransfer";
+import icon from "../assets/images/icon.svg";
 
 // 错误边界组件
 class ErrorBoundary extends Component<
@@ -41,7 +42,7 @@ export const App: React.FC = () => {
           <div className="flex justify-between items-center px-4 py-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
             <div className="flex items-center">
               <img
-                src="/logo.png"
+                src={icon}
                 alt="LanFile"
                 className="w-8 h-8"
                 onError={(e) => {

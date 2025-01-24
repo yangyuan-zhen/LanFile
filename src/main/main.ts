@@ -6,23 +6,40 @@ let mainWindow: BrowserWindow | null = null;
 let networkService: NetworkService | null = null;
 
 function createWindow() {
+    console.log('Creating window...');
+    const preloadPath = path.join(__dirname, 'preload.js');
+    console.log('Preload path:', preloadPath);
+
     mainWindow = new BrowserWindow({
         width: 900,
         height: 670,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js'),
+            preload: preloadPath,
+            sandbox: false,
+            webSecurity: false
         },
+    });
+
+    mainWindow.webContents.openDevTools();
+
+    mainWindow.webContents.on('did-finish-load', () => {
+        console.log('Window loaded');
+    });
+
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('Failed to load:', errorCode, errorDescription);
     });
 
     networkService = new NetworkService();
     networkService.start();
 
     if (process.env.NODE_ENV === 'development') {
+        console.log('Loading development URL...');
         mainWindow.loadURL('http://localhost:3001');
-        mainWindow.webContents.openDevTools();
     } else {
+        console.log('Loading production file...');
         mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
     }
 

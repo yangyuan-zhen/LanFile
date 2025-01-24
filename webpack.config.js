@@ -1,19 +1,16 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-var path_1 = __importDefault(require("path"));
-var html_webpack_plugin_1 = __importDefault(require("html-webpack-plugin"));
-var mini_css_extract_plugin_1 = __importDefault(require("mini-css-extract-plugin"));
-var rendererConfig = {
+const path = require("path");
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+
+const rendererConfig = {
     mode: process.env.NODE_ENV === "development" ? "development" : "production",
     entry: "./src/renderer/index.tsx",
     target: "web",
     output: {
-        path: path_1.default.resolve(__dirname, "dist/renderer"),
+        path: path.resolve(__dirname, "dist/renderer"),
         filename: "renderer.js",
         publicPath: "/",
+        assetModuleFilename: 'assets/[name][ext]'
     },
     resolve: {
         extensions: [".ts", ".tsx", ".js", ".jsx"],
@@ -33,7 +30,7 @@ var rendererConfig = {
             {
                 test: /\.css$/,
                 use: [
-                    mini_css_extract_plugin_1.default.loader,
+                    MiniCssExtractPlugin.loader,
                     "css-loader",
                     {
                         loader: "postcss-loader",
@@ -52,32 +49,36 @@ var rendererConfig = {
             {
                 test: /\.(png|jpe?g|gif|svg)$/i,
                 type: "asset/resource",
+                generator: {
+                    filename: 'assets/images/[name][ext]'
+                }
             },
         ],
     },
     plugins: [
-        new html_webpack_plugin_1.default({
-            template: path_1.default.resolve(__dirname, "src/renderer/index.html"),
+        new HtmlWebpackPlugin({
+            template: path.resolve(__dirname, "src/renderer/index.html"),
         }),
-        new mini_css_extract_plugin_1.default({
+        new MiniCssExtractPlugin({
             filename: "styles.css",
         }),
     ],
     devServer: {
         static: {
-            directory: path_1.default.join(__dirname, "dist/renderer"),
+            directory: path.join(__dirname, "dist/renderer"),
         },
         port: 3001,
         hot: true,
         historyApiFallback: true,
     },
 };
-var mainConfig = {
+
+const mainConfig = {
     mode: process.env.NODE_ENV === "development" ? "development" : "production",
     entry: "./src/main/main.ts",
     target: "electron-main",
     output: {
-        path: path_1.default.resolve(__dirname, "dist/main"),
+        path: path.resolve(__dirname, "dist/main"),
         filename: "main.js",
     },
     resolve: {
@@ -98,12 +99,14 @@ var mainConfig = {
         ],
     },
 };
-var preloadConfig = {
+
+const preloadConfig = {
+    name: 'preload',
     mode: process.env.NODE_ENV === "development" ? "development" : "production",
     entry: "./src/main/preload.ts",
     target: "electron-preload",
     output: {
-        path: path_1.default.resolve(__dirname, "dist/main"),
+        path: path.resolve(__dirname, "dist/main"),
         filename: "preload.js",
     },
     resolve: {
@@ -123,5 +126,10 @@ var preloadConfig = {
             },
         ],
     },
+    stats: {
+        errorDetails: true
+    },
+    devtool: 'source-map'
 };
-exports.default = [rendererConfig, mainConfig, preloadConfig];
+
+module.exports = [rendererConfig, mainConfig, preloadConfig]; 

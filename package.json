@@ -5,17 +5,43 @@
   "main": "dist/main/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "cross-env NODE_ENV=development TS_NODE_PROJECT=\"tsconfig.node.json\" concurrently \"npm run dev:renderer\" \"wait-on http://localhost:3001 && npm run dev:main\" \"npm run dev:preload\"",
-    "dev:renderer": "cross-env TS_NODE_PROJECT=\"tsconfig.node.json\" webpack serve --config webpack.config.ts --mode development",
+    "dev:compile": "tsc -p tsconfig.node.json",
+    "dev": "npm run dev:compile && cross-env NODE_ENV=development concurrently \"npm run dev:preload\" \"npm run dev:main\" \"npm run dev:renderer\" \"wait-on http://localhost:3001 && npm run start\"",
+    "dev:renderer": "webpack serve --config webpack.config.js --mode development",
     "dev:main": "tsc -p tsconfig.node.json -w",
-    "dev:preload": "cross-env TS_NODE_PROJECT=\"tsconfig.node.json\" webpack --config webpack.config.ts --mode development --watch",
+    "dev:preload": "webpack --config webpack.config.js --config-name preload --mode development --watch",
     "build": "cross-env NODE_ENV=production npm run build:renderer && npm run build:main && npm run build:preload",
-    "build:renderer": "cross-env TS_NODE_PROJECT=\"tsconfig.node.json\" webpack --config webpack.config.ts --mode production",
+    "build:renderer": "webpack --config webpack.config.js --mode production",
     "build:main": "tsc -p tsconfig.node.json",
-    "build:preload": "cross-env TS_NODE_PROJECT=\"tsconfig.node.json\" webpack --config webpack.config.ts --mode production",
+    "build:preload": "webpack --config webpack.config.js --mode production",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.lanfile.app",
+    "productName": "LanFile",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "src/assets/images/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
   },
   "dependencies": {
     "@heroicons/react": "^2.0.18",
@@ -35,6 +61,7 @@
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
     "css-loader": "^6.8.1",
+    "electron-builder": "^25.1.8",
     "html-webpack-plugin": "^5.5.4",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",

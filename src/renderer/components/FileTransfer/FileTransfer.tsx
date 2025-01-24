@@ -14,14 +14,14 @@ interface FileTransferItem {
 export const FileTransfer: React.FC = () => {
   const [transfers, setTransfers] = useState<FileTransferItem[]>([]);
 
-  const handleUpload = async () => {
-    // TODO: 实现文件上传逻辑
-    console.log("Upload clicked");
+  const handleSend = async () => {
+    // TODO: 实现文件发送逻辑
+    console.log("Send clicked");
   };
 
-  const handleDownload = async () => {
-    // TODO: 实现文件下载逻辑
-    console.log("Download clicked");
+  const handleReceive = async () => {
+    // TODO: 实现文件接收逻辑
+    console.log("Receive clicked");
   };
 
   const getStatusColor = (status: FileTransferItem["status"]) => {
@@ -56,18 +56,18 @@ export const FileTransfer: React.FC = () => {
         <h2 className="text-lg font-medium text-gray-900">文件传输</h2>
         <div className="flex space-x-2">
           <button
-            onClick={handleUpload}
+            onClick={handleSend}
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
           >
             <ArrowUpTrayIcon className="w-4 h-4 mr-1" />
-            上传
+            发送
           </button>
           <button
-            onClick={handleDownload}
+            onClick={handleReceive}
             className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
           >
             <ArrowDownTrayIcon className="w-4 h-4 mr-1" />
-            下载
+            接收
           </button>
         </div>
       </div>

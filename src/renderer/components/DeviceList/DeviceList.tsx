@@ -12,66 +12,44 @@ export const DeviceList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!window.electron?.network) {
-      setError("Electron API not available");
-      return;
-    }
+    console.log("DeviceList mounted");
+    console.log("Window electron object:", window.electron);
 
-    try {
-      const unsubscribeFound = window.electron.network.onDeviceFound(
-        (device: Device) => {
-          setDevices((prev) => {
-            // 检查设备是否已存在
-            const exists = prev.some((d) => d.id === device.id);
-            if (exists) {
-              return prev.map((d) =>
-                d.id === device.id ? { ...device, status: "online" } : d
-              );
-            }
-            return [...prev, { ...device, status: "online" }];
-          });
-        }
-      );
-
-      const unsubscribeLeft = window.electron.network.onDeviceLeft(
-        (device: Device) => {
-          setDevices((prev) =>
-            prev.map((d) =>
-              d.id === device.id ? { ...d, status: "offline" } : d
-            )
-          );
-        }
-      );
-
-      return () => {
-        try {
-          unsubscribeFound();
-          unsubscribeLeft();
-        } catch (e) {
-          console.error("Error cleaning up device listeners:", e);
-        }
-      };
-    } catch (e) {
-      setError("Failed to initialize device discovery");
-      console.error("Device discovery error:", e);
+    // 测试 electron 对象是否存在
+    if (window.electron?.test?.ping) {
+      console.log("Test ping result:", window.electron.test.ping());
+    } else {
+      console.error("Test API not available");
     }
   }, []);
 
   const handleRefresh = async () => {
-    if (!window.electron?.network) {
-      setError("Electron API not available");
-      return;
-    }
-
-    setIsRefreshing(true);
+    console.log("Refresh clicked");
     try {
-      // 清空设备列表并重新开始发现
-      setDevices([]);
-      // 这里可以添加重新扫描的逻辑
-      setTimeout(() => setIsRefreshing(false), 1000);
-    } catch (e) {
-      setError("Failed to refresh devices");
-      console.error("Refresh error:", e);
+      if (!window.electron?.network) {
+        throw new Error("Network API not available");
+      }
+
+      setIsRefreshing(true);
+      const localService = await window.electron.network.getLocalService();
+      console.log("Local service:", localService);
+
+      setDevices([
+        {
+          id: localService.id,
+          name: localService.name,
+          ip: localService.ip,
+          port: localService.port,
+          status: "online",
+        },
+      ]);
+    } catch (error: unknown) {
+      console.error("Refresh error:", error);
+      setError(
+        error instanceof Error ? error.message : "Unknown error occurred"
+      );
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -81,25 +59,24 @@ export const DeviceList: React.FC = () => {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="text-center py-4 text-red-500">{error}</div>
+      <div className="p-4 bg-white rounded-lg shadow-sm">
+        <div className="py-4 text-center text-red-500">{error}</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4">
+    <div className="p-4 bg-white rounded-lg shadow-sm">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-medium text-gray-900">局域网设备</h2>
         <button
           onClick={handleRefresh}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-2 rounded-full transition-colors hover:bg-gray-100"
           disabled={isRefreshing}
         >
           <ArrowPathIcon
             className={`w-5 h-5 text-gray-500 ${
-              isRefreshing ? "animate-spin" : ""
-            }`}
+              isRefreshing ? "animate-spin" : ""}`}
           />
         </button>
       </div>
@@ -108,7 +85,7 @@ export const DeviceList: React.FC = () => {
         {devices.map((device) => (
           <div
             key={device.id}
-            className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors"
+            className="flex justify-between items-center p-3 rounded-lg transition-colors hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
               <div
@@ -125,7 +102,7 @@ export const DeviceList: React.FC = () => {
         ))}
 
         {devices.length === 0 && (
-          <div className="text-center py-8 text-gray-500">暂无发现设备</div>
+          <div className="py-8 text-center text-gray-500">暂无发现设备</div>
         )}
       </div>
     </div>

@@ -8,6 +8,9 @@ export interface Device {
 declare global {
     interface Window {
         electron: {
+            test: {
+                ping: () => string;
+            };
             network: {
                 getLocalService: () => Promise<Device>;
                 onDeviceFound: (callback: (device: Device) => void) => () => void;

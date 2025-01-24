@@ -1,6 +1,7 @@
 import http from 'http';
 import mdns from 'multicast-dns';
 import { AddressInfo } from 'net';
+import { ipcMain } from 'electron';
 
 export class NetworkService {
     private httpServer: http.Server;
@@ -11,6 +12,7 @@ export class NetworkService {
         this.httpServer = http.createServer(this.handleRequest);
         this.mdnsInstance = mdns();
         this.setupMDNS();
+        this.setupIpcHandlers();
     }
 
     private handleRequest = (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -34,6 +36,19 @@ export class NetworkService {
                     this.broadcastService();
                 }
             });
+        });
+    }
+
+    private setupIpcHandlers() {
+        console.log('Setting up IPC handlers');
+        ipcMain.handle('network:getLocalService', async () => {
+            console.log('Handling getLocalService request');
+            return {
+                id: 'local-device',
+                name: 'This Device',
+                ip: '127.0.0.1',
+                port: 3000
+            };
         });
     }
 
@@ -67,5 +82,7 @@ export class NetworkService {
     public stop() {
         this.httpServer.close();
         this.mdnsInstance.destroy();
+        // 移除 IPC 处理程序
+        ipcMain.removeHandler('network:getLocalService');
     }
 } 
