@@ -64,6 +64,7 @@
    ```
 
 项目目录结构
+
 LanFile_PC/
 ├── src/
 │ ├── main/ # Electron 主进程
