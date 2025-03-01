@@ -32,7 +32,7 @@
 
 1. 克隆项目
    ```
-   git clone https://github.com/yourusername/lanfile-pc.git
+   git clone https://github.com/yangyuan-zhen/LanFile.git
    ```
 2. 进入项目目录
    ```
