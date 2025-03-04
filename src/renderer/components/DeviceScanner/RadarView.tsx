@@ -135,27 +135,27 @@ const RadarView: React.FC<RadarViewProps> = ({
   ) => {
     const centerX = width / 2;
     const centerY = height / 2;
+    const radius = 45;
 
-    // 绘制中心设备背景
+    // 绘制外圈淡蓝色背景
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius + 5, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(59, 130, 246, 0.1)";
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, 40, 0, Math.PI * 2);
     ctx.fill();
 
-    // 绘制中心设备图标
-    ctx.fillStyle = "#3b82f6";
+    // 绘制中心蓝色圆点
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#3B82F6";
     ctx.fill();
 
-    // 确保使用传入的设备名称
-    const displayName = currentDevice.name || "未知设备";
-    console.log("Drawing device name:", displayName); // 添加调试日志
-
-    ctx.fillStyle = "#3b82f6";
-    ctx.font = "14px Arial";
+    // 绘制设备名称
+    const deviceName = currentDevice.name || "未知设备";
+    ctx.font = "12px Arial";
+    ctx.fillStyle = "#334155";
     ctx.textAlign = "center";
-    ctx.fillText(displayName, centerX, centerY + 25);
+    ctx.textBaseline = "middle";
+    ctx.fillText(deviceName, centerX, centerY);
   };
 
   // 绘制设备

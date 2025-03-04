@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Settings, HelpCircle, RotateCw } from "lucide-react";
 import Button from "../../common/Button";
-import icon from "@assets/images/icon.svg";
+import icon from "../../../../assets/images/icon.svg";
 
 interface HeaderProps {
   currentDevice: string;

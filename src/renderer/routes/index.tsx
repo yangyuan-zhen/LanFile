@@ -4,6 +4,7 @@ import { SendPage } from "../pages/Send/Send";
 import { ReceivePage } from "../pages/Receive/Receive";
 import { StatusPage } from "../pages/Status/Status";
 import { SettingsPage } from "../pages/Settings/Settings";
+import { createBrowserRouter } from "react-router-dom";
 
 export interface Route {
   key: string;
@@ -12,6 +13,7 @@ export interface Route {
   component: React.FC;
 }
 
+// 这个数组用于生成底部导航
 export const routes: Route[] = [
   {
     key: "home",
@@ -44,3 +46,27 @@ export const routes: Route[] = [
     component: SettingsPage,
   },
 ];
+
+// 创建路由配置
+export const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <HomePage />,
+  },
+  {
+    path: "/send",
+    element: <SendPage />,
+  },
+  {
+    path: "/receive",
+    element: <ReceivePage />,
+  },
+  {
+    path: "/status",
+    element: <StatusPage />,
+  },
+  {
+    path: "/settings",
+    element: <SettingsPage />,
+  },
+]);

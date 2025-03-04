@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Home, Upload, Download, Signal, Settings } from "lucide-react";
 
 interface NavItemProps {
@@ -34,6 +35,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   currentTab,
   onTabChange,
 }) => {
+  const navigate = useNavigate();
+
+  const handleTabChange = (tab: string, path: string) => {
+    onTabChange(tab);
+    navigate(path);
+  };
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
       <div className="flex items-center justify-between px-4 mx-auto max-w-7xl">
@@ -41,33 +49,35 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           icon={<Home size={24} strokeWidth={1.5} />}
           label="主页"
           isActive={currentTab === "home"}
-          onClick={() => onTabChange("home")}
+          onClick={() => handleTabChange("home", "/")}
         />
         <NavItem
           icon={<Upload size={24} strokeWidth={1.5} />}
           label="发送"
           isActive={currentTab === "send"}
-          onClick={() => onTabChange("send")}
+          onClick={() => handleTabChange("send", "/send")}
         />
         <NavItem
           icon={<Download size={24} strokeWidth={1.5} />}
           label="接收"
           isActive={currentTab === "receive"}
-          onClick={() => onTabChange("receive")}
+          onClick={() => handleTabChange("receive", "/receive")}
         />
         <NavItem
           icon={<Signal size={24} strokeWidth={1.5} />}
           label="状态"
           isActive={currentTab === "status"}
-          onClick={() => onTabChange("status")}
+          onClick={() => handleTabChange("status", "/status")}
         />
         <NavItem
           icon={<Settings size={24} strokeWidth={1.5} />}
           label="设置"
           isActive={currentTab === "settings"}
-          onClick={() => onTabChange("settings")}
+          onClick={() => handleTabChange("settings", "/settings")}
         />
       </div>
     </nav>
   );
 };
+
+export default BottomNav;

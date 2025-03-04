@@ -53,7 +53,8 @@
     "lucide-react": "^0.477.0",
     "node-wifi": "^2.0.16",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.2.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
@@ -87,6 +88,7 @@
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
+    "vite": "^6.2.0",
     "wait-on": "^7.2.0",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4",
