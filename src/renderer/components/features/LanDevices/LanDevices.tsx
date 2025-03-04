@@ -29,7 +29,7 @@ const LanDevices: React.FC<LanDevicesProps> = ({
           onClick={onRefresh}
           className="!p-2"
         >
-          <ArrowPathIcon className="h-5 w-5" />
+          <ArrowPathIcon className="w-5 h-5" />
         </Button>
       </div>
 
@@ -38,8 +38,7 @@ const LanDevices: React.FC<LanDevicesProps> = ({
           <div
             key={index}
             onClick={() => onDeviceSelect(device)}
-            className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-md 
-              hover:bg-gray-100 cursor-pointer transition-colors"
+            className="flex justify-between items-center px-4 py-3 bg-gray-50 rounded-md transition-colors cursor-pointer hover:bg-gray-100"
           >
             <span className="text-gray-900">{device.name}</span>
             <span

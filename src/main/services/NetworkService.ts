@@ -1,171 +1,104 @@
 import { EventEmitter } from 'events';
-import mdns from 'multicast-dns';
-import { networkInterfaces } from 'os';
-import { Device } from '../../renderer/types/electron';
+import dgram from 'dgram';
 
-const SERVICE_TYPE = '_lanfile._tcp.local';
-const DISCOVERY_INTERVAL = 5000; // 5 seconds
+export interface NetworkDevice {
+    name: string;
+    address: string;
+    port: number;
+}
 
 export class NetworkService extends EventEmitter {
-    private mdns: any;
-    private localDevice: Device;
-    private discoveryTimer: NodeJS.Timeout | null = null;
-    private isDiscovering = false;
+    private socket: dgram.Socket | null = null;
+    private isDiscovering: boolean = false;
 
     constructor() {
         super();
-        this.mdns = mdns();
-        this.localDevice = this.createLocalDevice();
-
-        // 监听 MDNS 响应
-        this.mdns.on('response', (response: any) => {
-            this.handleMdnsResponse(response);
-        });
+        this.setupSocket();
     }
 
-    private createLocalDevice(): Device {
-        const interfaces = networkInterfaces();
-        let ipAddress = '';
-
-        // 获取本机IP地址
-        Object.values(interfaces).forEach((iface) => {
-            if (!iface) return;
-            iface.forEach((addr) => {
-                if (addr.family === 'IPv4' && !addr.internal) {
-                    ipAddress = addr.address;
-                }
-            });
-        });
-
-        return {
-            id: `device_${Math.random().toString(36).substr(2, 9)}`,
-            name: require('os').hostname(),
-            ip: ipAddress,
-            port: 27725, // 使用固定端口
-        };
-    }
-
-    private handleMdnsResponse(response: any) {
-        if (!this.isDiscovering) return;
-
+    private setupSocket() {
         try {
-            const answers = response.answers || [];
-            const additionals = response.additionals || [];
-            const allRecords = [...answers, ...additionals];
-
-            const serviceRecord = allRecords.find(
-                (record: any) => record.name === SERVICE_TYPE
-            );
-
-            if (serviceRecord) {
-                const device: Device = {
-                    id: serviceRecord.data.id || `device_${Math.random().toString(36).substr(2, 9)}`,
-                    name: serviceRecord.data.name || 'Unknown Device',
-                    ip: serviceRecord.data.ip || '',
-                    port: serviceRecord.data.port || 27725,
-                };
-
-                this.emit('deviceFound', device);
-            }
+            this.socket = dgram.createSocket('udp4');
+            this.socket.on('message', this.handleMessage.bind(this));
+            this.socket.on('error', this.handleError.bind(this));
+            this.socket.bind(0);
         } catch (error) {
-            console.error('Error handling MDNS response:', error);
+            console.error('Failed to setup UDP socket:', error);
         }
     }
 
-    public getLocalService(): Device {
-        return this.localDevice;
-    }
-
-    public startDiscovery(): Promise<void> {
-        return new Promise((resolve) => {
-            if (this.isDiscovering) {
-                resolve();
-                return;
-            }
-
-            this.isDiscovering = true;
-
-            try {
-                // 广播本机服务
-                const serviceData = {
-                    answers: [{
-                        name: SERVICE_TYPE,
-                        type: 'PTR',
-                        ttl: 300,
-                        data: this.localDevice.name
-                    }, {
-                        name: this.localDevice.name,
-                        type: 'SRV',
-                        ttl: 300,
-                        data: {
-                            port: this.localDevice.port,
-                            target: this.localDevice.name
-                        }
-                    }, {
-                        name: this.localDevice.name,
-                        type: 'TXT',
-                        ttl: 300,
-                        data: Buffer.from(JSON.stringify({
-                            id: this.localDevice.id,
-                            name: this.localDevice.name,
-                            ip: this.localDevice.ip
-                        }))
-                    }]
-                };
-
-                // 发送查询
-                this.mdns.query({
-                    questions: [{
-                        name: SERVICE_TYPE,
-                        type: 'PTR'
-                    }]
+    private handleMessage(msg: Buffer, rinfo: dgram.RemoteInfo) {
+        try {
+            const data = JSON.parse(msg.toString());
+            if (data.type === 'lanfile-announce') {
+                this.emit('deviceFound', {
+                    name: data.name,
+                    address: rinfo.address,
+                    port: data.port
                 });
-
-                // 发布本机服务
-                this.mdns.respond(serviceData);
-
-                // 定期发送查询
-                this.discoveryTimer = setInterval(() => {
-                    this.mdns.query({
-                        questions: [{
-                            name: SERVICE_TYPE,
-                            type: 'PTR'
-                        }]
-                    });
-                }, DISCOVERY_INTERVAL);
-
-                resolve();
-            } catch (error) {
-                console.error('Error starting discovery:', error);
-                this.isDiscovering = false;
-                resolve(); // 即使出错也resolve，避免卡住UI
             }
-        });
+        } catch (error) {
+            console.error('Error parsing message:', error);
+        }
     }
 
-    public stopDiscovery(): Promise<void> {
-        return new Promise((resolve) => {
-            try {
-                this.isDiscovering = false;
-                if (this.discoveryTimer) {
-                    clearInterval(this.discoveryTimer);
-                    this.discoveryTimer = null;
-                }
-            } catch (error) {
-                console.error('Error stopping discovery:', error);
-            }
-            resolve();
-        });
+    private handleError(error: Error) {
+        console.error('UDP error:', error);
+        this.emit('error', error);
+    }
+
+    public getLocalService() {
+        return {
+            name: 'LanFile Device',
+            port: 12345
+        };
+    }
+
+    public startDiscovery() {
+        if (this.isDiscovering) return;
+        this.isDiscovering = true;
+
+        try {
+            const message = Buffer.from(JSON.stringify({
+                type: 'lanfile-discover'
+            }));
+
+            this.socket?.setBroadcast(true);
+            this.socket?.send(message, 0, message.length, 12345, '255.255.255.255');
+        } catch (error) {
+            console.error('Failed to start discovery:', error);
+        }
+    }
+
+    public stopDiscovery() {
+        this.isDiscovering = false;
     }
 
     public stop() {
+        if (this.socket) {
+            this.socket.close();
+            this.socket = null;
+        }
+    }
+
+    public publishService(port: number): void {
         try {
-            this.stopDiscovery();
-            if (this.mdns) {
-                this.mdns.destroy();
-            }
+            const message = Buffer.from(JSON.stringify({
+                type: 'lanfile-announce',
+                name: 'LanFile Device',
+                port: port
+            }));
+            this.socket?.setBroadcast(true);
+            this.socket?.send(message, 0, message.length, 12345, '255.255.255.255');
         } catch (error) {
-            console.error('Error stopping network service:', error);
+            console.error('Failed to publish service:', error);
+        }
+    }
+
+    public unpublishService(): void {
+        if (this.socket) {
+            this.socket.close();
+            this.socket = null;
         }
     }
 } 

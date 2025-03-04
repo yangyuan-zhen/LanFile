@@ -26,6 +26,29 @@ try {
                     ipcRenderer.removeListener('network:deviceLeft', subscription);
                 };
             }
+        },
+        invoke: (channel: string, ...args: any[]) => {
+            const validChannels = [
+                'network:getLocalService',
+                'network:startDiscovery',
+                'network:stopDiscovery',
+                'zeroconf:startScan',
+                'zeroconf:stopScan',
+                'zeroconf:publishService',
+                'zeroconf:unpublishService',
+                'system:getDeviceName',
+                'system:getNetworkInfo',
+            ];
+            if (validChannels.includes(channel)) {
+                return ipcRenderer.invoke(channel, ...args);
+            }
+            throw new Error(`Unauthorized IPC channel: ${channel}`);
+        },
+        on: (channel: string, callback: (...args: any[]) => void) => {
+            ipcRenderer.on(channel, (_, ...args) => callback(...args));
+        },
+        off: (channel: string, callback: (...args: any[]) => void) => {
+            ipcRenderer.off(channel, callback);
         }
     });
     console.log('APIs exposed successfully');

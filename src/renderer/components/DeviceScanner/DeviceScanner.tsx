@@ -23,7 +23,7 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
     width: number,
     height: number
   ) => {
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, width, height);
 
     const centerX = width / 2;
@@ -31,11 +31,11 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
     const maxRadius = Math.min(width, height) / 2 - 20;
 
     // 绘制同心圆
-    ctx.strokeStyle = "rgba(0, 255, 0, 0.3)";
+    ctx.strokeStyle = "rgba(59, 130, 246, 0.3)";
     ctx.lineWidth = 1;
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 3; i++) {
       ctx.beginPath();
-      ctx.arc(centerX, centerY, (maxRadius / 5) * i, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, (maxRadius / 3) * i, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -75,9 +75,9 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
 
     // 创建渐变效果
     const gradient = ctx.createLinearGradient(0, 0, radius, 0);
-    gradient.addColorStop(0, "rgba(0, 255, 0, 0.8)");
-    gradient.addColorStop(0.5, "rgba(0, 255, 0, 0.3)");
-    gradient.addColorStop(1, "rgba(0, 255, 0, 0)");
+    gradient.addColorStop(0, "rgba(59, 130, 246, 0.8)");
+    gradient.addColorStop(0.5, "rgba(59, 130, 246, 0.3)");
+    gradient.addColorStop(1, "rgba(59, 130, 246, 0)");
 
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -88,7 +88,7 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
     ctx.fill();
 
     // 添加扫描线的边缘线
-    ctx.strokeStyle = "rgba(0, 255, 0, 0.8)";
+    ctx.strokeStyle = "rgba(59, 130, 246, 0.8)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -110,31 +110,25 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
     const maxRadius = Math.min(width, height) / 2 - 20;
 
     foundDevices.forEach((device) => {
-      // 固定设备位置在中心偏右位置
-      const distance = maxRadius * 0.4; // 40% 半径位置
-      const x = centerX + distance;
-      const y = centerY;
+      // 根据设备索引计算位置
+      const angle = (2 * Math.PI * foundDevices.indexOf(device)) / foundDevices.length;
+      const distance = maxRadius * 0.6; // 60% 半径位置
+      const x = centerX + distance * Math.cos(angle);
+      const y = centerY + distance * Math.sin(angle);
 
-      // 计算设备是否在扫描线后面
-      const deviceAngle = 0; // 设备固定在0度位置（右侧）
-      const normalizedCurrentAngle = currentAngle % (Math.PI * 2);
-      const isAfterScanLine = deviceAngle <= normalizedCurrentAngle;
-
-      // 根据是否被扫描到决定显示样式
-      if (isAfterScanLine) {
+      // 始终显示设备
+      {
         // 绘制设备图标（点）
-        ctx.fillStyle = "#0f0";
+        ctx.fillStyle = "#3b82f6";
         ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
         ctx.fill();
 
-        // 绘制设备名称和距离
-        ctx.fillStyle = "rgba(0, 255, 0, 0.8)";
-        ctx.font = "11px Arial";
+        // 绘制设备名称
+        ctx.fillStyle = "#1f2937";
+        ctx.font = "12px Arial";
         ctx.textAlign = "center";
-        ctx.fillText(device.name || "Unknown Device", x, y - 8);
-        ctx.font = "10px Arial";
-        ctx.fillText("6m", x, y + 12);
+        ctx.fillText(device.name || "Unknown Device", x, y - 10);
       }
     });
   };
@@ -225,15 +219,15 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center p-4 bg-black rounded-lg">
-      <h3 className="mb-4 text-lg text-green-500">设备扫描器</h3>
+    <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm">
+      <h3 className="mb-4 text-lg text-gray-900">设备扫描器</h3>
       <canvas ref={canvasRef} width={400} height={400} className="mb-6" />
       <div className="flex gap-4">
         <button
           className={`px-6 py-2 rounded-md ${
             isScanning
-              ? "bg-green-600 hover:bg-green-700"
-              : "bg-green-500 hover:bg-green-600"
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-blue-500 hover:bg-blue-600"
           } text-white transition-colors`}
           onClick={handleStartScanning}
           disabled={isScanning}
@@ -252,8 +246,21 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
           停止扫描
         </button>
       </div>
-      <p className="mt-4 text-sm text-green-500">
-        请确保您与要查找的设备连接到同一个Wi-Fi网络。
+      <div className="mt-4 flex gap-4">
+        <button
+          className="px-4 py-2 bg-blue-500 text-white rounded-md"
+          disabled
+        >
+          雷达
+        </button>
+        <button
+          className="px-4 py-2 bg-gray-300 text-gray-600 rounded-md"
+        >
+          列表
+        </button>
+      </div>
+      <p className="mt-4 text-sm text-gray-500">
+        发现 {foundDevices.length} 个设备
       </p>
     </div>
   );

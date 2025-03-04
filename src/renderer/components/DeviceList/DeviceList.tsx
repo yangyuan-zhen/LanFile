@@ -1,83 +1,54 @@
 import React, { useEffect, useState } from "react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
-import { Device } from "../../types/electron";
-import { DeviceScanner } from "../DeviceScanner/DeviceScanner";
+import { Device } from "../../services/ZeroconfService";
+import { zeroconfService } from "../../services/ZeroconfService";
 
 interface DeviceWithStatus extends Device {
   status: "online" | "offline";
 }
 
 export const DeviceList: React.FC = () => {
-  const [devices, setDevices] = useState<DeviceWithStatus[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log("DeviceList mounted");
-    console.log("Window electron object:", window.electron);
+    // 设置事件监听器
+    zeroconfService.on("deviceFound", handleDeviceFound);
+    zeroconfService.on("error", handleError);
 
-    if (window.electron?.test?.ping) {
-      console.log("Test ping result:", window.electron.test.ping());
-    } else {
-      console.error("Test API not available");
-    }
-
-    // 设置设备发现监听器
-    const unsubscribe = window.electron?.network?.onDeviceFound((device) => {
-      handleDeviceFound(device);
-    });
-
+    // 清理函数
     return () => {
-      unsubscribe?.();
+      zeroconfService.removeListener("deviceFound", handleDeviceFound);
+      zeroconfService.removeListener("error", handleError);
+      zeroconfService.stopScan();
     };
   }, []);
 
-  const handleRefresh = async () => {
-    console.log("Refresh clicked");
-    try {
-      if (!window.electron?.network) {
-        throw new Error("Network API not available");
-      }
-
-      setIsRefreshing(true);
-      const localService = await window.electron.network.getLocalService();
-      console.log("Local service:", localService);
-
-      setDevices([
-        {
-          id: localService.id,
-          name: localService.name,
-          ip: localService.ip,
-          port: localService.port,
-          status: "online",
-        },
-      ]);
-    } catch (error: unknown) {
-      console.error("Refresh error:", error);
-      setError(
-        error instanceof Error ? error.message : "Unknown error occurred"
-      );
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
   const handleDeviceFound = (device: Device) => {
-    console.log("Device found:", device);
     setDevices((prev) => {
-      const exists = prev.some((d) => d.id === device.id);
-      if (exists) {
-        return prev.map((d) =>
-          d.id === device.id ? { ...d, status: "online" } : d
-        );
-      }
-      return [...prev, { ...device, status: "online" }];
+      // 检查设备是否已存在
+      const exists = prev.some((d) => d.host === device.host);
+      if (exists) return prev;
+      return [...prev, device];
     });
   };
 
-  const handleScanningChange = (scanning: boolean) => {
-    setIsScanning(scanning);
+  const handleError = (error: Error) => {
+    setError(error.message);
+    setIsScanning(false);
+  };
+
+  const handleStartScan = () => {
+    setDevices([]);
+    setError(null);
+    setIsScanning(true);
+    zeroconfService.startScan();
+  };
+
+  const handleStopScan = () => {
+    setIsScanning(false);
+    zeroconfService.stopScan();
   };
 
   const getStatusColor = (status: "online" | "offline") => {
@@ -98,49 +69,42 @@ export const DeviceList: React.FC = () => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-medium text-gray-900">局域网设备</h2>
           <button
-            onClick={handleRefresh}
-            className="p-2 rounded-full transition-colors hover:bg-gray-100"
-            disabled={isRefreshing}
+            onClick={isScanning ? handleStopScan : handleStartScan}
+            className={`px-4 py-2 rounded ${
+              isScanning
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-blue-500 hover:bg-blue-600"
+            } text-white`}
           >
-            <ArrowPathIcon
-              className={`w-5 h-5 text-gray-500 ${
-                isRefreshing ? "animate-spin" : ""
-              }`}
-            />
+            {isScanning ? "停止扫描" : "开始扫描"}
           </button>
         </div>
 
         <div className="space-y-2">
-          {devices.map((device) => (
+          {devices.map((device, index) => (
             <div
-              key={device.id}
-              className="flex justify-between items-center p-3 rounded-lg transition-colors hover:bg-gray-50"
+              key={index}
+              className="p-3 bg-gray-50 rounded transition-colors hover:bg-gray-100"
             >
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`w-2 h-2 rounded-full ${getStatusColor(
-                    device.status
-                  )}`}
-                />
-                <span className="text-gray-900">{device.name}</span>
+              <div className="font-medium">{device.name}</div>
+              <div className="text-sm text-gray-500">
+                {device.addresses.join(", ")}
               </div>
-              <span className={`text-sm ${getStatusColor(device.status)}`}>
-                {device.status === "online" ? "在线" : "离线"}
-              </span>
+              <div className="text-sm text-gray-500">端口: {device.port}</div>
             </div>
           ))}
 
-          {devices.length === 0 && (
-            <div className="py-8 text-center text-gray-500">暂无发现设备</div>
+          {isScanning && devices.length === 0 && (
+            <div className="py-4 text-center text-gray-500">
+              正在扫描设备...
+            </div>
+          )}
+
+          {!isScanning && devices.length === 0 && (
+            <div className="py-4 text-center text-gray-500">未发现设备</div>
           )}
         </div>
       </div>
-
-      <DeviceScanner
-        isScanning={isScanning}
-        onDeviceFound={handleDeviceFound}
-        onScanningChange={handleScanningChange}
-      />
     </div>
   );
 };

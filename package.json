@@ -10,10 +10,11 @@
     "dev:renderer": "webpack serve --config webpack.config.js --mode development",
     "dev:main": "tsc -p tsconfig.node.json -w",
     "dev:preload": "webpack --config webpack.config.js --config-name preload --mode development --watch",
-    "build": "cross-env NODE_ENV=production npm run build:renderer && npm run build:main && npm run build:preload",
+    "clean": "node -e \"if (require('fs').existsSync('dist')) require('fs').rmSync('dist', { recursive: true })\"",
+    "build": "npm run clean && cross-env NODE_ENV=production npm run build:main && npm run build:preload && npm run build:renderer",
     "build:renderer": "webpack --config webpack.config.js --mode production",
     "build:main": "tsc -p tsconfig.node.json",
-    "build:preload": "webpack --config webpack.config.js --mode production",
+    "build:preload": "webpack --config webpack.config.js --config-name preload --mode production",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -24,11 +25,13 @@
     "appId": "com.lanfile.app",
     "productName": "LanFile",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "resources"
     },
     "files": [
       "dist/**/*",
-      "package.json"
+      "package.json",
+      "resources/**/*"
     ],
     "win": {
       "target": [
@@ -46,7 +49,8 @@
   "dependencies": {
     "@heroicons/react": "^2.0.18",
     "electron": "^28.0.0",
-    "multicast-dns": "^7.2.5",
+    "framer-motion": "^12.4.10",
+    "node-wifi": "^2.0.16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -54,20 +58,28 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/jest": "^29.5.14",
-    "@types/multicast-dns": "^7.2.4",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.20",
+    "buffer": "^6.0.3",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
     "css-loader": "^6.8.1",
+    "dgram-browserify": "^0.0.13",
     "electron-builder": "^25.1.8",
+    "global": "^4.4.0",
     "html-webpack-plugin": "^5.5.4",
+    "https-browserify": "^1.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "mini-css-extract-plugin": "^2.7.6",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
     "postcss": "^8.5.1",
     "postcss-loader": "^8.1.1",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
+    "stream-http": "^3.2.0",
     "tailwindcss": "^3.4.17",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.1",
@@ -76,6 +88,7 @@
     "wait-on": "^7.2.0",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^4.15.1"
+    "webpack-dev-server": "^4.15.1",
+    "ws": "^8.18.1"
   }
 }

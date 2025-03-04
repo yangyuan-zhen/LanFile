@@ -15,11 +15,14 @@ export interface NetworkAPI {
 
 declare global {
     interface Window {
-        electron?: {
+        electron: {
             network: NetworkAPI;
             test: {
                 ping: () => string;
             };
+            invoke: (channel: string, ...args: any[]) => Promise<any>;
+            on: (channel: string, callback: (...args: any[]) => void) => void;
+            off: (channel: string, callback: (...args: any[]) => void) => void;
         };
     }
 } 

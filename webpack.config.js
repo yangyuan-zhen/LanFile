@@ -1,6 +1,7 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const webpack = require("webpack");
 
 const rendererConfig = {
     mode: process.env.NODE_ENV === "development" ? "development" : "production",
@@ -8,12 +9,32 @@ const rendererConfig = {
     target: "web",
     output: {
         path: path.resolve(__dirname, "dist/renderer"),
-        filename: "renderer.js",
+        filename: "[name].js",
         publicPath: "/",
         assetModuleFilename: 'assets/[name][ext]'
     },
     resolve: {
         extensions: [".ts", ".tsx", ".js", ".jsx"],
+        fallback: {
+            "dgram": false,
+            "os": require.resolve("os-browserify/browser"),
+            "path": require.resolve("path-browserify"),
+            "stream": require.resolve("stream-browserify"),
+            "buffer": require.resolve("buffer/"),
+            "crypto": require.resolve("crypto-browserify"),
+            "util": require.resolve("util/"),
+            "assert": require.resolve("assert/"),
+            "url": require.resolve("url/"),
+            "events": require.resolve("events/"),
+            "http": require.resolve("stream-http"),
+            "https": require.resolve("https-browserify"),
+            "net": false,
+            "tls": false,
+            "fs": false,
+            "child_process": false,
+            "ws": false,
+            "socket.io-client": false
+        }
     },
     module: {
         rules: [
@@ -58,10 +79,16 @@ const rendererConfig = {
     plugins: [
         new HtmlWebpackPlugin({
             template: path.resolve(__dirname, "src/renderer/index.html"),
+            filename: 'index.html'
         }),
         new MiniCssExtractPlugin({
             filename: "styles.css",
         }),
+        new webpack.ProvidePlugin({
+            Buffer: ['buffer', 'Buffer'],
+            process: 'process/browser',
+            global: ['global']
+        })
     ],
     devServer: {
         static: {
@@ -70,6 +97,9 @@ const rendererConfig = {
         port: 3001,
         hot: true,
         historyApiFallback: true,
+        devMiddleware: {
+            publicPath: '/'
+        }
     },
 };
 
