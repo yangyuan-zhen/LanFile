@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  HomeIcon,
-  ArrowUpTrayIcon,
-  ArrowDownTrayIcon,
-  SignalIcon,
-  Cog6ToothIcon,
-} from "@heroicons/react/24/outline";
+import { Home, Upload, Download, Signal, Settings } from "lucide-react";
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -41,34 +35,34 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onTabChange,
 }) => {
   return (
-    <nav className="fixed right-0 bottom-0 left-0 bg-white border-t border-gray-200">
-      <div className="flex justify-between items-center px-4 mx-auto max-w-7xl">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
+      <div className="flex items-center justify-between px-4 mx-auto max-w-7xl">
         <NavItem
-          icon={<HomeIcon />}
+          icon={<Home size={24} strokeWidth={1.5} />}
           label="主页"
           isActive={currentTab === "home"}
           onClick={() => onTabChange("home")}
         />
         <NavItem
-          icon={<ArrowUpTrayIcon />}
+          icon={<Upload size={24} strokeWidth={1.5} />}
           label="发送"
           isActive={currentTab === "send"}
           onClick={() => onTabChange("send")}
         />
         <NavItem
-          icon={<ArrowDownTrayIcon />}
+          icon={<Download size={24} strokeWidth={1.5} />}
           label="接收"
           isActive={currentTab === "receive"}
           onClick={() => onTabChange("receive")}
         />
         <NavItem
-          icon={<SignalIcon />}
+          icon={<Signal size={24} strokeWidth={1.5} />}
           label="状态"
           isActive={currentTab === "status"}
           onClick={() => onTabChange("status")}
         />
         <NavItem
-          icon={<Cog6ToothIcon />}
+          icon={<Settings size={24} strokeWidth={1.5} />}
           label="设置"
           isActive={currentTab === "settings"}
           onClick={() => onTabChange("settings")}

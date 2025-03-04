@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Device } from "../../types/electron";
 import { useNetworkInfo } from "../../hooks/useNetworkInfo";
+import { Smartphone, Laptop, Tablet, Monitor } from "lucide-react";
 
 interface RadarViewProps {
   devices: Device[];
@@ -11,11 +12,90 @@ interface RadarViewProps {
   onViewChange?: (view: "radar" | "list") => void;
 }
 
+const DeviceList: React.FC<{
+  devices: Device[];
+  currentDevice: { name: string };
+  networkInfo: { type: string; ssid?: string; ip?: string };
+}> = ({ devices, currentDevice, networkInfo }) => {
+  // 示例设备数据
+  const mockDevices = [
+    { name: "iPhone 13", type: "mobile", icon: Smartphone, online: true },
+    { name: "MacBook Pro", type: "laptop", icon: Laptop, online: true },
+    { name: "iPad Air", type: "tablet", icon: Tablet, online: false },
+    { name: "Windows PC", type: "desktop", icon: Monitor, online: true },
+  ];
+
+  return (
+    <div className="px-4 mx-auto w-full max-w-3xl">
+      {/* 本机设备信息 */}
+      <div className="mb-8">
+        <h2 className="mb-3 text-xl font-medium text-gray-900">当前设备</h2>
+        <div className="flex items-center p-5 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex flex-1 items-center">
+            <Monitor className="mr-4 w-7 h-7 text-blue-500" />
+            <div className="flex-1">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900">
+                  {currentDevice.name}
+                </h3>
+                <span className="px-2 py-1 text-xs font-medium text-green-700 bg-green-50 rounded-full">
+                  在线
+                </span>
+              </div>
+              <p className="text-sm text-gray-500">
+                {networkInfo.ip || "未连接到网络"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 可用设备列表 */}
+      <h2 className="mb-6 text-xl font-medium text-gray-900">可用设备</h2>
+      <div className="space-y-3">
+        {mockDevices.map((device) => {
+          const Icon = device.icon;
+          return (
+            <div
+              key={device.name}
+              className="flex items-center p-5 bg-white rounded-lg border border-gray-200 transition-colors cursor-pointer hover:border-blue-500"
+            >
+              <div className="flex flex-1 items-center">
+                <Icon className="mr-4 w-7 h-7 text-gray-500" />
+                <div className="flex-1">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      {device.name}
+                    </h3>
+                    <span
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        device.online
+                          ? "text-green-700 bg-green-50"
+                          : "text-gray-600 bg-gray-100"
+                      }`}
+                    >
+                      {device.online ? "在线" : "离线"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 capitalize">
+                    {device.type}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const RadarView: React.FC<RadarViewProps> = ({
   devices,
   currentDevice,
   onViewChange,
 }) => {
+  const [viewMode, setViewMode] = useState<"radar" | "list">("radar");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameIdRef = useRef<number>();
   const startTimeRef = useRef<number | null>(null);
@@ -148,8 +228,8 @@ const RadarView: React.FC<RadarViewProps> = ({
     ctx.stroke();
   };
 
-  // 动画循环
-  useEffect(() => {
+  // 初始化雷达动画
+  const initRadar = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -175,49 +255,77 @@ const RadarView: React.FC<RadarViewProps> = ({
 
     startTimeRef.current = null;
     animationFrameIdRef.current = requestAnimationFrame(drawRadar);
+  };
 
+  // 监听视图模式变化
+  useEffect(() => {
+    if (viewMode === "radar") {
+      initRadar();
+    }
     return () => {
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
       startTimeRef.current = null;
     };
-  }, [devices, currentDevice]);
+  }, [viewMode, devices, currentDevice]);
 
   const handleViewChange = (view: "radar" | "list") => {
     onViewChange?.(view);
   };
 
   return (
-    <div className="flex flex-col items-center">
-      <canvas ref={canvasRef} width={400} height={400} className="mb-4" />
-
-      <div className="flex gap-4 mb-2">
+    <div className="flex flex-col items-center px-4 mx-auto w-full max-w-5xl">
+      <div className="flex gap-4 mt-4 mb-8">
         <button
-          className="px-4 py-2 text-white bg-blue-500 rounded-md"
-          onClick={() => handleViewChange("radar")}
-          disabled
+          className={`px-6 py-2.5 rounded-md transition-colors text-base ${
+            viewMode === "radar"
+              ? "text-white bg-blue-500"
+              : "text-gray-600 bg-gray-200 hover:bg-gray-300"
+          }`}
+          onClick={() => setViewMode("radar")}
         >
           雷达
         </button>
         <button
-          className="px-4 py-2 text-gray-600 bg-gray-300 rounded-md hover:bg-gray-400"
-          onClick={() => handleViewChange("list")}
+          className={`px-6 py-2.5 rounded-md transition-colors text-base ${
+            viewMode === "list"
+              ? "text-white bg-blue-500"
+              : "text-gray-600 bg-gray-200 hover:bg-gray-300"
+          }`}
+          onClick={() => setViewMode("list")}
         >
           列表
         </button>
       </div>
 
-      <div className="text-center text-gray-500">
-        {networkInfo.type === "wifi" && (
-          <p>已连接到 Wi-Fi: {networkInfo.ssid || "未知网络"}</p>
-        )}
-        {networkInfo.type === "ethernet" && (
-          <p>已连接到有线网络: {networkInfo.ip}</p>
-        )}
-        {networkInfo.type === "none" && <p>未连接到网络</p>}
-        <p>发现 {devices.length || 4} 个设备</p>
-      </div>
+      {viewMode === "radar" ? (
+        <>
+          <canvas ref={canvasRef} width={600} height={600} className="mb-6" />
+          <div className="space-y-2 text-center text-gray-500">
+            {networkInfo.type === "wifi" && (
+              <div className="space-y-1">
+                <p>已连接到 Wi-Fi: {networkInfo.ssid || "未知网络"}</p>
+                <p className="text-sm">IP: {networkInfo.ip}</p>
+              </div>
+            )}
+            {networkInfo.type === "ethernet" && (
+              <div className="space-y-1">
+                <p>已连接到有线网络</p>
+                <p className="text-sm">IP: {networkInfo.ip}</p>
+              </div>
+            )}
+            {networkInfo.type === "none" && <p>未连接到网络</p>}
+            <p className="mt-2">发现 {devices.length || 4} 个设备</p>
+          </div>
+        </>
+      ) : (
+        <DeviceList
+          devices={devices}
+          currentDevice={currentDevice}
+          networkInfo={networkInfo}
+        />
+      )}
     </div>
   );
 };

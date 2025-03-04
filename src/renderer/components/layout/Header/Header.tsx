@@ -1,8 +1,5 @@
-import React from "react";
-import {
-  Cog6ToothIcon,
-  QuestionMarkCircleIcon,
-} from "@heroicons/react/24/outline";
+import React, { useState } from "react";
+import { Settings, HelpCircle, RotateCw } from "lucide-react";
 import Button from "../../common/Button";
 import icon from "@assets/images/icon.svg";
 
@@ -17,6 +14,16 @@ const Header: React.FC<HeaderProps> = ({
   onSettingsClick,
   onHelpClick,
 }) => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    if (isRefreshing) {
+      setIsRefreshing(false);
+      return;
+    }
+    setIsRefreshing(true);
+  };
+
   return (
     <header className="bg-white shadow">
       <div className="flex justify-between items-center px-4 py-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
@@ -26,16 +33,30 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-600">
-            当前设备: {currentDevice}
-          </span>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-600">当前设备:</span>
+            <span className="text-sm font-medium text-gray-900">
+              {currentDevice}
+            </span>
+            <button
+              onClick={handleRefresh}
+              className="p-1 transition-colors hover:text-blue-500 focus:outline-none"
+            >
+              <RotateCw
+                size={20}
+                className={`${
+                  isRefreshing ? "text-blue-500 animate-spin" : "text-gray-900"
+                }`}
+              />
+            </button>
+          </div>
           <Button
             variant="outline"
             size="sm"
             onClick={onSettingsClick}
             className="!p-2"
           >
-            <Cog6ToothIcon className="w-5 h-5" />
+            <Settings size={20} />
           </Button>
           <Button
             variant="outline"
@@ -43,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({
             onClick={onHelpClick}
             className="!p-2"
           >
-            <QuestionMarkCircleIcon className="w-5 h-5" />
+            <HelpCircle size={20} />
           </Button>
         </div>
       </div>
