@@ -5,6 +5,7 @@ import { zeroconfService } from './services/ZeroconfService';
 import os from "os";
 import { networkInterfaces } from 'os';
 import wifi from 'node-wifi';
+import store from './store/index';
 
 let mainWindow: BrowserWindow | null = null;
 let networkService: NetworkService | null = null;
@@ -137,6 +138,30 @@ function setupIpcHandlers() {
         } catch (error) {
             console.error('Error getting network info:', error);
             return { type: 'none' };
+        }
+    });
+
+    // 设置设备名称
+    ipcMain.handle('system:setDeviceName', async (_event, newName: string) => {
+        try {
+            // 保存新的设备名称
+            store.set('deviceName', newName);
+            return true;
+        } catch (error) {
+            console.error('Failed to set device name:', error);
+            throw error;
+        }
+    });
+
+    // 更新设备名称
+    ipcMain.handle('system:updateDeviceName', async (_event, { oldName, newName }) => {
+        try {
+            // 通知所有窗口设备名称已更新
+            mainWindow?.webContents.send('device:nameUpdated', { oldName, newName });
+            return true;
+        } catch (error) {
+            console.error('Failed to update device name:', error);
+            throw error;
         }
     });
 }

@@ -54,7 +54,7 @@ export class NetworkService extends EventEmitter {
         };
     }
 
-    public startDiscovery() {
+    public startDiscovery(): void {
         if (this.isDiscovering) return;
         this.isDiscovering = true;
 
@@ -70,7 +70,8 @@ export class NetworkService extends EventEmitter {
         }
     }
 
-    public stopDiscovery() {
+    public stopDiscovery(): void {
+        if (!this.isDiscovering) return;
         this.isDiscovering = false;
     }
 

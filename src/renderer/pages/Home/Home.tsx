@@ -1,28 +1,24 @@
-import React, { useState } from "react";
-import RadarView from "../../components/DeviceScanner/RadarView";
-import { useDeviceInfo } from "../../hooks/useDeviceInfo";
-import { Device } from "../../types/electron";
+import React from "react";
+import NetworkService from "../../components/features/NetworkService/NetworkService";
 
-export const HomePage: React.FC = () => {
-  const [viewMode, setViewMode] = useState<"radar" | "list">("radar");
-  const { currentDevice } = useDeviceInfo();
-  const [devices, setDevices] = useState<Device[]>([]);
-
-  const handleViewChange = (view: "radar" | "list") => {
-    setViewMode(view);
+const Home: React.FC = () => {
+  const networkInfo = {
+    currentDevice: "当前在线设备",
+    networkStatus: "稳定",
+    networkSpeed: "100 Mbps",
+    lastUpdate: "2 分钟前",
+    connectedDevices: "3/4",
   };
 
   return (
-    <div className="p-4">
-      {viewMode === "radar" ? (
-        <RadarView
-          devices={devices}
-          currentDevice={currentDevice}
-          onViewChange={handleViewChange}
-        />
-      ) : (
-        <div>列表视图开发中...</div>
-      )}
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-gray-900">仪表盘</h1>
+      </div>
+
+      <NetworkService networkInfo={networkInfo} />
     </div>
   );
 };
+
+export default Home;
