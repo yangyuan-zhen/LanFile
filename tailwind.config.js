@@ -7,11 +7,15 @@ module.exports = {
         extend: {
             colors: {
                 primary: {
-                    50: '#f0f9ff',
-                    100: '#e0f2fe',
-                    500: '#0ea5e9',  // 主要蓝色
-                    600: '#0284c7',
+                    light: '#818CF8',
+                    DEFAULT: '#4F46E5',
+                    dark: '#3730A3',
                 },
+                secondary: {
+                    light: '#E9D5FF',
+                    DEFAULT: '#A855F7',
+                    dark: '#7E22CE',
+                }
             },
         },
     },

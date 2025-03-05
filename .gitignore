@@ -54,3 +54,7 @@ dist_electron/
 
 # System Files
 Thumbs.db
+
+# 项目特定文件
+demo.html
+prompt.md

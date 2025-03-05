@@ -118,7 +118,7 @@ export const SendPage: React.FC = () => {
       </div>
 
       {/* Add Files Button */}
-      <div className="p-4 bg-white border-t border-gray-200">
+      <div className="p-4 bg-white">
         <button className="flex justify-center items-center p-3 w-full text-blue-500 rounded-lg border-2 border-blue-500 border-dashed transition-colors hover:bg-blue-50">
           <Plus className="mr-2 w-6 h-6" />
           <span className="font-medium">Add Files</span>
