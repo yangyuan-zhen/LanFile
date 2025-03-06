@@ -275,57 +275,20 @@ const RadarView: React.FC<RadarViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center px-4 mx-auto w-full max-w-5xl">
-      <div className="flex gap-4 mt-4 mb-8">
-        <button
-          className={`px-6 py-2.5 rounded-md transition-colors text-base ${
-            viewMode === "radar"
-              ? "text-white bg-blue-500"
-              : "text-gray-600 bg-gray-200 hover:bg-gray-300"
-          }`}
-          onClick={() => setViewMode("radar")}
-        >
-          雷达
-        </button>
-        <button
-          className={`px-6 py-2.5 rounded-md transition-colors text-base ${
-            viewMode === "list"
-              ? "text-white bg-blue-500"
-              : "text-gray-600 bg-gray-200 hover:bg-gray-300"
-          }`}
-          onClick={() => setViewMode("list")}
-        >
-          列表
-        </button>
-      </div>
+    <div className="flex flex-col items-center">
+      <canvas ref={canvasRef} width={400} height={340} />
 
-      {viewMode === "radar" ? (
-        <>
-          <canvas ref={canvasRef} width={600} height={600} className="mb-6" />
-          <div className="space-y-2 text-center text-gray-500">
-            {networkInfo.type === "wifi" && (
-              <div className="space-y-1">
-                <p>已连接到 Wi-Fi: {networkInfo.ssid || "未知网络"}</p>
-                <p className="text-sm">IP: {networkInfo.ip}</p>
-              </div>
-            )}
-            {networkInfo.type === "ethernet" && (
-              <div className="space-y-1">
-                <p>已连接到有线网络</p>
-                <p className="text-sm">IP: {networkInfo.ip}</p>
-              </div>
-            )}
-            {networkInfo.type === "none" && <p>未连接到网络</p>}
-            <p className="mt-2">发现 {devices.length || 4} 个设备</p>
-          </div>
-        </>
-      ) : (
-        <DeviceList
-          devices={devices}
-          currentDevice={currentDevice}
-          networkInfo={networkInfo}
-        />
-      )}
+      {/* 只保留 Wi-Fi 信息 */}
+      <div className="mt-2 text-center">
+        <div className="text-sm text-gray-600">
+          已连接到 Wi-Fi:{" "}
+          {networkInfo.type === "wifi"
+            ? networkInfo.ssid || "未知网络"
+            : networkInfo.type === "ethernet"
+            ? "有线网络"
+            : "未连接到网络"}
+        </div>
+      </div>
     </div>
   );
 };
