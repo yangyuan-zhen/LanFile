@@ -5,7 +5,7 @@ import { useNetworkDevices } from "../../../hooks/useNetworkDevices";
 
 const DeviceList: React.FC = () => {
   const [expanded, setExpanded] = useState(true);
-  const devices = useNetworkDevices();
+  const { devices, setDevices } = useNetworkDevices();
   const [editingDevice, setEditingDevice] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
@@ -20,12 +20,18 @@ const DeviceList: React.FC = () => {
   const handleNameChange = async (device: any) => {
     if (editName.trim() && editName !== device.name) {
       try {
-        await window.electron.invoke("system:setDeviceName", editName);
-        // 更新本地设备列表中的名称
-        window.electron.invoke("system:updateDeviceName", {
+        // 确保传递正确的参数格式
+        await window.electron.invoke("system:setDeviceName", {
           oldName: device.name,
           newName: editName,
         });
+
+        // 更新设备列表
+        setDevices((prev) =>
+          prev.map((d) =>
+            d.name === device.name ? { ...d, name: editName } : d
+          )
+        );
       } catch (error) {
         console.error("Failed to update device name:", error);
       }
@@ -73,7 +79,7 @@ const DeviceList: React.FC = () => {
                               setEditingDevice(null);
                             }
                           }}
-                          className="flex-1 px-1 text-base border rounded outline-none"
+                          className="flex-1 px-1 text-base rounded border outline-none"
                           autoFocus
                         />
                       ) : (

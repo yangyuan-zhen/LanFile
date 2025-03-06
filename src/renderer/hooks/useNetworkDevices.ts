@@ -79,5 +79,5 @@ export const useNetworkDevices = () => {
         }
     };
 
-    return devices;
+    return { devices, setDevices };
 }; 

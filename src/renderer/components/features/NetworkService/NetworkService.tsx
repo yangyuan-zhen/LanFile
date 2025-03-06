@@ -16,7 +16,7 @@ interface NetworkServiceProps {
 
 const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
   const deviceInfo = useDeviceInfo();
-  const devices = useNetworkDevices(); // 使用 hook 获取真实设备列表
+  const { devices } = useNetworkDevices(); // 解构获取 devices
 
   // 使用 deviceInfo 中的真实设备名称
   const currentDevice = {
@@ -33,7 +33,7 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
         </div>
         <RadarView
           devices={devices.map((device) => ({
-            id: device.name, // 使用设备名称作为id
+            id: device.name, // 使用 name 作为 id
             name: device.name,
             type: device.type,
             icon: device.icon,

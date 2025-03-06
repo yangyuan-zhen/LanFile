@@ -38,6 +38,8 @@ try {
                 'zeroconf:unpublishService',
                 'system:getDeviceName',
                 'system:getNetworkInfo',
+                'system:setDeviceName',
+                'system:updateDeviceName',
             ];
             if (validChannels.includes(channel)) {
                 return ipcRenderer.invoke(channel, ...args);
@@ -45,10 +47,32 @@ try {
             throw new Error(`Unauthorized IPC channel: ${channel}`);
         },
         on: (channel: string, callback: (...args: any[]) => void) => {
-            ipcRenderer.on(channel, (_, ...args) => callback(...args));
+            const validChannels = [
+                'network:deviceFound',
+                'device:nameUpdated',
+                'zeroconf:deviceFound'
+            ];
+            if (validChannels.includes(channel)) {
+                ipcRenderer.on(channel, (_event, data) => {
+                    if (data) {
+                        callback(data);
+                    }
+                });
+            }
         },
         off: (channel: string, callback: (...args: any[]) => void) => {
-            ipcRenderer.off(channel, callback);
+            const validChannels = [
+                'network:deviceFound',
+                'device:nameUpdated',
+                'zeroconf:deviceFound'
+            ];
+            if (validChannels.includes(channel)) {
+                ipcRenderer.removeListener(channel, (_event, data) => {
+                    if (data) {
+                        callback(data);
+                    }
+                });
+            }
         }
     });
     console.log('APIs exposed successfully');

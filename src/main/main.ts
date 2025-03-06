@@ -141,11 +141,19 @@ function setupIpcHandlers() {
         }
     });
 
-    // 设置设备名称
-    ipcMain.handle('system:setDeviceName', async (_event, newName: string) => {
+    // 添加设备名称设置处理程序
+    ipcMain.handle('system:setDeviceName', async (_event, params) => {
         try {
-            // 保存新的设备名称
+            const { oldName, newName } = params;  // 确保正确解构参数
+            // 保存到 store
             store.set('deviceName', newName);
+
+            // 广播更新事件
+            mainWindow?.webContents.send('device:nameUpdated', {
+                oldName,
+                newName
+            });
+
             return true;
         } catch (error) {
             console.error('Failed to set device name:', error);
