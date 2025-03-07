@@ -14,54 +14,16 @@ const DeviceList: React.FC = () => {
   const [editingDevice, setEditingDevice] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
-  // 根据 IP 和名称组合去重，保留最新的设备信息
-  const filteredDevices = devices.reduce((acc: any[], device) => {
-    // 查找是否存在完全相同的设备（IP和名称都相同）
-    const exactMatch = acc.findIndex(
-      (d) => d.ip === device.ip && d.name === device.name
-    );
-
-    if (exactMatch >= 0) {
-      // 如果找到完全匹配的设备，更新最新状态
-      if ((device.lastSeen ?? 0) > (acc[exactMatch].lastSeen ?? 0)) {
-        acc[exactMatch] = device;
-      }
-    } else {
-      // 如果没有完全匹配的设备，添加到列表
-      acc.push(device);
-    }
-    return acc;
-  }, []);
+  // 修改设备过滤逻辑，保留所有设备
+  const filteredDevices = devices;
 
   // 添加调试日志
-  console.log("DeviceList - 设备列表:", {
-    所有设备: devices,
-    本机设备: {
-      name: deviceInfo.currentDevice.name,
-      ip: networkInfo.ip,
-    },
-    去重后设备: filteredDevices,
-  });
-
-  // 监听设备变化，确保设备列表更新
   useEffect(() => {
-    console.log(
-      "DeviceList - 设备列表已更新:",
-      filteredDevices.length,
-      "个设备"
-    );
-    console.log(
-      "设备详情:",
-      filteredDevices.map((d) => ({
-        name: d.name,
-        ip: d.ip,
-        status: d.status,
-        lastSeen: d.lastSeen
-          ? new Date(d.lastSeen).toLocaleString()
-          : undefined,
-      }))
-    );
-  }, [devices, deviceInfo.currentDevice.name]);
+    console.log("DeviceList 渲染 - 当前设备数量:", devices.length);
+    devices.forEach((device) => {
+      console.log(`- ${device.name} (${device.ip}): ${device.status}`);
+    });
+  }, [devices]);
 
   const handleDoubleClick = (device: any) => {
     // 只允许编辑在线设备
@@ -124,7 +86,7 @@ const DeviceList: React.FC = () => {
               <>
                 {filteredDevices.map((device) => (
                   <div
-                    key={device.name + device.ip}
+                    key={`${device.ip}-${device.name}`}
                     className="flex flex-col px-6 py-2 hover:bg-gray-50"
                   >
                     <div className="flex items-center">
