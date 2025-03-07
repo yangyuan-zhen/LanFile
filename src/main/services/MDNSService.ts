@@ -11,7 +11,7 @@ export interface MDNSDevice {
     port: number;
     heartbeatPort: number;
     type: string;
-    status: 'online';
+    status: 'online' | 'offline';
 }
 
 class MDNSService {
@@ -137,7 +137,7 @@ class MDNSService {
                     port: service.port,
                     heartbeatPort: service.txt?.heartbeatPort ? parseInt(service.txt.heartbeatPort) : 0,
                     type: service.txt?.deviceType || 'unknown',
-                    status: 'online'
+                    status: 'offline'
                 };
 
                 this.emit('deviceLeft', device);

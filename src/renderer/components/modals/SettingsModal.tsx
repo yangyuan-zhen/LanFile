@@ -23,7 +23,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
       <div className="w-full max-w-2xl bg-white rounded-lg shadow-lg">
         {/* 标题栏 */}
         <div className="flex justify-between items-center p-4 border-b">
@@ -59,20 +59,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           {/* 右侧内容 */}
-          <div className="w-3/4 p-6">
+          <div className="p-6 w-3/4">
             {activeTab === "network" && (
               <div>
-                <h3 className="text-lg font-medium mb-4">网络设置</h3>
+                <h3 className="mb-4 text-lg font-medium">网络设置</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">
+                    <label className="block mb-1 text-sm font-medium">
                       心跳服务端口
                     </label>
                     <input
                       type="number"
                       value={heartbeatPort}
                       onChange={(e) => setHeartbeatPort(Number(e.target.value))}
-                      className="px-3 py-2 border rounded w-32"
+                      className="px-3 py-2 w-32 rounded border"
                       min="1024"
                       max="65535"
                     />
@@ -90,13 +90,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         <div className="flex justify-end p-4 border-t">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded mr-2 hover:bg-gray-300"
+            className="px-4 py-2 mr-2 text-gray-800 bg-gray-200 rounded hover:bg-gray-300"
           >
             取消
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700"
           >
             保存
           </button>

@@ -310,6 +310,30 @@ function setupIpcHandlers() {
         heartbeatService.setPort(port);
         return { success: true };
     });
+
+    // 设备信息相关的处理程序
+    ipcMain.handle('system:getDeviceInfo', async () => {
+        try {
+            const deviceName = store.get('deviceName', os.hostname());
+            const deviceId = require('node-machine-id').machineIdSync();
+
+            return {
+                name: deviceName,
+                id: deviceId,
+                os: {
+                    platform: os.platform(),
+                    release: os.release(),
+                    arch: os.arch()
+                }
+            };
+        } catch (error) {
+            console.error('获取设备信息失败:', error);
+            return {
+                name: os.hostname(),
+                id: 'unknown'
+            };
+        }
+    });
 }
 
 function createWindow() {
@@ -382,6 +406,9 @@ app.whenReady().then(() => {
     // 启动MDNS服务
     MDNSService.publishService();
 
+    // 启动心跳服务
+    heartbeatService.start();
+
     // 可选: 自动开始发现设备
     // MDNSService.startDiscovery();
 });
@@ -409,4 +436,5 @@ app.on('will-quit', () => {
         networkService = null;
     }
     MDNSService.destroy();
+    heartbeatService.stop();
 }); 
