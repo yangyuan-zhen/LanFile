@@ -1,13 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import { Settings, Bell } from "lucide-react";
 import Sidebar from "../Sidebar/Sidebar";
 import SearchBar from "../../common/SearchBar/SearchBar";
+import SettingsModal from "../../modals/SettingsModal";
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -23,7 +26,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <Bell className="w-5 h-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
-            <button className="p-2 text-gray-400 hover:text-gray-600">
+            <button
+              className="p-2 text-gray-400 hover:text-gray-600"
+              onClick={() => setSettingsOpen(true)}
+            >
               <Settings className="w-5 h-5" />
             </button>
             <div className="flex items-center">
@@ -41,6 +47,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           {children}
         </main>
       </div>
+
+      {/* 设置弹窗 */}
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   );
 };

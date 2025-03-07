@@ -77,7 +77,13 @@ try {
         off: (channel: string, func: (...args: any[]) => void) => {
             ipcRenderer.removeListener(channel, func);
         },
-        invoke: (channel: string, data: any) => {
+        heartbeat: {
+            start: () => ipcRenderer.invoke('heartbeat:start'),
+            stop: () => ipcRenderer.invoke('heartbeat:stop'),
+            getPort: () => ipcRenderer.invoke('heartbeat:getPort'),
+            setPort: (port: number) => ipcRenderer.invoke('heartbeat:setPort', port)
+        },
+        invoke: (channel: string, ...args: any[]) => {
             const validChannels = [
                 'network:getLocalService',
                 'network:startDiscovery',
@@ -91,9 +97,14 @@ try {
                 'mdns:publishService',
                 'mdns:unpublishService',
                 'network:pingDevice',
+                'system:getDeviceInfo',
+                'heartbeat:start',
+                'heartbeat:stop',
+                'heartbeat:getPort',
+                'heartbeat:setPort'
             ];
             if (validChannels.includes(channel)) {
-                return ipcRenderer.invoke(channel, data);
+                return ipcRenderer.invoke(channel, ...args);
             }
             throw new Error(`Unauthorized IPC channel: ${channel}`);
         }

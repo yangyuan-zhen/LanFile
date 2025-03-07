@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
 
+export interface NetworkInfo {
+    ip: string;
+    type: string; // wifi 或 ethernet
+    ssid?: string; // WiFi名称
+    speed?: string; // 网络速度
+    ipv4?: string; // 备用IPv4
+}
+
 export const useNetworkInfo = () => {
-    const [networkInfo, setNetworkInfo] = useState({
-        type: "none",
-        ssid: "",
+    const [networkInfo, setNetworkInfo] = useState<NetworkInfo>({
         ip: "",
-        speed: "100 Mbps",
-        lastScan: new Date().toISOString()
+        type: "",
     });
 
     useEffect(() => {
@@ -16,13 +21,7 @@ export const useNetworkInfo = () => {
                 const info = await window.electron.invoke('system:getNetworkInfo');
                 console.log('获取到网络信息 (useNetworkInfo):', info);
                 if (info) {
-                    setNetworkInfo({
-                        ...networkInfo,
-                        type: info.type || 'none',
-                        ssid: info.ssid || '',
-                        ip: info.ip || '',
-                        lastScan: new Date().toISOString()
-                    });
+                    setNetworkInfo(info);
                 }
             } catch (error) {
                 console.error('获取网络信息失败:', error);
@@ -31,8 +30,8 @@ export const useNetworkInfo = () => {
 
         fetchNetworkInfo();
 
-        // 每30秒更新一次
-        const interval = setInterval(fetchNetworkInfo, 30000);
+        // 每10秒更新一次
+        const interval = setInterval(fetchNetworkInfo, 10000);
 
         return () => clearInterval(interval);
     }, []);

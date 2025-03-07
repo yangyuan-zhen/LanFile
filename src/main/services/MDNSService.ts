@@ -9,7 +9,7 @@ export interface MDNSDevice {
     addresses: string[];
     port: number;
     type: string;
-    status: 'online';
+    status: 'online' | 'offline';
 }
 
 class MDNSService {
@@ -132,7 +132,7 @@ class MDNSService {
                     addresses: service.addresses,
                     port: service.port,
                     type: service.txt?.deviceType || 'unknown',
-                    status: 'online'
+                    status: 'offline'
                 };
 
                 this.emit('deviceLeft', device);

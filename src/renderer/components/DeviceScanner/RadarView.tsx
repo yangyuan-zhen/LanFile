@@ -411,6 +411,9 @@ const RadarView: React.FC<RadarViewProps> = ({
     centerDevice
   );
 
+  // 动态选择图标组件
+  const IconComponent = centerDevice.icon || Monitor;
+
   return (
     <div className="relative w-full h-full">
       {/* 雷达背景圆环 */}
@@ -423,7 +426,7 @@ const RadarView: React.FC<RadarViewProps> = ({
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
         <div className="flex flex-col items-center">
           <div className="flex justify-center items-center mb-1 w-16 h-16 text-white bg-blue-500 rounded-full">
-            {React.createElement(centerDevice.icon || Monitor, { size: 32 })}
+            <IconComponent width={32} height={32} />
           </div>
           <span className="text-sm font-medium">{centerDevice.name}</span>
           {centerDevice.ip && (

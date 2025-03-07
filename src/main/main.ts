@@ -7,6 +7,7 @@ import { networkInterfaces } from 'os';
 import wifi from 'node-wifi';
 import store from './store/index';
 import MDNSService, { MDNSDevice } from './services/MDNSService';
+import heartbeatService from './services/HeartbeatService';
 
 let mainWindow: BrowserWindow | null = null;
 let networkService: NetworkService | null = null;
@@ -290,6 +291,47 @@ function setupIpcHandlers() {
             return false; // 出错时返回离线状态
         }
     });
+
+    // 设备信息相关的处理程序
+    ipcMain.handle('system:getDeviceInfo', async () => {
+        try {
+            const deviceName = store.get('deviceName', os.hostname());
+            const deviceId = require('node-machine-id').machineIdSync();
+
+            return {
+                name: deviceName,
+                id: deviceId,
+                os: {
+                    platform: os.platform(),
+                    release: os.release(),
+                    arch: os.arch()
+                }
+            };
+        } catch (error) {
+            console.error('获取设备信息失败:', error);
+            // 返回一个基本的默认值
+            return {
+                name: os.hostname(),
+                id: 'unknown'
+            };
+        }
+    });
+
+    // 设置设备名称
+    ipcMain.handle('system:setDeviceName', async (_, { newName }) => {
+        try {
+            store.set('deviceName', newName);
+            return { success: true, name: newName };
+        } catch (error) {
+            console.error('设置设备名称失败:', error);
+            // 添加类型检查以处理 error 的未知类型
+            if (error instanceof Error) {
+                return { success: false, error: error.message };
+            } else {
+                return { success: false, error: String(error) };
+            }
+        }
+    });
 }
 
 function createWindow() {
@@ -362,6 +404,9 @@ app.whenReady().then(() => {
     // 启动MDNS服务
     MDNSService.publishService();
 
+    // 启动心跳服务
+    heartbeatService.start();
+
     // 可选: 自动开始发现设备
     // MDNSService.startDiscovery();
 });
@@ -389,4 +434,5 @@ app.on('will-quit', () => {
         networkService = null;
     }
     MDNSService.destroy();
+    heartbeatService.stop();
 }); 
