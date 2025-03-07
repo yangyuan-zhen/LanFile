@@ -10,6 +10,7 @@ interface RadarViewProps {
     id: string;
   };
   onViewChange?: (view: "radar" | "list") => void;
+  isScanning?: boolean;
 }
 
 const DeviceList: React.FC<{
@@ -94,11 +95,14 @@ const RadarView: React.FC<RadarViewProps> = ({
   devices,
   currentDevice,
   onViewChange,
+  isScanning = false,
 }) => {
   const [viewMode, setViewMode] = useState<"radar" | "list">("radar");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameIdRef = useRef<number>();
   const startTimeRef = useRef<number | null>(null);
+  const scanStartTimeRef = useRef<number | null>(null);
+  const scanDuration = 5000; // 5秒扫描时间
   const networkInfo = useNetworkInfo();
 
   // 添加调试日志
@@ -196,13 +200,16 @@ const RadarView: React.FC<RadarViewProps> = ({
     });
   };
 
-  // 绘制波纹效果
+  // 绘制波纹效果 - 仅在扫描时显示
   const drawRippleEffect = (
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
-    elapsedTime: number
+    elapsedTime: number,
+    isScanningActive: boolean
   ) => {
+    if (!isScanningActive) return; // 如果不在扫描中，不绘制波纹
+
     const centerX = width / 2;
     const centerY = height / 2;
     const maxRadius = Math.min(width, height) / 2 - 20;
@@ -240,13 +247,28 @@ const RadarView: React.FC<RadarViewProps> = ({
       if (!startTimeRef.current) {
         startTimeRef.current = timestamp;
       }
+
       const elapsedTime = timestamp - startTimeRef.current;
+
+      // 检查扫描状态和时间
+      let isScanningActive = isScanning;
+      if (isScanning && !scanStartTimeRef.current) {
+        scanStartTimeRef.current = timestamp;
+      }
+
+      // 如果扫描开始了且超过了指定的扫描时间，停止扫描动画
+      if (
+        scanStartTimeRef.current &&
+        timestamp - scanStartTimeRef.current > scanDuration
+      ) {
+        isScanningActive = false;
+      }
 
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
 
       drawRadarBackground(ctx, width, height);
-      drawRippleEffect(ctx, width, height, elapsedTime);
+      drawRippleEffect(ctx, width, height, elapsedTime, isScanningActive);
       drawCurrentDevice(ctx, width, height);
       drawDevices(ctx, width, height, elapsedTime);
 
@@ -270,6 +292,14 @@ const RadarView: React.FC<RadarViewProps> = ({
     };
   }, [viewMode, devices, currentDevice]);
 
+  // 监听扫描状态变化
+  useEffect(() => {
+    if (isScanning) {
+      // 重置扫描计时器
+      scanStartTimeRef.current = null;
+    }
+  }, [isScanning]);
+
   const handleViewChange = (view: "radar" | "list") => {
     onViewChange?.(view);
   };
@@ -277,18 +307,6 @@ const RadarView: React.FC<RadarViewProps> = ({
   return (
     <div className="flex flex-col items-center">
       <canvas ref={canvasRef} width={400} height={340} />
-
-      {/* 只保留 Wi-Fi 信息 */}
-      <div className="mt-2 text-center">
-        <div className="text-sm text-gray-600">
-          已连接到 Wi-Fi:{" "}
-          {networkInfo.type === "wifi"
-            ? networkInfo.ssid || "未知网络"
-            : networkInfo.type === "ethernet"
-            ? "有线网络"
-            : "未连接到网络"}
-        </div>
-      </div>
     </div>
   );
 };

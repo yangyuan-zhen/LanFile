@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import RadarView from "../../DeviceScanner/RadarView";
 import { useDeviceInfo } from "../../../hooks/useDeviceInfo";
 import { useNetworkDevices } from "../../../hooks/useNetworkDevices";
+import { useNetworkInfo } from "../../../hooks/useNetworkInfo";
 
 interface NetworkServiceProps {
   networkInfo: {
@@ -15,7 +16,9 @@ interface NetworkServiceProps {
 
 const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
   const deviceInfo = useDeviceInfo();
-  const { devices } = useNetworkDevices();
+  const { devices = [] } = useNetworkDevices() || {};
+  const networkStatusInfo = useNetworkInfo();
+  const [isScanning, setIsScanning] = useState(false);
 
   // 使用 deviceInfo 中的真实设备名称
   const currentDevice = {
@@ -25,9 +28,19 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
 
   const handleScanNetwork = async () => {
     try {
-      await window.electron?.network?.startDiscovery();
+      setIsScanning(true); // 开始扫描
+
+      // 使用通用的 invoke 方法而不是 mdns 对象
+      await window.electron.invoke("mdns:stopDiscovery");
+      await window.electron.invoke("mdns:startDiscovery");
+
+      // 5秒后自动结束扫描状态
+      setTimeout(() => {
+        setIsScanning(false);
+      }, 5000);
     } catch (error) {
       console.error("扫描网络失败:", error);
+      setIsScanning(false);
     }
   };
 
@@ -35,7 +48,7 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
     <div className="p-6 mb-6 bg-white rounded-xl shadow-sm">
       <h3 className="mb-4 text-lg font-semibold text-gray-900">局域网设备</h3>
       <div className="flex flex-wrap justify-center items-center">
-        {/* 左侧雷达图 - 增加高度 */}
+        {/* 左侧雷达图 */}
         <div className="relative mb-6 w-full h-80 lg:w-2/3 xl:w-1/2">
           <RadarView
             devices={devices.map((device) => ({
@@ -49,11 +62,24 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
             }))}
             currentDevice={currentDevice}
             onViewChange={() => {}}
+            isScanning={isScanning} // 传递扫描状态
           />
         </div>
 
         {/* 右侧网络状态 */}
         <div className="pl-0 w-full lg:w-1/3 xl:w-1/2 lg:pl-6">
+          {/* 添加 Wi-Fi 信息 */}
+          <div className="flex justify-between mb-2">
+            <span className="text-gray-600">连接网络:</span>
+            <span className="font-semibold">
+              {networkStatusInfo.type === "wifi"
+                ? networkStatusInfo.ssid || "未知网络"
+                : networkStatusInfo.type === "ethernet"
+                ? "有线网络"
+                : "未连接到网络"}
+            </span>
+          </div>
+
           <div className="flex justify-between mb-2">
             <span className="text-gray-600">当前在线设备:</span>
             <span className="font-semibold">
@@ -82,10 +108,15 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
 
           <button
             onClick={handleScanNetwork}
-            className="flex justify-center items-center py-2 mt-4 space-x-2 w-full text-white rounded-md transition-all bg-blue-500 hover:bg-blue-600"
+            disabled={isScanning}
+            className={`flex justify-center items-center py-2 mt-4 space-x-2 w-full text-white rounded-md transition-all ${
+              isScanning
+                ? "bg-blue-400 cursor-not-allowed"
+                : "bg-blue-500 hover:bg-blue-600"
+            }`}
           >
             <svg
-              className="w-5 h-5 mr-2"
+              className={`mr-2 w-5 h-5 ${isScanning ? "animate-spin" : ""}`}
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
@@ -99,7 +130,7 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
               <path d="M8 16l4 4 4-4"></path>
               <path d="M16 8l-4-4-4 4"></path>
             </svg>
-            <span>重新扫描网络</span>
+            <span>{isScanning ? "扫描中..." : "重新扫描网络"}</span>
           </button>
         </div>
       </div>

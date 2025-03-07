@@ -6,6 +6,7 @@ import os from "os";
 import { networkInterfaces } from 'os';
 import wifi from 'node-wifi';
 import store from './store/index';
+import MDNSService, { MDNSDevice } from './services/MDNSService';
 
 let mainWindow: BrowserWindow | null = null;
 let networkService: NetworkService | null = null;
@@ -172,6 +173,36 @@ function setupIpcHandlers() {
             throw error;
         }
     });
+
+    // 在 registerIpcHandlers 函数中添加
+    ipcMain.handle('mdns:startDiscovery', () => {
+        return MDNSService.startDiscovery();
+    });
+
+    ipcMain.handle('mdns:stopDiscovery', () => {
+        return MDNSService.stopDiscovery();
+    });
+
+    ipcMain.handle('mdns:publishService', () => {
+        return MDNSService.publishService();
+    });
+
+    ipcMain.handle('mdns:unpublishService', () => {
+        return MDNSService.unpublishService();
+    });
+
+    // 添加 mdns 事件转发
+    MDNSService.on('deviceFound', (device: MDNSDevice) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('mdns:deviceFound', device);
+        }
+    });
+
+    MDNSService.on('deviceLeft', (device: MDNSDevice) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('mdns:deviceLeft', device);
+        }
+    });
 }
 
 function createWindow() {
@@ -238,7 +269,15 @@ function createWindow() {
     Menu.setApplicationMenu(menu);
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createWindow();
+
+    // 启动MDNS服务
+    MDNSService.publishService();
+
+    // 可选: 自动开始发现设备
+    // MDNSService.startDiscovery();
+});
 
 app.on('window-all-closed', () => {
     if (networkService) {
@@ -255,4 +294,12 @@ app.on('activate', () => {
     if (mainWindow === null) {
         createWindow();
     }
+});
+
+app.on('will-quit', () => {
+    if (networkService) {
+        networkService.stop();
+        networkService = null;
+    }
+    MDNSService.destroy();
 }); 

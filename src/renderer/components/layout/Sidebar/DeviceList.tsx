@@ -5,7 +5,7 @@ import { useNetworkDevices } from "../../../hooks/useNetworkDevices";
 
 const DeviceList: React.FC = () => {
   const [expanded, setExpanded] = useState(true);
-  const { devices, setDevices } = useNetworkDevices();
+  const { devices = [], setDevices = () => {} } = useNetworkDevices() || {};
   const [editingDevice, setEditingDevice] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 

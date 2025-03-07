@@ -40,6 +40,10 @@ try {
                 'system:getNetworkInfo',
                 'system:setDeviceName',
                 'system:updateDeviceName',
+                'mdns:startDiscovery',
+                'mdns:stopDiscovery',
+                'mdns:publishService',
+                'mdns:unpublishService'
             ];
             if (validChannels.includes(channel)) {
                 return ipcRenderer.invoke(channel, ...args);
@@ -50,7 +54,9 @@ try {
             const validChannels = [
                 'network:deviceFound',
                 'device:nameUpdated',
-                'zeroconf:deviceFound'
+                'zeroconf:deviceFound',
+                'mdns:deviceFound',
+                'mdns:deviceLeft'
             ];
             if (validChannels.includes(channel)) {
                 ipcRenderer.on(channel, (_event, data) => {
@@ -64,7 +70,9 @@ try {
             const validChannels = [
                 'network:deviceFound',
                 'device:nameUpdated',
-                'zeroconf:deviceFound'
+                'zeroconf:deviceFound',
+                'mdns:deviceFound',
+                'mdns:deviceLeft'
             ];
             if (validChannels.includes(channel)) {
                 ipcRenderer.removeListener(channel, (_event, data) => {
