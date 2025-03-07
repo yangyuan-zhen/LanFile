@@ -43,7 +43,6 @@ const Home: React.FC = () => {
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">仪表盘</h1>
       </div>
-
       <NetworkService networkInfo={networkInfo} />
       <TransferStatus transfers={transfers} />
     </div>

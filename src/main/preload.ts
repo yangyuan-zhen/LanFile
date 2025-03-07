@@ -91,6 +91,10 @@ try {
                 'mdns:publishService',
                 'mdns:unpublishService',
                 'network:pingDevice',
+                'heartbeat:start',
+                'heartbeat:stop',
+                'heartbeat:getPort',
+                'heartbeat:setPort'
             ];
             if (validChannels.includes(channel)) {
                 return ipcRenderer.invoke(channel, data);

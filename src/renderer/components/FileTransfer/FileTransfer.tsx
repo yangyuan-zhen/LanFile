@@ -51,36 +51,36 @@ export const FileTransfer: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4">
+    <div className="p-4 bg-white rounded-lg shadow-sm">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-medium text-gray-900">文件传输</h2>
         <div className="flex space-x-2">
           <button
             onClick={handleSend}
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 text-white bg-indigo-600 rounded-md transition-colors hover:bg-indigo-700"
           >
-            <ArrowUpTrayIcon className="w-4 h-4 mr-1" />
+            <ArrowUpTrayIcon className="mr-1 w-4 h-4" />
             发送
           </button>
           <button
             onClick={handleReceive}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center px-4 py-2 text-gray-700 rounded-md border border-gray-300 transition-colors hover:bg-gray-50"
           >
-            <ArrowDownTrayIcon className="w-4 h-4 mr-1" />
+            <ArrowDownTrayIcon className="mr-1 w-4 h-4" />
             接收
           </button>
         </div>
       </div>
 
-      <div className="border-t border-gray-200 pt-4">
+      <div className="pt-4 border-t border-gray-200">
         {transfers.length > 0 ? (
           <div className="space-y-3">
             {transfers.map((transfer) => (
               <div
                 key={transfer.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
               >
-                <div className="flex-1 min-w-0 mr-4">
+                <div className="flex-1 mr-4 min-w-0">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-sm font-medium text-gray-900 truncate">
                       {transfer.name}
@@ -102,7 +102,7 @@ export const FileTransfer: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">暂无传输任务</div>
+          <div className="py-8 text-center text-gray-500">暂无传输任务</div>
         )}
       </div>
     </div>

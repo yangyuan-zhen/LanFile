@@ -2,12 +2,14 @@ import Bonjour from 'bonjour-service';
 import { app } from 'electron';
 import store from '../store';
 import { networkInterfaces } from 'os';
+import { heartbeatService } from './HeartbeatService';
 
 export interface MDNSDevice {
     name: string;
     host: string;
     addresses: string[];
     port: number;
+    heartbeatPort: number;
     type: string;
     status: 'online';
 }
@@ -67,7 +69,8 @@ class MDNSService {
                 txt: {
                     appVersion: app.getVersion(),
                     deviceType: 'desktop',
-                    os: process.platform
+                    os: process.platform,
+                    heartbeatPort: heartbeatService.getPort().toString()
                 }
             });
 
@@ -115,6 +118,7 @@ class MDNSService {
                     host: service.host || "",
                     addresses: service.addresses || [],
                     port: service.port || 0,
+                    heartbeatPort: service.txt?.heartbeatPort ? parseInt(service.txt.heartbeatPort) : 0,
                     type: service.txt?.deviceType || 'unknown',
                     status: 'online'
                 };
@@ -131,6 +135,7 @@ class MDNSService {
                     host: service.host,
                     addresses: service.addresses,
                     port: service.port,
+                    heartbeatPort: service.txt?.heartbeatPort ? parseInt(service.txt.heartbeatPort) : 0,
                     type: service.txt?.deviceType || 'unknown',
                     status: 'online'
                 };

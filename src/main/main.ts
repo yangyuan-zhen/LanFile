@@ -7,6 +7,7 @@ import { networkInterfaces } from 'os';
 import wifi from 'node-wifi';
 import store from './store/index';
 import MDNSService, { MDNSDevice } from './services/MDNSService';
+import { heartbeatService } from './services/HeartbeatService';
 
 let mainWindow: BrowserWindow | null = null;
 let networkService: NetworkService | null = null;
@@ -289,6 +290,25 @@ function setupIpcHandlers() {
             console.error('检测设备状态失败:', error);
             return false; // 出错时返回离线状态
         }
+    });
+
+    // 心跳服务相关的处理程序
+    ipcMain.handle('heartbeat:start', () => {
+        return heartbeatService.start();
+    });
+
+    ipcMain.handle('heartbeat:stop', () => {
+        heartbeatService.stop();
+        return { success: true };
+    });
+
+    ipcMain.handle('heartbeat:getPort', () => {
+        return heartbeatService.getPort();
+    });
+
+    ipcMain.handle('heartbeat:setPort', (_, port: number) => {
+        heartbeatService.setPort(port);
+        return { success: true };
     });
 }
 
