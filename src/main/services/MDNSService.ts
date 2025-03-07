@@ -29,7 +29,7 @@ class MDNSService {
     }
 
     // 获取当前设备IP地址
-    private getLocalIP(): string | null {
+    public getLocalIP(): string | null {
         const interfaces = networkInterfaces();
         for (const name of Object.keys(interfaces)) {
             for (const iface of interfaces[name] || []) {
@@ -45,10 +45,15 @@ class MDNSService {
     // 注册本设备服务
     public publishService(): void {
         try {
-            // 从存储中获取设备名称
-            const deviceName = store.get('deviceName');
-            const localIP = this.getLocalIP();
+            // 优先使用存储的设备名称，如果没有则使用系统设备名称
+            const deviceName = store.get('deviceName') || store.get('systemDeviceName');
 
+            if (!deviceName) {
+                console.error('无法获取设备名称');
+                return;
+            }
+
+            const localIP = this.getLocalIP();
             if (!localIP) {
                 console.error('无法获取本机IP地址');
                 return;
@@ -56,12 +61,12 @@ class MDNSService {
 
             // 发布服务，宣告本设备存在
             this.service = this.bonjour.publish({
-                name: deviceName,
+                name: deviceName,  // 使用存储的名称
                 type: this.SERVICE_TYPE,
                 port: this.SERVICE_PORT,
                 txt: {
                     appVersion: app.getVersion(),
-                    deviceType: 'desktop', // 可根据实际设备类型设置
+                    deviceType: 'desktop',
                     os: process.platform
                 }
             });
@@ -88,23 +93,33 @@ class MDNSService {
                 this.browser.stop();
             }
 
+            // 启动前先清空缓存
+            console.log('开始新的MDNS设备发现');
+
             // 开始浏览指定类型的服务
             this.browser = this.bonjour.find({ type: this.SERVICE_TYPE });
 
             // 当发现服务时触发
             this.browser.on('up', (service: any) => {
-                console.log('发现设备:', service.name, service.addresses);
+                console.log('MDNSService 发现设备，原始数据:', service);
 
+                // 防御性检查确保服务对象存在
+                if (!service) {
+                    console.error('收到无效的设备数据');
+                    return;
+                }
+
+                // 确保所有必要字段都存在
                 const device: MDNSDevice = {
-                    name: service.name,
-                    host: service.host,
-                    addresses: service.addresses,
-                    port: service.port,
+                    name: service.name || "未知设备",
+                    host: service.host || "",
+                    addresses: service.addresses || [],
+                    port: service.port || 0,
                     type: service.txt?.deviceType || 'unknown',
                     status: 'online'
                 };
 
-                // 触发设备发现事件
+                console.log('格式化后的设备数据:', device);
                 this.emit('deviceFound', device);
             });
 

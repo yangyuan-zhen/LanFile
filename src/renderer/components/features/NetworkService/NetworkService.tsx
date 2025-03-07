@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import RadarView from "../../DeviceScanner/RadarView";
 import { useDeviceInfo } from "../../../hooks/useDeviceInfo";
 import { useNetworkDevices } from "../../../hooks/useNetworkDevices";
@@ -16,9 +16,41 @@ interface NetworkServiceProps {
 
 const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
   const deviceInfo = useDeviceInfo();
-  const { devices = [] } = useNetworkDevices() || {};
+  const { devices, startScan, isScanning } = useNetworkDevices();
   const networkStatusInfo = useNetworkInfo();
-  const [isScanning, setIsScanning] = useState(false);
+  const [lastScanTime, setLastScanTime] = useState<Date>(new Date());
+
+  // 获取最新设备扫描时间
+  useEffect(() => {
+    if (devices.length > 0) {
+      // 找出设备中最新的 lastSeen 时间
+      const latestTime = Math.max(
+        ...devices.map((device) => device.lastSeen || 0)
+      );
+      if (latestTime > 0) {
+        setLastScanTime(new Date(latestTime));
+      }
+    }
+  }, [devices]);
+
+  // 获取在线设备数量
+  const onlineDevicesCount = devices.filter((d) => d.status === "在线").length;
+
+  // 格式化最后扫描时间
+  const formatLastScanTime = () => {
+    const now = new Date();
+    const diff = Math.floor(
+      (now.getTime() - lastScanTime.getTime()) / 1000 / 60
+    ); // 分钟差
+
+    if (diff < 1) return "刚刚";
+    if (diff < 60) return `${diff} 分钟前`;
+
+    const hours = Math.floor(diff / 60);
+    if (hours < 24) return `${hours} 小时前`;
+
+    return lastScanTime.toLocaleDateString();
+  };
 
   // 使用 deviceInfo 中的真实设备名称
   const currentDevice = {
@@ -28,19 +60,11 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
 
   const handleScanNetwork = async () => {
     try {
-      setIsScanning(true); // 开始扫描
-
-      // 使用通用的 invoke 方法而不是 mdns 对象
-      await window.electron.invoke("mdns:stopDiscovery");
-      await window.electron.invoke("mdns:startDiscovery");
-
-      // 5秒后自动结束扫描状态
-      setTimeout(() => {
-        setIsScanning(false);
-      }, 5000);
+      // 直接使用 useNetworkDevices 提供的 startScan 方法
+      startScan();
+      setLastScanTime(new Date()); // 更新扫描时间
     } catch (error) {
       console.error("扫描网络失败:", error);
-      setIsScanning(false);
     }
   };
 
@@ -83,8 +107,7 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
           <div className="flex justify-between mb-2">
             <span className="text-gray-600">当前在线设备:</span>
             <span className="font-semibold">
-              {devices.filter((d) => d.status === "在线").length}/
-              {devices.length}
+              {onlineDevicesCount}/{devices.length}
             </span>
           </div>
           <div className="flex justify-between mb-2">
@@ -96,14 +119,14 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
           <div className="flex justify-between mb-2">
             <span className="text-gray-600">网络速度:</span>
             <span className="font-semibold">
-              {networkInfo.networkSpeed || "100 Mbps"}
+              {networkInfo.networkSpeed ||
+                networkStatusInfo.speed ||
+                "100 Mbps"}
             </span>
           </div>
           <div className="flex justify-between mb-4">
             <span className="text-gray-600">最后扫描:</span>
-            <span className="text-gray-500">
-              {networkInfo.lastUpdate || "2 分钟前"}
-            </span>
+            <span className="text-gray-500">{formatLastScanTime()}</span>
           </div>
 
           <button

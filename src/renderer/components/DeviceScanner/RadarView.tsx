@@ -1,20 +1,31 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Device } from "../../types/electron";
+// import { Device } from "../../types/electron";
 import { useNetworkInfo } from "../../hooks/useNetworkInfo";
 import { Smartphone, Laptop, Tablet, Monitor } from "lucide-react";
+import { useDeviceInfo } from "../../hooks/useDeviceInfo";
+import { useNetworkDevices } from "../../hooks/useNetworkDevices";
 
+// 重命名本地接口以避免冲突
+interface RadarDevice {
+  id: string;
+  name: string;
+  type: string;
+  icon: any;
+  online: boolean;
+  ip?: string;
+  port?: number;
+}
+
+// 更新 props 接口中的类型
 interface RadarViewProps {
-  devices: Device[];
-  currentDevice: {
-    name: string;
-    id: string;
-  };
-  onViewChange?: (view: "radar" | "list") => void;
+  devices?: RadarDevice[];
+  currentDevice?: { name: string; id?: string };
+  onViewChange?: (id: string) => void;
   isScanning?: boolean;
 }
 
 const DeviceList: React.FC<{
-  devices: Device[];
+  devices: RadarDevice[];
   currentDevice: { name: string };
   networkInfo: { type: string; ssid?: string; ip?: string };
 }> = ({ devices, currentDevice, networkInfo }) => {
@@ -91,9 +102,26 @@ const DeviceList: React.FC<{
   );
 };
 
+// 从设备类型获取图标
+const getDeviceTypeIcon = (type: string) => {
+  switch (type.toLowerCase()) {
+    case "mobile":
+    case "phone":
+      return Smartphone;
+    case "tablet":
+    case "ipad":
+      return Tablet;
+    case "laptop":
+      return Laptop;
+    case "desktop":
+    default:
+      return Monitor;
+  }
+};
+
 const RadarView: React.FC<RadarViewProps> = ({
-  devices,
-  currentDevice,
+  devices: propDevices,
+  currentDevice: propCurrentDevice,
   onViewChange,
   isScanning = false,
 }) => {
@@ -103,10 +131,26 @@ const RadarView: React.FC<RadarViewProps> = ({
   const startTimeRef = useRef<number | null>(null);
   const scanStartTimeRef = useRef<number | null>(null);
   const scanDuration = 5000; // 5秒扫描时间
-  const networkInfo = useNetworkInfo();
+  const networkInfo = useNetworkInfo(); // 使用网络信息钩子
+  const { currentDevice } = useDeviceInfo();
+  const { devices: networkDevices, isScanning: networkScanning } =
+    useNetworkDevices(); // 使用共享的设备列表
+
+  // 整合设备数据 - 优先使用networkDevices以保持一致性
+  const effectiveDevices = networkDevices.map((device) => ({
+    id: device.ip + device.name,
+    name: device.name,
+    type: device.type || "desktop",
+    icon: device.icon || Monitor,
+    online: device.status === "在线",
+    ip: device.ip,
+    port: device.port,
+  }));
 
   // 添加调试日志
-  console.log("RadarView currentDevice:", currentDevice);
+  console.log("RadarView - 使用网络设备:", effectiveDevices);
+  console.log("RadarView - 当前设备:", currentDevice);
+  console.log("RadarView - 网络信息:", networkInfo);
 
   // 绘制雷达背景
   const drawRadarBackground = (
@@ -156,7 +200,7 @@ const RadarView: React.FC<RadarViewProps> = ({
     // 绘制设备名称
     const deviceName = currentDevice.name || "未知设备";
     ctx.font = "12px Arial";
-    ctx.fillStyle = "#334155";
+    ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(deviceName, centerX, centerY);
@@ -173,18 +217,20 @@ const RadarView: React.FC<RadarViewProps> = ({
     const centerY = height / 2;
     const maxRadius = Math.min(width, height) / 2 - 40;
 
-    // 预定义设备名称和位置
-    const predefinedDevices = [
-      { name: "Windows PC", angle: Math.PI * 0.5 },
-      { name: "iPad Air", angle: Math.PI },
-      { name: "iPhone 13", angle: Math.PI * 1.5 },
-      { name: "MacBook Pro", angle: Math.PI * 2 },
-    ];
+    // 过滤出非中心设备且在线的设备
+    const otherDevices = effectiveDevices.filter(
+      (d) => d.name !== currentDevice.name && d.online
+    );
 
-    predefinedDevices.forEach((device, index) => {
+    // 如果没有在线设备，不绘制
+    if (otherDevices.length === 0) return;
+
+    // 将设备均匀分布在雷达上
+    otherDevices.forEach((device, index) => {
+      const angle = (Math.PI * 2 * index) / otherDevices.length;
       const distance = maxRadius * 0.7; // 70% 半径位置
-      const x = centerX + distance * Math.cos(device.angle);
-      const y = centerY + distance * Math.sin(device.angle);
+      const x = centerX + distance * Math.cos(angle);
+      const y = centerY + distance * Math.sin(angle);
 
       // 绘制设备图标
       ctx.fillStyle = "#64748b";
@@ -243,6 +289,18 @@ const RadarView: React.FC<RadarViewProps> = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // 设置Canvas尺寸
+    const updateCanvasSize = () => {
+      const container = canvas.parentElement;
+      if (container) {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+      }
+    };
+
+    updateCanvasSize();
+    window.addEventListener("resize", updateCanvasSize);
+
     const drawRadar = (timestamp: number) => {
       if (!startTimeRef.current) {
         startTimeRef.current = timestamp;
@@ -277,20 +335,25 @@ const RadarView: React.FC<RadarViewProps> = ({
 
     startTimeRef.current = null;
     animationFrameIdRef.current = requestAnimationFrame(drawRadar);
+
+    return () => {
+      window.removeEventListener("resize", updateCanvasSize);
+    };
   };
 
   // 监听视图模式变化
   useEffect(() => {
     if (viewMode === "radar") {
-      initRadar();
+      const cleanup = initRadar();
+      return () => {
+        if (animationFrameIdRef.current) {
+          cancelAnimationFrame(animationFrameIdRef.current);
+        }
+        startTimeRef.current = null;
+        if (cleanup) cleanup();
+      };
     }
-    return () => {
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-      }
-      startTimeRef.current = null;
-    };
-  }, [viewMode, devices, currentDevice]);
+  }, [viewMode, effectiveDevices, currentDevice, isScanning]);
 
   // 监听扫描状态变化
   useEffect(() => {
@@ -301,12 +364,113 @@ const RadarView: React.FC<RadarViewProps> = ({
   }, [isScanning]);
 
   const handleViewChange = (view: "radar" | "list") => {
-    onViewChange?.(view);
+    onViewChange?.(currentDevice.id || "");
   };
 
+  // 计算设备在雷达上的位置
+  const calculateDevicePositions = (
+    deviceList: RadarDevice[],
+    centerDeviceInfo: RadarDevice
+  ) => {
+    // 过滤出非中心设备且在线的设备
+    const otherDevices = deviceList.filter(
+      (d) => d.ip !== centerDeviceInfo.ip && d.online
+    );
+
+    // 如果没有其他设备，返回空数组
+    if (otherDevices.length === 0) return [];
+
+    // 计算每个设备的角度和半径
+    return otherDevices.map((device, index) => {
+      const angle = (2 * Math.PI * index) / otherDevices.length;
+      // 设备与中心的距离，可以根据不同设备类型设置不同距离
+      const radius = 120;
+
+      return {
+        ...device,
+        x: radius * Math.sin(angle),
+        y: -radius * Math.cos(angle),
+      };
+    });
+  };
+
+  // 获取当前设备和定位其他设备
+  const centerDevice = effectiveDevices.find(
+    (d) => d.ip === networkInfo.ip
+  ) || {
+    id: "local",
+    name: currentDevice.name,
+    type: "desktop",
+    icon: Monitor,
+    online: true,
+    ip: networkInfo.ip,
+  };
+
+  const positionedDevices = calculateDevicePositions(
+    effectiveDevices,
+    centerDevice
+  );
+
   return (
-    <div className="flex flex-col items-center">
-      <canvas ref={canvasRef} width={400} height={340} />
+    <div className="relative w-full h-full">
+      {/* 雷达背景圆环 */}
+      <div className="flex absolute inset-0 justify-center items-center">
+        <div className="w-60 h-60 rounded-full border border-gray-200"></div>
+        <div className="absolute w-40 h-40 rounded-full border border-gray-200"></div>
+      </div>
+
+      {/* 中心设备（当前设备） */}
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <div className="flex flex-col items-center">
+          <div className="flex justify-center items-center mb-1 w-16 h-16 text-white bg-blue-500 rounded-full">
+            {React.createElement(centerDevice.icon || Monitor, { size: 32 })}
+          </div>
+          <span className="text-sm font-medium">{centerDevice.name}</span>
+          {centerDevice.ip && (
+            <span className="text-xs text-gray-500">{centerDevice.ip}</span>
+          )}
+        </div>
+      </div>
+
+      {/* 其他设备 */}
+      {positionedDevices.map((device) => (
+        <div
+          key={device.id}
+          className="flex absolute top-1/2 left-1/2 flex-col justify-center items-center"
+          style={{
+            transform: `translate(calc(-50% + ${device.x}px), calc(-50% + ${device.y}px))`,
+            transition: "transform 0.5s ease-out",
+          }}
+        >
+          <div
+            className={`flex justify-center items-center mb-1 w-10 h-10 text-white ${
+              device.online ? "bg-green-500" : "bg-gray-300"
+            } rounded-full`}
+          >
+            {React.createElement(device.icon || Monitor, { size: 20 })}
+          </div>
+          <span className="text-xs font-medium">{device.name}</span>
+          {device.ip && (
+            <span className="text-xs text-gray-500">{device.ip}</span>
+          )}
+        </div>
+      ))}
+
+      {/* 扫描动画 */}
+      {(isScanning || networkScanning) && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <div className="w-60 h-60 rounded-full animate-radar-scan"></div>
+        </div>
+      )}
+
+      {/* 网络信息 */}
+      <div className="absolute bottom-2 left-2 p-2 text-xs text-gray-500 bg-white bg-opacity-70 rounded">
+        {networkInfo.type === "wifi"
+          ? `WiFi: ${networkInfo.ssid || "未知网络"}`
+          : "有线网络"}
+        <br />
+        IP: {networkInfo.ip || "未知"}
+      </div>
     </div>
   );
 };

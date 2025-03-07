@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events';
 import dgram from 'dgram';
+import { ipcMain } from 'electron';
+import * as net from 'net';
 
 export interface NetworkDevice {
     name: string;
@@ -102,4 +104,48 @@ export class NetworkService extends EventEmitter {
             this.socket = null;
         }
     }
-} 
+}
+
+// 检查设备是否在线
+const checkDeviceStatus = async (ip: string, port: number): Promise<boolean> => {
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+        const timeout = 1000; // 1秒超时
+
+        // 设置超时
+        socket.setTimeout(timeout);
+
+        // 尝试连接
+        socket.connect(port, ip, () => {
+            socket.destroy();
+            resolve(true);
+        });
+
+        // 处理错误
+        socket.on('error', () => {
+            socket.destroy();
+            resolve(false);
+        });
+
+        // 处理超时
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve(false);
+        });
+    });
+};
+
+// 注册IPC处理程序
+export const registerNetworkHandlers = () => {
+    // ... 其他现有代码 ...
+
+    // 处理设备状态检查请求
+    ipcMain.handle('network:pingDevice', async (_event, { ip, port }) => {
+        try {
+            return await checkDeviceStatus(ip, port);
+        } catch (error) {
+            console.error('检查设备状态失败:', error);
+            return false;
+        }
+    });
+}; 

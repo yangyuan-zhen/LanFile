@@ -27,15 +27,61 @@ try {
                 };
             }
         },
-        invoke: (channel: string, ...args: any[]) => {
+        mdns: {
+            publishService: () => ipcRenderer.invoke('mdns:publishService'),
+            unpublishService: () => ipcRenderer.invoke('mdns:unpublishService'),
+            startDiscovery: () => ipcRenderer.invoke('mdns:startDiscovery'),
+            stopDiscovery: () => ipcRenderer.invoke('mdns:stopDiscovery'),
+            onDeviceFound: (callback: (device: Device) => void) => {
+                const subscription = (_: any, device: Device) => callback(device);
+                ipcRenderer.on('mdns:deviceFound', subscription);
+                return () => {
+                    ipcRenderer.removeListener('mdns:deviceFound', subscription);
+                };
+            },
+            onDeviceLeft: (callback: (device: Device) => void) => {
+                const subscription = (_: any, device: Device) => callback(device);
+                ipcRenderer.on('mdns:deviceLeft', subscription);
+                return () => {
+                    ipcRenderer.removeListener('mdns:deviceLeft', subscription);
+                };
+            }
+        },
+        on: (channel: string, func: (...args: any[]) => void) => {
+            const validChannels = [
+                'mdns:deviceFound',
+                'mdns:deviceLeft',
+                'system:deviceNameChanged',
+                'system:remoteDeviceNameChanged',
+                'device:nameUpdated',
+            ];
+
+            if (!validChannels.includes(channel)) {
+                console.error(`无效的频道名称: ${channel}`);
+                return;
+            }
+
+            const subscription = (_event: any, data: any) => {
+                if (!data) {
+                    console.error(`从主进程接收到无效数据，频道: ${channel}`);
+                    return;
+                }
+
+                console.log(`Preload - 从主进程收到数据(${channel}):`, data);
+                func(data);
+            };
+
+            ipcRenderer.on(channel, subscription);
+            return () => ipcRenderer.removeListener(channel, subscription);
+        },
+        off: (channel: string, func: (...args: any[]) => void) => {
+            ipcRenderer.removeListener(channel, func);
+        },
+        invoke: (channel: string, data: any) => {
             const validChannels = [
                 'network:getLocalService',
                 'network:startDiscovery',
                 'network:stopDiscovery',
-                'zeroconf:startScan',
-                'zeroconf:stopScan',
-                'zeroconf:publishService',
-                'zeroconf:unpublishService',
                 'system:getDeviceName',
                 'system:getNetworkInfo',
                 'system:setDeviceName',
@@ -43,44 +89,13 @@ try {
                 'mdns:startDiscovery',
                 'mdns:stopDiscovery',
                 'mdns:publishService',
-                'mdns:unpublishService'
+                'mdns:unpublishService',
+                'network:pingDevice',
             ];
             if (validChannels.includes(channel)) {
-                return ipcRenderer.invoke(channel, ...args);
+                return ipcRenderer.invoke(channel, data);
             }
             throw new Error(`Unauthorized IPC channel: ${channel}`);
-        },
-        on: (channel: string, callback: (...args: any[]) => void) => {
-            const validChannels = [
-                'network:deviceFound',
-                'device:nameUpdated',
-                'zeroconf:deviceFound',
-                'mdns:deviceFound',
-                'mdns:deviceLeft'
-            ];
-            if (validChannels.includes(channel)) {
-                ipcRenderer.on(channel, (_event, data) => {
-                    if (data) {
-                        callback(data);
-                    }
-                });
-            }
-        },
-        off: (channel: string, callback: (...args: any[]) => void) => {
-            const validChannels = [
-                'network:deviceFound',
-                'device:nameUpdated',
-                'zeroconf:deviceFound',
-                'mdns:deviceFound',
-                'mdns:deviceLeft'
-            ];
-            if (validChannels.includes(channel)) {
-                ipcRenderer.removeListener(channel, (_event, data) => {
-                    if (data) {
-                        callback(data);
-                    }
-                });
-            }
         }
     });
     console.log('APIs exposed successfully');
