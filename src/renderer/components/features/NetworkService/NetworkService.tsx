@@ -3,6 +3,8 @@ import RadarView from "../../DeviceScanner/RadarView";
 import { useDeviceInfo } from "../../../hooks/useDeviceInfo";
 import { useNetworkDevices } from "../../../hooks/useNetworkDevices";
 import { useNetworkInfo } from "../../../hooks/useNetworkInfo";
+import { Button } from "../../common/Button/Button";
+import { RefreshCw } from "lucide-react";
 
 interface NetworkServiceProps {
   networkInfo: {
@@ -58,14 +60,14 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
     id: deviceInfo.currentDevice.id,
   };
 
-  const handleScanNetwork = async () => {
-    try {
-      // 直接使用 useNetworkDevices 提供的 startScan 方法
-      startScan();
-      setLastScanTime(new Date()); // 更新扫描时间
-    } catch (error) {
-      console.error("扫描网络失败:", error);
-    }
+  const handleScanClick = () => {
+    console.log("开始扫描网络设备流程...");
+    // 调用 startScan() 开始扫描，其中包含了以下步骤：
+    // 1. 启动 MDNS 发现服务
+    // 2. 5秒后停止发现服务
+    // 3. 保存发现的设备到缓存
+    // 4. 检查所有设备状态
+    startScan();
   };
 
   return (
@@ -129,32 +131,18 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
             <span className="text-gray-500">{formatLastScanTime()}</span>
           </div>
 
-          <button
-            onClick={handleScanNetwork}
-            disabled={isScanning}
-            className={`flex justify-center items-center py-2 mt-4 space-x-2 w-full text-white rounded-md transition-all ${
-              isScanning
-                ? "bg-blue-400 cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600"
-            }`}
-          >
-            <svg
-              className={`mr-2 w-5 h-5 ${isScanning ? "animate-spin" : ""}`}
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <div className="mb-4">
+            <Button
+              onClick={handleScanClick}
+              disabled={isScanning}
+              className="flex items-center text-white bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400"
             >
-              <path d="M2 12h2a8 8 0 0 1 8-8V2"></path>
-              <path d="M22 12h-2a8 8 0 0 1-8 8v2"></path>
-              <path d="M8 16l4 4 4-4"></path>
-              <path d="M16 8l-4-4-4 4"></path>
-            </svg>
-            <span>{isScanning ? "扫描中..." : "重新扫描网络"}</span>
-          </button>
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${isScanning ? "animate-spin" : ""}`}
+              />
+              <span>{isScanning ? "扫描中..." : "重新扫描网络"}</span>
+            </Button>
+          </div>
         </div>
       </div>
     </div>

@@ -314,24 +314,32 @@ export const useNetworkDevices = () => {
         });
 
         setDevices(prev => {
-            const existingDeviceIndex = prev.findIndex(d => d.ip === ipAddress);
+            // 创建新的设备列表的副本，避免引用问题
+            const updatedDevices = [...prev];
+            const existingDeviceIndex = updatedDevices.findIndex(d => d.ip === ipAddress);
             const customName = deviceNameMap[ipAddress];
 
+            // 合并设备信息而不是替换
             if (existingDeviceIndex >= 0) {
-                return prev.map((d, index) =>
-                    index === existingDeviceIndex
-                        ? {
-                            ...deviceStatus,
-                            name: customName || d.name,
-                        }
-                        : d
-                );
+                updatedDevices[existingDeviceIndex] = {
+                    ...updatedDevices[existingDeviceIndex],
+                    ...deviceStatus,
+                    name: customName || updatedDevices[existingDeviceIndex].name,
+                    lastSeen: Date.now()
+                };
+                console.log(`更新现有设备: ${updatedDevices[existingDeviceIndex].name} (${ipAddress})`);
             } else {
-                return [...prev, {
+                updatedDevices.push({
                     ...deviceStatus,
                     name: customName || device.name,
-                }];
+                });
+                console.log(`添加新设备: ${customName || device.name} (${ipAddress})`);
             }
+
+            // 每次设备列表变化时保存
+            setTimeout(() => saveDevicesToCache(updatedDevices), 100);
+
+            return updatedDevices;
         });
     };
 
@@ -343,12 +351,20 @@ export const useNetworkDevices = () => {
 
         console.log('【设备离开】:', device);
 
+        // 仅更新状态，不从列表移除
         setDevices(prev => {
+            const deviceToUpdate = prev.find(d => d.ip === device.addresses[0]);
+            if (!deviceToUpdate) {
+                console.log(`离开的设备不在列表中: ${device.name} (${device.addresses[0]})`);
+                return prev;
+            }
+
+            console.log(`设备标记为离线: ${deviceToUpdate.name} (${deviceToUpdate.ip})`);
             return prev.map(d => {
                 if (d.ip === device.addresses[0]) {
                     return {
                         ...d,
-                        status: "离线",
+                        status: "离线" as DeviceStatus,
                         lastSeen: Date.now()
                     };
                 }
@@ -411,11 +427,14 @@ export const useNetworkDevices = () => {
             clearTimeout(scanTimeoutRef.current);
         }
 
-        setDevices(prev => prev.map(d =>
-            d.ip === networkInfo.ip
-                ? d
-                : { ...d, status: "扫描中" }
-        ));
+        setDevices(prev => {
+            console.log('扫描前更新设备状态，当前数量:', prev.length);
+            return prev.map(d =>
+                d.ip === networkInfo.ip
+                    ? d
+                    : { ...d, status: "扫描中" }
+            );
+        });
 
         window.electron.invoke('mdns:startDiscovery')
             .then(() => console.log('MDNS发现服务已启动'))
@@ -425,13 +444,47 @@ export const useNetworkDevices = () => {
             window.electron.invoke('mdns:stopDiscovery')
                 .then(() => {
                     console.log('MDNS发现服务已停止');
-                    applySavedNames();
-                    checkAllDevicesStatus();
+
+                    // 保持已有设备，只更新状态和新设备
+                    setDevices(currentDevices => {
+                        console.log('扫描结束，当前设备数量:', currentDevices.length);
+
+                        // 确保不会丢失之前发现的设备
+                        const knownDevices = new Map();
+                        currentDevices.forEach(device => {
+                            knownDevices.set(device.ip, device);
+                        });
+
+                        // 合并新设备和已知设备
+                        saveDevicesToCache(Array.from(knownDevices.values()));
+
+                        // 检查所有设备状态
+                        setTimeout(() => checkAllDevicesStatus(), 100);
+
+                        return currentDevices;
+                    });
                 })
                 .catch(err => console.error('停止MDNS发现服务失败:', err))
                 .finally(() => setIsScanning(false));
         }, 5000);
     }, [networkInfo.ip]);
+
+    useEffect(() => {
+        // 使用一个标志记录是否是首次加载
+        if (!isInitialized) {
+            // 先尝试加载缓存的设备
+            const cachedDevices = loadCachedDevices();
+            if (cachedDevices.length > 0) {
+                console.log('从缓存加载了', cachedDevices.length, '个设备');
+                setDevices(cachedDevices);
+            } else {
+                console.log('缓存中没有设备，将开始扫描');
+                // 如果没有缓存设备，才执行扫描
+                startScan();
+            }
+            setIsInitialized(true);
+        }
+    }, []);
 
     useEffect(() => {
         return () => {
@@ -522,18 +575,42 @@ export const useNetworkDevices = () => {
         }
 
         try {
-            const deviceCheckPromises = devices.map(device => checkDeviceStatus(device));
-            const updatedDevices = await Promise.all(deviceCheckPromises);
+            // 确保设备列表中包含本地设备
+            const hasLocalDevice = devices.some(d => d.ip === networkInfo.ip);
 
-            // 确保设备不会从列表中消失，只会改变状态
-            if (updatedDevices.length < devices.length) {
-                console.warn(`警告: 设备数量减少 ${devices.length} -> ${updatedDevices.length}`);
+            if (!hasLocalDevice && networkInfo.ip) {
+                console.log('设备列表中缺少本地设备，正在添加...');
+                const localDevice = {
+                    name: deviceInfo.currentDevice.name,
+                    type: "desktop" as DeviceType,
+                    icon: Monitor,
+                    status: "在线" as DeviceStatus,
+                    ip: networkInfo.ip,
+                    port: 12345,
+                    lastSeen: Date.now()
+                };
+
+                setDevices(prev => [localDevice, ...prev]);
+                return; // 添加后退出，下次检查会包含所有设备
             }
 
+            // 对每个设备检查状态
+            const updatedDevices = await Promise.all(
+                devices.map(device => checkDeviceStatus(device))
+            );
+
+            // 打印详细日志
+            console.log('状态检查完成:');
+            updatedDevices.forEach(device => {
+                console.log(`- ${device.name} (${device.ip}): ${device.status}`);
+            });
+
             setDevices(updatedDevices);
+
+            // 延迟应用自定义名称
             setTimeout(applySavedNames, 100);
         } catch (error) {
-            console.error('检查设备状态整体过程出错:', error);
+            console.error('检查设备状态过程出错:', error);
         }
     };
 
