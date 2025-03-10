@@ -100,6 +100,7 @@ try {
                 'system:getNetworkInfo',
                 'system:setDeviceName',
                 'system:updateDeviceName',
+                'system:getDeviceInfo',
                 'mdns:startDiscovery',
                 'mdns:stopDiscovery',
                 'mdns:publishService',

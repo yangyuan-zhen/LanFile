@@ -15,9 +15,9 @@ export const useDeviceInfo = (): DeviceInfo => {
     useEffect(() => {
         const getDeviceInfo = async () => {
             try {
-                const info = await window.electron.invoke("system:getDeviceInfo");
-                if (info && info.name) {
-                    setDeviceInfo({ currentDevice: { name: info.name, id: info.id } });
+                const name = await window.electron.invoke("system:getDeviceName");
+                if (name) {
+                    setDeviceInfo({ currentDevice: { name, id: require('os').hostname() } });
                 }
             } catch (error) {
                 console.error("获取设备信息失败:", error);

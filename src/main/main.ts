@@ -312,27 +312,11 @@ function setupIpcHandlers() {
     });
 
     // 设备信息相关的处理程序
-    ipcMain.handle('system:getDeviceInfo', async () => {
-        try {
-            const deviceName = store.get('deviceName', os.hostname());
-            const deviceId = require('node-machine-id').machineIdSync();
-
-            return {
-                name: deviceName,
-                id: deviceId,
-                os: {
-                    platform: os.platform(),
-                    release: os.release(),
-                    arch: os.arch()
-                }
-            };
-        } catch (error) {
-            console.error('获取设备信息失败:', error);
-            return {
-                name: os.hostname(),
-                id: 'unknown'
-            };
-        }
+    ipcMain.handle('system:getDeviceInfo', () => {
+        return {
+            name: store.get('deviceName'),
+            id: require('os').hostname() // 使用主机名作为临时ID
+        };
     });
 }
 

@@ -201,8 +201,10 @@ export const useNetworkDevices = () => {
             if (localDeviceIndex >= 0) {
                 const updatedDevices = [...prev];
                 updatedDevices[localDeviceIndex] = localDevice;
+                console.log('设置设备列表，之前:', devices.length, '个，现在:', updatedDevices.length, '个');
                 return updatedDevices;
             } else {
+                console.log('设置设备列表，之前:', devices.length, '个，现在:', [localDevice, ...prev].length, '个');
                 return [localDevice, ...prev];
             }
         });
@@ -477,7 +479,7 @@ export const useNetworkDevices = () => {
             try {
                 const heartbeatPort = await window.electron.invoke('heartbeat:getPort');
                 const response = await fetch(`http://${device.ip}:${heartbeatPort}/lanfile/status`, {
-                    signal: AbortSignal.timeout(3000) // 3秒超时
+                    signal: AbortSignal.timeout(5000)  // 5秒超时
                 });
 
                 if (response.ok) {
@@ -523,11 +525,10 @@ export const useNetworkDevices = () => {
             const deviceCheckPromises = devices.map(device => checkDeviceStatus(device));
             const updatedDevices = await Promise.all(deviceCheckPromises);
 
-            console.log(`状态检查完成，共 ${updatedDevices.length} 个设备（${updatedDevices.filter(d => d.status === "在线").length} 个在线）`);
-
-            updatedDevices.forEach(d => {
-                console.log(`- ${d.name} (${d.ip}): ${d.status}`);
-            });
+            // 确保设备不会从列表中消失，只会改变状态
+            if (updatedDevices.length < devices.length) {
+                console.warn(`警告: 设备数量减少 ${devices.length} -> ${updatedDevices.length}`);
+            }
 
             setDevices(updatedDevices);
             setTimeout(applySavedNames, 100);
@@ -576,7 +577,7 @@ export const useNetworkDevices = () => {
             if (devices.length > 0) {
                 checkAllDevicesStatus();
             }
-        }, 30000);
+        }, 30000);  // 30秒
 
         return () => clearInterval(statusCheckInterval);
     }, [devices.length]);
