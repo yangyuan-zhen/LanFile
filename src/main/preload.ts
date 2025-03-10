@@ -3,6 +3,14 @@ import { Device } from '../renderer/types/electron';
 
 console.log('Preload script starting...');
 
+// 添加 heartbeat API 类型定义
+interface HeartbeatAPI {
+    start: () => Promise<void>;
+    stop: () => Promise<void>;
+    getPort: () => Promise<number>;
+    setPort: (port: number) => Promise<void>;
+}
+
 try {
     contextBridge.exposeInMainWorld('electron', {
         test: {
@@ -82,7 +90,7 @@ try {
             stop: () => ipcRenderer.invoke('heartbeat:stop'),
             getPort: () => ipcRenderer.invoke('heartbeat:getPort'),
             setPort: (port: number) => ipcRenderer.invoke('heartbeat:setPort', port)
-        },
+        } as HeartbeatAPI,
         invoke: (channel: string, ...args: any[]) => {
             const validChannels = [
                 'network:getLocalService',

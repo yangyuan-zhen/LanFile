@@ -18,7 +18,7 @@ export interface NetworkDevice {
 }
 
 type DeviceType = 'mobile' | 'tablet' | 'laptop' | 'desktop';
-type DeviceStatus = '在线' | '离线' | '扫描中';
+type DeviceStatus = '在线' | '离线' | '扫描中' | '检测中';
 
 const getDeviceIcon = (type: DeviceType): React.ComponentType => {
     const iconMap: Record<DeviceType, React.ComponentType> = {
@@ -283,7 +283,7 @@ export const useNetworkDevices = () => {
         };
     }, [networkInfo.ip]);
 
-    const handleDeviceFound = (device: any) => {
+    const handleDeviceFound = async (device: any) => {
         if (!device || !device.name) {
             console.error('接收到无效设备数据:', device);
             return;
@@ -292,16 +292,24 @@ export const useNetworkDevices = () => {
         console.log('【设备发现】收到设备数据:', device);
 
         const ipv4Addresses = device.addresses?.filter(isValidIPv4) || [];
-
         if (ipv4Addresses.length === 0) {
             console.log(`设备 ${device.name} 没有有效的IPv4地址，已忽略`);
             return;
         }
 
         const ipAddress = ipv4Addresses[0];
-
         const timestamp = Date.now();
-        console.log(`设备发现时间戳: ${timestamp}, IP: ${ipAddress}`);
+
+        // 立即检查新发现设备的状态
+        const deviceStatus = await checkDeviceStatus({
+            name: device.name,
+            type: (device.type || "desktop") as DeviceType,
+            icon: getDeviceIcon((device.type || "desktop") as DeviceType),
+            status: "检测中" as DeviceStatus,
+            ip: ipAddress,
+            port: device.port || 0,
+            lastSeen: timestamp
+        });
 
         setDevices(prev => {
             const existingDeviceIndex = prev.findIndex(d => d.ip === ipAddress);
@@ -311,22 +319,15 @@ export const useNetworkDevices = () => {
                 return prev.map((d, index) =>
                     index === existingDeviceIndex
                         ? {
-                            ...d,
+                            ...deviceStatus,
                             name: customName || d.name,
-                            status: "在线",
-                            lastSeen: timestamp
                         }
                         : d
                 );
             } else {
                 return [...prev, {
+                    ...deviceStatus,
                     name: customName || device.name,
-                    type: (device.type || "desktop") as DeviceType,
-                    icon: getDeviceIcon((device.type || "desktop") as DeviceType),
-                    status: "在线" as DeviceStatus,
-                    ip: ipAddress,
-                    port: device.port || 0,
-                    lastSeen: timestamp
                 }];
             }
         });
@@ -464,7 +465,6 @@ export const useNetworkDevices = () => {
 
     const checkDeviceStatus = async (device: NetworkDevice) => {
         try {
-            // 本机设备总是在线
             if (device.ip === networkInfo.ip) {
                 return {
                     ...device,
@@ -473,16 +473,16 @@ export const useNetworkDevices = () => {
                 };
             }
 
-            // 改用心跳检测
+            // 使用心跳服务检测
             try {
-                // 使用 fetch 检查心跳状态
-                const response = await fetch(`http://${device.ip}:8080/status`, {
-                    signal: AbortSignal.timeout(3000) // 设置3秒超时
+                const heartbeatPort = await window.electron.invoke('heartbeat:getPort');
+                const response = await fetch(`http://${device.ip}:${heartbeatPort}/lanfile/status`, {
+                    signal: AbortSignal.timeout(3000) // 3秒超时
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    if (data.app === "LanFile" && data.running === true) {
+                    if (data.status === 'online') {
                         return {
                             ...device,
                             status: "在线" as DeviceStatus,
@@ -491,7 +491,6 @@ export const useNetworkDevices = () => {
                     }
                 }
 
-                // 如果请求失败或返回不符合预期，标记为离线
                 return {
                     ...device,
                     status: "离线" as DeviceStatus
@@ -521,46 +520,16 @@ export const useNetworkDevices = () => {
         }
 
         try {
-            const deviceCheckPromises = devices.map(async (device) => {
-                if (device.ip === networkInfo.ip) {
-                    console.log(`本机设备 ${device.name} (${device.ip}) 始终在线`);
-                    return { ...device, status: "在线", lastSeen: Date.now() };
-                }
-
-                try {
-                    console.log(`检查设备 ${device.name} (${device.ip}) 状态...`);
-                    const isAlive = await window.electron.invoke('network:pingDevice', {
-                        ip: device.ip,
-                        port: device.port || 0
-                    }).catch(() => false);
-
-                    console.log(`设备 ${device.name} (${device.ip}) 状态检查结果: ${isAlive ? '在线' : '离线'}`);
-
-                    return {
-                        ...device,
-                        status: isAlive ? "在线" : "离线",
-                        lastSeen: isAlive ? Date.now() : device.lastSeen
-                    };
-                } catch (err) {
-                    console.error(`检查设备 ${device.name} (${device.ip}) 状态时出错:`, err);
-                    return { ...device, status: "离线" };
-                }
-            });
-
+            const deviceCheckPromises = devices.map(device => checkDeviceStatus(device));
             const updatedDevices = await Promise.all(deviceCheckPromises);
+
             console.log(`状态检查完成，共 ${updatedDevices.length} 个设备（${updatedDevices.filter(d => d.status === "在线").length} 个在线）`);
 
             updatedDevices.forEach(d => {
                 console.log(`- ${d.name} (${d.ip}): ${d.status}`);
             });
 
-            const typedDevices = updatedDevices.map(device => ({
-                ...device,
-                status: device.status as DeviceStatus
-            }));
-
-            setDevices(typedDevices);
-
+            setDevices(updatedDevices);
             setTimeout(applySavedNames, 100);
         } catch (error) {
             console.error('检查设备状态整体过程出错:', error);
@@ -600,6 +569,17 @@ export const useNetworkDevices = () => {
             }
         }
     };
+
+    useEffect(() => {
+        // 每30秒检查一次所有设备状态
+        const statusCheckInterval = setInterval(() => {
+            if (devices.length > 0) {
+                checkAllDevicesStatus();
+            }
+        }, 30000);
+
+        return () => clearInterval(statusCheckInterval);
+    }, [devices.length]);
 
     return {
         devices,

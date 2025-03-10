@@ -2,7 +2,7 @@ import React from "react";
 import NetworkService from "../../components/features/NetworkService/NetworkService";
 import TransferStatus from "../../components/features/TransferStatus/TransferStatus";
 
-const Home: React.FC = () => {
+export const HomePage = () => {
   const networkInfo = {
     currentDevice: "当前在线设备",
     networkStatus: "稳定",
@@ -48,5 +48,3 @@ const Home: React.FC = () => {
     </div>
   );
 };
-
-export default Home;
