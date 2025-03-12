@@ -5,6 +5,9 @@ import { Smartphone, Laptop, Tablet, Monitor } from "lucide-react";
 import { useDeviceInfo } from "../../hooks/useDeviceInfo";
 import { useNetworkDevices } from "../../hooks/useNetworkDevices";
 
+// 添加在文件顶部其他类型定义附近
+type DeviceType = "mobile" | "tablet" | "laptop" | "desktop";
+
 // 重命名本地接口以避免冲突
 interface RadarDevice {
   id: string;
@@ -18,10 +21,22 @@ interface RadarDevice {
 
 // 更新 props 接口中的类型
 interface RadarViewProps {
-  devices?: RadarDevice[];
-  currentDevice?: { name: string; id?: string };
-  onViewChange?: (id: string) => void;
-  isScanning?: boolean;
+  devices: Array<{
+    id: string;
+    name: string;
+    type: DeviceType;
+    icon: React.ComponentType;
+    online: boolean;
+    ip: string;
+    port: number;
+  }>;
+  currentDevice: {
+    name: string;
+    id?: string;
+  };
+  onViewChange: (id?: string) => void;
+  isScanning: boolean;
+  hideNetworkInfo?: boolean;
 }
 
 const DeviceList: React.FC<{
@@ -124,6 +139,7 @@ const RadarView: React.FC<RadarViewProps> = ({
   currentDevice: propCurrentDevice,
   onViewChange,
   isScanning = false,
+  hideNetworkInfo = false,
 }) => {
   const [viewMode, setViewMode] = useState<"radar" | "list">("radar");
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -467,13 +483,15 @@ const RadarView: React.FC<RadarViewProps> = ({
       )}
 
       {/* 网络信息 */}
-      <div className="absolute bottom-2 left-2 p-2 text-xs text-gray-500 bg-white bg-opacity-70 rounded">
-        {networkInfo.type === "wifi"
-          ? `WiFi: ${networkInfo.ssid || "未知网络"}`
-          : "有线网络"}
-        <br />
-        IP: {networkInfo.ip || "未知"}
-      </div>
+      {!hideNetworkInfo && (
+        <div className="absolute bottom-2 left-2 p-2 text-xs text-gray-500 bg-white bg-opacity-70 rounded">
+          {networkInfo.type === "wifi"
+            ? `WiFi: ${networkInfo.ssid || "未知网络"}`
+            : "有线网络"}
+          <br />
+          IP: {networkInfo.ip || "未知"}
+        </div>
+      )}
     </div>
   );
 };

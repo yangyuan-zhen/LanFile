@@ -88,7 +88,8 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
             }))}
             currentDevice={currentDevice}
             onViewChange={() => {}}
-            isScanning={isScanning} // 传递扫描状态
+            isScanning={isScanning}
+            hideNetworkInfo={true}
           />
         </div>
 
