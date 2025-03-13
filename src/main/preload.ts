@@ -109,7 +109,10 @@ try {
                 'heartbeat:start',
                 'heartbeat:stop',
                 'heartbeat:getPort',
-                'heartbeat:setPort'
+                'heartbeat:setPort',
+                'settings:getDownloadPath',
+                'settings:setDownloadPath',
+                'dialog:openDirectory'
             ];
             if (validChannels.includes(channel)) {
                 return ipcRenderer.invoke(channel, ...args);
