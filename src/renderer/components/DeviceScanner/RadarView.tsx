@@ -37,6 +37,7 @@ interface RadarViewProps {
   onViewChange: (id?: string) => void;
   isScanning: boolean;
   hideNetworkInfo?: boolean;
+  getSelectedFiles?: () => FileList | null;
 }
 
 const DeviceList: React.FC<{
@@ -134,12 +135,57 @@ const getDeviceTypeIcon = (type: string) => {
   }
 };
 
+// 添加传输确认弹窗组件
+const TransferConfirmModal: React.FC<{
+  device: RadarDevice;
+  onClose: () => void;
+  onConfirm: () => void;
+  hasSelectedFiles: boolean;
+}> = ({ device, onClose, onConfirm, hasSelectedFiles }) => {
+  return (
+    <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+      <div className="p-6 w-full max-w-sm bg-white rounded-lg shadow-xl">
+        <h3 className="mb-4 text-lg font-semibold text-gray-800">传输文件</h3>
+        <p className="mb-6 text-gray-600">
+          是否要向 <span className="font-medium">{device.name}</span> (
+          {device.ip}) 传输文件？
+        </p>
+        {!hasSelectedFiles && (
+          <p className="mb-4 text-sm text-red-500">
+            请先在文件上传区域选择要传输的文件
+          </p>
+        )}
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+          >
+            否
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={!hasSelectedFiles}
+            className={`px-4 py-2 text-white rounded ${
+              hasSelectedFiles
+                ? "bg-blue-500 hover:bg-blue-600"
+                : "bg-gray-400 cursor-not-allowed"
+            }`}
+          >
+            是
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const RadarView: React.FC<RadarViewProps> = ({
   devices: propDevices,
   currentDevice: propCurrentDevice,
   onViewChange,
   isScanning = false,
   hideNetworkInfo = false,
+  getSelectedFiles,
 }) => {
   const [viewMode, setViewMode] = useState<"radar" | "list">("radar");
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -430,6 +476,38 @@ const RadarView: React.FC<RadarViewProps> = ({
   // 动态选择图标组件
   const IconComponent = centerDevice.icon || Monitor;
 
+  // 添加传输确认弹窗状态
+  const [selectedDevice, setSelectedDevice] = useState<RadarDevice | null>(
+    null
+  );
+
+  // 处理设备点击
+  const handleDeviceClick = (device: RadarDevice) => {
+    if (device.ip === networkInfo.ip) return; // 如果是当前设备，不显示弹窗
+    setSelectedDevice(device);
+  };
+
+  // 处理传输确认
+  const handleTransferConfirm = () => {
+    const selectedFiles = getSelectedFiles?.();
+
+    if (!selectedFiles || selectedFiles.length === 0) {
+      // 如果没有选择文件，显示提示信息
+      console.log("请先选择要传输的文件");
+      return;
+    }
+
+    // 这里可以添加文件传输逻辑
+    console.log("确认向设备传输文件:", selectedDevice);
+    console.log("要传输的文件:", selectedFiles);
+    setSelectedDevice(null);
+  };
+
+  // 处理弹窗关闭
+  const handleCloseModal = () => {
+    setSelectedDevice(null);
+  };
+
   return (
     <div className="relative w-full h-full">
       {/* 雷达背景圆环 */}
@@ -455,11 +533,12 @@ const RadarView: React.FC<RadarViewProps> = ({
       {positionedDevices.map((device) => (
         <div
           key={device.id}
-          className="flex absolute top-1/2 left-1/2 flex-col justify-center items-center"
+          className="flex absolute top-1/2 left-1/2 flex-col justify-center items-center cursor-pointer"
           style={{
             transform: `translate(calc(-50% + ${device.x}px), calc(-50% + ${device.y}px))`,
             transition: "transform 0.5s ease-out",
           }}
+          onClick={() => handleDeviceClick(device)}
         >
           <div
             className={`flex justify-center items-center mb-1 w-10 h-10 text-white ${
@@ -491,6 +570,16 @@ const RadarView: React.FC<RadarViewProps> = ({
           <br />
           IP: {networkInfo.ip || "未知"}
         </div>
+      )}
+
+      {/* 添加传输确认弹窗 */}
+      {selectedDevice && (
+        <TransferConfirmModal
+          device={selectedDevice}
+          onClose={handleCloseModal}
+          onConfirm={handleTransferConfirm}
+          hasSelectedFiles={!!getSelectedFiles?.()?.length}
+        />
       )}
     </div>
   );

@@ -14,9 +14,13 @@ interface NetworkServiceProps {
     lastUpdate: string;
     connectedDevices: string;
   };
+  getSelectedFiles?: () => FileList | null;
 }
 
-const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
+const NetworkService: React.FC<NetworkServiceProps> = ({
+  networkInfo,
+  getSelectedFiles,
+}) => {
   const deviceInfo = useDeviceInfo();
   const { devices, startScan, isScanning } = useNetworkDevices();
   const networkStatusInfo = useNetworkInfo();
@@ -135,6 +139,7 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
             onViewChange={() => {}}
             isScanning={isScanning}
             hideNetworkInfo={true}
+            getSelectedFiles={getSelectedFiles}
           />
         </div>
 

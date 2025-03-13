@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useRef } from "react";
 import NetworkService from "../../components/features/NetworkService/NetworkService";
-import TransferStatus from "../../components/features/TransferStatus/TransferStatus";
 import FileList from "../../components/features/FileList/FileList";
 import FileUploader from "../../components/features/FileUploader/FileUploader";
+import CurrentTransfers from "../../components/features/CurrentTransfers/CurrentTransfers";
 
 export const HomePage = () => {
   const networkInfo = {
@@ -74,14 +74,28 @@ export const HomePage = () => {
     // 实现文件上传逻辑
   };
 
+  // 添加文件选择状态的引用
+  const fileUploaderRef = useRef<HTMLInputElement>(null);
+
+  // 获取已选择的文件
+  const getSelectedFiles = () => {
+    return fileUploaderRef.current?.files || null;
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">仪表盘</h1>
       </div>
-      <NetworkService networkInfo={networkInfo} />
-      <TransferStatus transfers={transfers} />
-      <FileUploader onFileSelect={handleFileSelect} />
+      <NetworkService
+        networkInfo={networkInfo}
+        getSelectedFiles={getSelectedFiles} // 传递获取文件方法
+      />
+      <CurrentTransfers transfers={transfers} />
+      <FileUploader
+        ref={fileUploaderRef} // 添加 ref
+        onFileSelect={handleFileSelect}
+      />
       <FileList files={files} />
     </div>
   );

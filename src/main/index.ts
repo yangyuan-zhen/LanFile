@@ -7,6 +7,7 @@ import { heartbeatService } from './services/HeartbeatService';
 import { networkInterfaces, hostname } from 'os';
 import wifi from 'node-wifi';
 import fetch from 'node-fetch';
+import { setupWebRTCHandlers } from './webrtc';
 
 // 创建配置存储实例
 const store = new Store();
@@ -329,6 +330,8 @@ const createWindow = () => {
         networkService?.unpublishService();
         mainWindow = null;
     });
+
+    setupWebRTCHandlers(mainWindow);
 };
 
 // 应用初始化
