@@ -4,6 +4,7 @@ import { useNetworkInfo } from "../../hooks/useNetworkInfo";
 import { Smartphone, Laptop, Tablet, Monitor } from "lucide-react";
 import { useDeviceInfo } from "../../hooks/useDeviceInfo";
 import { useNetworkDevices } from "../../hooks/useNetworkDevices";
+import { useWebRTC } from "../../hooks/useWebRTC";
 
 // 添加在文件顶部其他类型定义附近
 type DeviceType = "mobile" | "tablet" | "laptop" | "desktop";
@@ -197,6 +198,7 @@ const RadarView: React.FC<RadarViewProps> = ({
   const { currentDevice } = useDeviceInfo();
   const { devices: networkDevices, isScanning: networkScanning } =
     useNetworkDevices(); // 使用共享的设备列表
+  const { connectToPeer, sendFile } = useWebRTC();
 
   // 整合设备数据 - 优先使用networkDevices以保持一致性
   const effectiveDevices = networkDevices.map((device) => ({
@@ -488,19 +490,39 @@ const RadarView: React.FC<RadarViewProps> = ({
   };
 
   // 处理传输确认
-  const handleTransferConfirm = () => {
+  const handleTransferConfirm = async () => {
     const selectedFiles = getSelectedFiles?.();
 
     if (!selectedFiles || selectedFiles.length === 0) {
-      // 如果没有选择文件，显示提示信息
       console.log("请先选择要传输的文件");
       return;
     }
 
-    // 这里可以添加文件传输逻辑
-    console.log("确认向设备传输文件:", selectedDevice);
-    console.log("要传输的文件:", selectedFiles);
-    setSelectedDevice(null);
+    if (!selectedDevice?.ip) {
+      console.log("设备信息不完整");
+      return;
+    }
+
+    try {
+      // 建立连接
+      console.log(`尝试连接到设备: ${selectedDevice.id}`);
+      await connectToPeer(selectedDevice.id);
+
+      // 发送所有选中的文件
+      for (let i = 0; i < selectedFiles.length; i++) {
+        console.log(`准备发送文件: ${selectedFiles[i].name}`);
+        await sendFile(selectedDevice.id, selectedFiles[i]);
+      }
+
+      // 传输已开始，关闭对话框即可，进度由CurrentTransfers组件显示
+      console.log("文件传输已开始");
+      setSelectedDevice(null);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error("传输失败:", errorMessage);
+      alert(`文件传输失败: ${errorMessage}`);
+    }
   };
 
   // 处理弹窗关闭
