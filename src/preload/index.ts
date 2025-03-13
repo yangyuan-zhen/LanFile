@@ -19,7 +19,8 @@ const invokeHandler = (channel: string, ...args: any[]) => {
     // 检查通道名称
     const allowedPrefixes = [
         'dialog:', 'settings:', 'heartbeat:',
-        'network:', 'system:', 'mdns:'
+        'network:', 'system:', 'mdns:',
+        'webrtc:', 'file:'
     ];
 
     // 完整通道列表
@@ -46,6 +47,11 @@ const invokeHandler = (channel: string, ...args: any[]) => {
         'dialog:openDirectory',
         'system:getDeviceId',
         'http:request',
+        'webrtc:initialize',
+        'webrtc:sendOffer',
+        'webrtc:sendAnswer',
+        'webrtc:sendIceCandidate',
+        'file:saveDownloadedFile'
     ];
 
     const isAllowed = validChannels.includes(channel) ||
@@ -113,6 +119,11 @@ try {
                 'system:deviceNameChanged',
                 'system:remoteDeviceNameChanged',
                 'device:nameUpdated',
+                'update:checking',
+                'update:available',
+                'webrtc:connectionRequest',
+                'webrtc:answer',
+                'webrtc:iceCandidate'
             ];
 
             if (!validChannels.includes(channel)) {
@@ -135,7 +146,16 @@ try {
         },
 
         off: (channel: string, func: (...args: any[]) => void) => {
-            ipcRenderer.removeListener(channel, func);
+            const validChannels = [
+                'update:checking',
+                'update:available',
+                'webrtc:connectionRequest',
+                'webrtc:answer',
+                'webrtc:iceCandidate'
+            ];
+            if (validChannels.includes(channel)) {
+                ipcRenderer.removeListener(channel, (_, ...args) => func(...args));
+            }
         },
 
         heartbeat: {

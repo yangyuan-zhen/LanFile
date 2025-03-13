@@ -34,7 +34,8 @@ export const useWebRTC = () => {
 
         const initWebRTC = async () => {
             try {
-                // 告诉主进程我们准备好接收 WebRTC 连接
+                setIsReady(false);
+                // 真实初始化WebRTC
                 await window.electron.invoke('webrtc:initialize');
                 setIsReady(true);
                 console.log('WebRTC 初始化完成');
@@ -46,13 +47,11 @@ export const useWebRTC = () => {
         initWebRTC();
 
         // 监听连接请求
-        const handleConnectionRequest = async (data: any) => {
-            if (!data || !data.fromPeerId || !data.offer) {
-                console.error('收到无效的连接请求');
-                return;
+        const handleConnectionRequest = (data: any) => {
+            console.log('收到连接请求:', data);
+            if (data?.fromPeerId && data?.offer) {
+                createPeerConnection(data.fromPeerId, false, data.offer);
             }
-
-            await createPeerConnection(data.fromPeerId, false, data.offer);
         };
 
         window.electron.on('webrtc:connectionRequest', handleConnectionRequest);
@@ -62,7 +61,7 @@ export const useWebRTC = () => {
             // 清理连接
             Object.values(peers).forEach(peer => peer.connection.close());
         };
-    }, [networkInfo.isConnected, networkInfo.ip, peers]);
+    }, [networkInfo.isConnected, networkInfo.ip]);
 
     // 创建对等连接
     const createPeerConnection = async (peerId: string, isInitiator = true, remoteOffer?: RTCSessionDescriptionInit) => {
@@ -256,12 +255,12 @@ export const useWebRTC = () => {
         return false;
     };
 
-    // 发送文件
+    // 发送文件的真实实现
     const sendFile = async (peerId: string, file: File) => {
         try {
             console.log(`开始传输文件 ${file.name} 到设备 ${peerId}`);
 
-            // 确保有连接并获取正确的数据通道
+            // 确保有连接
             let dataChannel: RTCDataChannel;
             if (peers[peerId]?.dataChannel) {
                 dataChannel = peers[peerId].dataChannel;
@@ -293,21 +292,85 @@ export const useWebRTC = () => {
             // 添加到传输列表
             setTransfers(prev => [...prev, transfer]);
 
-            // 模拟传输过程
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 10;
-                if (progress <= 100) {
+            // 告知对方准备接收文件
+            sendControlMessage(peerId, {
+                type: 'file-info',
+                name: file.name,
+                size: file.size,
+                fileType: file.type,
+                transferId
+            });
+
+            // 将文件分块发送
+            const chunkSize = 16384; // 16KB
+            const reader = new FileReader();
+            let offset = 0;
+
+            reader.onload = async (e) => {
+                if (!e.target?.result) return;
+
+                const data = e.target.result;
+                try {
+                    // 添加文件ID到数据前面
+                    const idBytes = new TextEncoder().encode(transferId);
+                    const chunk = new Uint8Array(1 + idBytes.length + (data as ArrayBuffer).byteLength);
+                    chunk[0] = idBytes.length;
+                    chunk.set(idBytes, 1);
+                    chunk.set(new Uint8Array(data as ArrayBuffer), idBytes.length + 1);
+
+                    // 发送数据
+                    dataChannel.send(chunk);
+
+                    // 更新进度
+                    offset += (data as ArrayBuffer).byteLength;
+                    const progress = Math.min(100, Math.floor((offset / file.size) * 100));
+
                     setTransfers(prev =>
-                        prev.map(t => t.id === transferId ? { ...t, progress, status: "transferring" as const } : t)
+                        prev.map(t => t.id === transferId ?
+                            { ...t, progress, status: "transferring" as const } : t)
                     );
-                } else {
-                    clearInterval(interval);
+
+                    // 继续读取下一块
+                    if (offset < file.size) {
+                        readNextChunk();
+                    } else {
+                        // 文件传输完成
+                        sendControlMessage(peerId, {
+                            type: 'file-complete',
+                            transferId,
+                            fileName: file.name,
+                            fileType: file.type
+                        });
+
+                        setTransfers(prev =>
+                            prev.map(t => t.id === transferId ?
+                                { ...t, progress: 100, status: "completed" as const } : t)
+                        );
+                    }
+                } catch (error) {
+                    console.error(`发送文件块失败:`, error);
                     setTransfers(prev =>
-                        prev.map(t => t.id === transferId ? { ...t, progress: 100, status: "completed" as const } : t)
+                        prev.map(t => t.id === transferId ?
+                            { ...t, status: "error" as const } : t)
                     );
                 }
-            }, 500);
+            };
+
+            reader.onerror = () => {
+                console.error(`读取文件失败`);
+                setTransfers(prev =>
+                    prev.map(t => t.id === transferId ?
+                        { ...t, status: "error" as const } : t)
+                );
+            };
+
+            const readNextChunk = () => {
+                const slice = file.slice(offset, offset + chunkSize);
+                reader.readAsArrayBuffer(slice);
+            };
+
+            // 开始读取第一块
+            readNextChunk();
 
             return transferId;
         } catch (error) {
