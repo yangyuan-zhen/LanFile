@@ -13,16 +13,30 @@ export interface NetworkAPI {
     onDeviceLeft: (callback: (device: Device) => void) => () => void;
 }
 
+interface ElectronAPI {
+    network: NetworkAPI;
+    test: {
+        ping: () => string;
+    };
+    invoke: (channel: string, ...args: any[]) => Promise<any>;
+    on: (channel: string, callback: (...args: any[]) => void) => void;
+    off: (channel: string, callback: (...args: any[]) => void) => void;
+    http: {
+        request: (options: {
+            url: string;
+            method?: string;
+            headers?: Record<string, string>;
+            body?: any;
+        }) => Promise<{
+            ok: boolean;
+            status: number;
+            data: any;
+        }>;
+    };
+}
+
 declare global {
     interface Window {
-        electron: {
-            network: NetworkAPI;
-            test: {
-                ping: () => string;
-            };
-            invoke: (channel: string, ...args: any[]) => Promise<any>;
-            on: (channel: string, callback: (...args: any[]) => void) => void;
-            off: (channel: string, callback: (...args: any[]) => void) => void;
-        };
+        electron: ElectronAPI;
     }
 } 

@@ -119,7 +119,7 @@ const isValidIPv4 = (ip: string): boolean => {
 export const useNetworkDevices = () => {
     const [devices, setDevices] = useState<NetworkDevice[]>([]);
     const deviceInfo = useDeviceInfo();
-    const [networkInfo, setNetworkInfo] = useState<{ ip?: string; type?: string }>({});
+    const [networkInfo, setNetworkInfo] = useState<{ ip?: string; type?: string; isConnected: boolean }>({ isConnected: false });
     const [isScanning, setIsScanning] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
     const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>(loadDeviceNameMap());
@@ -152,22 +152,24 @@ export const useNetworkDevices = () => {
                 const info = await window.electron.invoke('system:getNetworkInfo');
                 console.log('获取到网络信息:', info);
 
-                if (info) {
-                    if (info.ip && info.ip.includes(':')) {
-                        console.log('检测到IPv6地址，尝试使用IPv4地址');
-                        if (info.ipv4) {
-                            info.ip = info.ipv4;
-                        }
+                if (info && info.isConnected && info.ip) {
+                    if (info.ip.includes(':') && info.ipv4) {
+                        info.ip = info.ipv4;
                     }
 
-                    if (info.ip && !info.ip.includes(':')) {
+                    if (!info.ip.includes(':')) {
                         setNetworkInfo(info);
+                        console.log('网络已连接:', info);
                     } else {
                         console.warn('未找到有效的IPv4地址:', info);
                     }
+                } else {
+                    setNetworkInfo({ ...info, type: 'none', isConnected: false });
+                    console.log('网络未连接');
                 }
             } catch (error) {
                 console.error('获取网络信息失败:', error);
+                setNetworkInfo({ type: 'none', ip: '', isConnected: false });
             }
         };
 
@@ -177,40 +179,46 @@ export const useNetworkDevices = () => {
     }, []);
 
     useEffect(() => {
-        if (!isInitialized || !networkInfo.ip || !deviceInfo.currentDevice.name) {
-            return;
-        }
+        // 确保本机设备始终存在且在线
+        const ensureLocalDevice = () => {
+            // 添加 IP 检查
+            const currentIp = networkInfo.ip;
+            if (!currentIp || !deviceInfo.currentDevice.name) return;
 
-        console.log('更新本机设备信息:', {
-            deviceName: deviceInfo.currentDevice.name,
-            networkIP: networkInfo.ip
-        });
+            setDevices(prev => {
+                const localDeviceIndex = prev.findIndex(d => d.ip === currentIp);
+                const localDevice: NetworkDevice = {  // 添加类型注解
+                    name: deviceInfo.currentDevice.name,
+                    type: "desktop",
+                    icon: Monitor,
+                    status: "在线",
+                    ip: currentIp,  // 使用已验证的 IP
+                    port: 12345,
+                    lastSeen: Date.now()
+                };
 
-        const localDevice: NetworkDevice = {
-            name: deviceInfo.currentDevice.name,
-            type: "desktop" as DeviceType,
-            icon: Monitor,
-            status: "在线" as DeviceStatus,
-            ip: networkInfo.ip,
-            port: 12345,
-            lastSeen: Date.now()
+                if (localDeviceIndex === -1) {
+                    return [localDevice, ...prev];
+                } else {
+                    const updatedDevices = [...prev];
+                    updatedDevices[localDeviceIndex] = {
+                        ...updatedDevices[localDeviceIndex],
+                        status: "在线",
+                        lastSeen: Date.now()
+                    };
+                    return updatedDevices;
+                }
+            });
         };
 
-        setDevices(prev => {
-            const localDeviceIndex = prev.findIndex(d => d.ip === networkInfo.ip);
-            if (localDeviceIndex >= 0) {
-                const updatedDevices = [...prev];
-                updatedDevices[localDeviceIndex] = localDevice;
-                console.log('设置设备列表，之前:', devices.length, '个，现在:', updatedDevices.length, '个');
-                return updatedDevices;
-            } else {
-                console.log('设置设备列表，之前:', devices.length, '个，现在:', [localDevice, ...prev].length, '个');
-                return [localDevice, ...prev];
-            }
-        });
+        // 立即执行一次
+        ensureLocalDevice();
 
-        startScan();
-    }, [isInitialized, deviceInfo.currentDevice.name, networkInfo.ip]);
+        // 设置定时器，每5秒检查一次
+        const timer = setInterval(ensureLocalDevice, 5000);
+
+        return () => clearInterval(timer);
+    }, [networkInfo.ip, deviceInfo.currentDevice.name]);
 
     useEffect(() => {
         const handleLocalDeviceNameUpdate = (data: any) => {
@@ -520,7 +528,9 @@ export const useNetworkDevices = () => {
 
     const checkDeviceStatus = async (device: NetworkDevice) => {
         try {
+            // 如果是本机，始终返回在线状态
             if (device.ip === networkInfo.ip) {
+                console.log('本机设备状态检查 - 始终在线');
                 return {
                     ...device,
                     status: "在线" as DeviceStatus,
@@ -528,37 +538,54 @@ export const useNetworkDevices = () => {
                 };
             }
 
-            // 使用心跳服务检测
-            try {
-                const heartbeatPort = await window.electron.invoke('heartbeat:getPort');
-                const response = await fetch(`http://${device.ip}:${heartbeatPort}/lanfile/status`, {
-                    signal: AbortSignal.timeout(5000)  // 5秒超时
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.status === 'online') {
-                        return {
-                            ...device,
-                            status: "在线" as DeviceStatus,
-                            lastSeen: Date.now()
-                        };
-                    }
-                }
-
-                return {
-                    ...device,
-                    status: "离线" as DeviceStatus
-                };
-            } catch (err) {
-                console.log(`设备 ${device.name} (${device.ip}) 心跳检测失败:`, err);
+            // 检查网络连接状态
+            if (!networkInfo.isConnected) {
+                console.log('网络未连接，设备状态设置为离线');
                 return {
                     ...device,
                     status: "离线" as DeviceStatus
                 };
             }
+
+            // 使用心跳服务检测其他设备
+            try {
+                const heartbeatPort = await window.electron.invoke('heartbeat:getPort');
+                console.log(`检查设备状态: ${device.name} (${device.ip}:${heartbeatPort})`);
+
+                const response = await window.electron.http.request({
+                    url: `http://${device.ip}:${heartbeatPort}/lanfile/status`,
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+
+                if (response.ok && response.data.status === 'online') {
+                    console.log(`设备 ${device.name} (${device.ip}) 在线`);
+                    return {
+                        ...device,
+                        status: "在线" as DeviceStatus,
+                        lastSeen: Date.now()
+                    };
+                }
+            } catch (err) {
+                console.log(`设备 ${device.name} (${device.ip}) 心跳检测失败:`, err);
+            }
+
+            return {
+                ...device,
+                status: "离线" as DeviceStatus
+            };
         } catch (error) {
             console.error(`检查设备 ${device.name} (${device.ip}) 状态失败:`, error);
+            // 如果是本机，即使发生错误也保持在线状态
+            if (device.ip === networkInfo.ip) {
+                return {
+                    ...device,
+                    status: "在线" as DeviceStatus,
+                    lastSeen: Date.now()
+                };
+            }
             return {
                 ...device,
                 status: "离线" as DeviceStatus

@@ -1,0 +1,9 @@
+{
+  "directories": {
+    "output": "release"
+  },
+  "files": ["dist/**/*"],
+  "extraMetadata": {
+    "main": "./dist/main/index.js"
+  }
+}

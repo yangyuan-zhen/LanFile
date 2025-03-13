@@ -83,6 +83,38 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
     startScan();
   };
 
+  const getNetworkStatus = () => {
+    if (!networkStatusInfo.isConnected) {
+      return {
+        text: "未连接到网络",
+        color: "text-red-500",
+      };
+    }
+
+    if (networkStatusInfo.type === "ethernet") {
+      return {
+        text: "已连接到有线网络",
+        color: "text-green-500",
+      };
+    }
+
+    if (networkStatusInfo.type === "wifi") {
+      return {
+        text: networkStatusInfo.ssid
+          ? `已连接到 ${networkStatusInfo.ssid}`
+          : "已连接到无线网络",
+        color: "text-green-500",
+      };
+    }
+
+    return {
+      text: "网络状态未知",
+      color: "text-yellow-500",
+    };
+  };
+
+  const status = getNetworkStatus();
+
   return (
     <div className="p-6 mb-6 bg-white rounded-xl shadow-sm">
       <h3 className="mb-4 text-lg font-semibold text-gray-900">局域网设备</h3>
@@ -111,12 +143,8 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
           {/* 添加 Wi-Fi 信息 */}
           <div className="flex justify-between mb-2">
             <span className="text-gray-600">连接网络:</span>
-            <span className="font-semibold">
-              {networkStatusInfo.type === "wifi"
-                ? networkStatusInfo.ssid || "未知网络"
-                : networkStatusInfo.type === "ethernet"
-                ? "有线网络"
-                : "未连接到网络"}
+            <span className={`font-semibold ${status.color}`}>
+              {status.text}
             </span>
           </div>
 

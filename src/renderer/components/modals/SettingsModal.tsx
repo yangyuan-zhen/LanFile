@@ -51,15 +51,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const handleSelectDownloadFolder = async () => {
     try {
       const result = await window.electron.invoke("dialog:openDirectory");
-      console.log("文件夹选择结果:", result);
+      console.log("文件保存路径选择结果:", result);
 
-      if (result && !result.canceled && result.filePaths.length > 0) {
-        setDownloadPath(result.filePaths[0]);
+      if (result && !result.canceled && result.filePath) {
+        // 注意：showSaveDialog 返回的是 filePath (单个路径)
+        // 而不是 filePaths (路径数组)
+        setDownloadPath(result.filePath);
       }
     } catch (error) {
-      console.error("选择文件夹失败:", error);
+      console.error("选择文件保存路径失败:", error);
       const errorMessage = error instanceof Error ? error.message : "未知错误";
-      alert(`选择文件夹失败: ${errorMessage}`);
+      alert(`选择文件保存路径失败: ${errorMessage}`);
     }
   };
 
@@ -162,7 +164,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     <label className="block mb-1 text-sm font-medium">
                       下载位置
                     </label>
-                    <p className="text-sm text-gray-700 mb-1">{downloadPath}</p>
+                    <div className="flex items-center mb-1">
+                      <p className="flex-1 mr-2 text-sm text-gray-700 truncate">
+                        {downloadPath}
+                      </p>
+                      <button
+                        onClick={handleSelectDownloadFolder}
+                        className="flex items-center p-2 text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                        title="选择下载文件夹"
+                      >
+                        <Folder size={16} className="mr-1" />
+                        <span>浏览...</span>
+                      </button>
+                    </div>
                     <p className="mt-1 text-sm text-gray-500">
                       从其他设备接收的文件将保存在此文件夹中
                     </p>
