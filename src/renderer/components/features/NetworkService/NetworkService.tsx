@@ -21,6 +21,7 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
   const { devices, startScan, isScanning } = useNetworkDevices();
   const networkStatusInfo = useNetworkInfo();
   const [lastScanTime, setLastScanTime] = useState<Date>(new Date());
+  const [timeUpdateTrigger, setTimeUpdateTrigger] = useState(0);
 
   // 获取最新设备扫描时间
   useEffect(() => {
@@ -35,11 +36,25 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
     }
   }, [devices]);
 
+  // 在 useEffect 中，添加一个定时器来实时更新显示的时间
+  useEffect(() => {
+    // 设置一个每分钟更新一次的定时器，确保时间显示实时更新
+    const timer = setInterval(() => {
+      // 增加触发器的值来强制组件重新渲染
+      setTimeUpdateTrigger((prev) => prev + 1);
+    }, 60000); // 每分钟更新一次
+
+    return () => clearInterval(timer); // 组件卸载时清除定时器
+  }, []);
+
   // 获取在线设备数量
   const onlineDevicesCount = devices.filter((d) => d.status === "在线").length;
 
   // 格式化最后扫描时间
   const formatLastScanTime = () => {
+    // timeUpdateTrigger 变化会导致这个函数重新计算
+    console.log("更新时间显示，触发器:", timeUpdateTrigger);
+
     const now = new Date();
     const diff = Math.floor(
       (now.getTime() - lastScanTime.getTime()) / 1000 / 60
@@ -62,11 +77,9 @@ const NetworkService: React.FC<NetworkServiceProps> = ({ networkInfo }) => {
 
   const handleScanClick = () => {
     console.log("开始扫描网络设备流程...");
-    // 调用 startScan() 开始扫描，其中包含了以下步骤：
-    // 1. 启动 MDNS 发现服务
-    // 2. 5秒后停止发现服务
-    // 3. 保存发现的设备到缓存
-    // 4. 检查所有设备状态
+    // 立即更新最后扫描时间为当前时间
+    setLastScanTime(new Date());
+    // 调用 startScan() 开始扫描
     startScan();
   };
 
