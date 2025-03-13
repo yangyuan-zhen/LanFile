@@ -13,6 +13,15 @@ export interface NetworkAPI {
     onDeviceLeft: (callback: (device: Device) => void) => () => void;
 }
 
+export interface NetworkDevice {
+    id: string;
+    name: string;
+    ip: string;
+    port?: number;
+    type: string;
+    online: boolean;
+}
+
 interface ElectronAPI {
     network: NetworkAPI;
     test: {

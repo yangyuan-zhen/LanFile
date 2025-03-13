@@ -308,6 +308,43 @@ function setupIpcHandlers() {
         return true;
     });
 
+    // 在setupIpcHandlers函数中添加
+    ipcMain.handle('network:pingDevice', async (_, ip: string) => {
+        try {
+            console.log(`尝试 ping 设备: ${ip}`);
+            // 使用 AbortController 实现超时功能
+            const HEARTBEAT_PORT = 32199; // 添加心跳端口定义
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+            try {
+                const response = await fetch(`http://${ip}:${HEARTBEAT_PORT}/ping`, {
+                    method: 'GET',
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                return response.status === 200;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw error; // 继续到下一个尝试方法
+            }
+        } catch (error) {
+            console.log(`Ping设备 ${ip} 失败:`, error);
+            // 尝试用其他方式检测设备
+            try {
+                const tcpPing = require('tcp-ping');
+                const HEARTBEAT_PORT = 32199; // 使用相同的端口
+                return new Promise((resolve) => {
+                    tcpPing.probe(ip, HEARTBEAT_PORT, (err: Error | null, available: boolean) => {
+                        resolve(available);
+                    });
+                });
+            } catch (err) {
+                return false;
+            }
+        }
+    });
+
     console.log("IPC 处理器注册完成");
 }
 

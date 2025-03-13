@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 // import { Device } from "../../types/electron";
 import { useNetworkInfo } from "../../hooks/useNetworkInfo";
-import { Smartphone, Laptop, Tablet, Monitor } from "lucide-react";
+import { Smartphone, Laptop, Tablet, Monitor, RefreshCw } from "lucide-react";
 import { useDeviceInfo } from "../../hooks/useDeviceInfo";
 import { useNetworkDevices } from "../../hooks/useNetworkDevices";
 import { useWebRTC } from "../../hooks/useWebRTC";
