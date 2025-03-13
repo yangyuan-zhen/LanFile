@@ -15,8 +15,20 @@ export const useNetworkDevices = () => {
     try {
       const updatedDevices = await Promise.all(
         devices.map(async (device) => {
-          // 实现设备状态检查逻辑
-          return device;
+          try {
+            // 通过ping或其他方式检查设备在线状态
+            const isOnline = await window.electron.invoke(
+              "network:pingDevice",
+              device.ip
+            );
+            return { ...device, online: isOnline };
+          } catch (error) {
+            console.error(
+              `检查设备 ${device.name} (${device.ip}) 状态失败:`,
+              error
+            );
+            return device;
+          }
         })
       );
       setDevices(updatedDevices);
@@ -62,6 +74,17 @@ export const useNetworkDevices = () => {
       setIsScanning(false);
     }
   }, [devices, checkAllDevicesStatus]);
+
+  useEffect(() => {
+    // 每15秒检查一次设备状态，原来是30秒
+    const statusCheckInterval = setInterval(() => {
+      if (devices.length > 0) {
+        checkAllDevicesStatus();
+      }
+    }, 15000);
+
+    return () => clearInterval(statusCheckInterval);
+  }, [devices.length, checkAllDevicesStatus]);
 
   return {
     devices,
