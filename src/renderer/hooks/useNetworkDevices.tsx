@@ -52,6 +52,10 @@ export const useNetworkDevices = () => {
 
       console.log("设备状态检查完成:", updatedDevices);
       setDevices(updatedDevices);
+      console.log(
+        "网络设备端口信息:",
+        updatedDevices.map((d) => ({ name: d.name, ip: d.ip, port: d.port }))
+      );
       return updatedDevices;
     } catch (error) {
       console.error("检查设备状态失败:", error);

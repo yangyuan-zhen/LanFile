@@ -3,6 +3,7 @@ export interface IElectronAPI {
     invoke(channel: 'heartbeat:setPort', port: number): Promise<void>;
     invoke(channel: 'settings:getDownloadPath'): Promise<string>;
     invoke(channel: 'settings:setDownloadPath', path: string): Promise<void>;
+    invoke(channel: 'settings:setPort', port: number): Promise<void>;
     invoke(channel: 'dialog:openDirectory'): Promise<Electron.OpenDialogReturnValue>;
 }
 

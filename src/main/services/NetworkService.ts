@@ -12,6 +12,8 @@ export interface NetworkDevice {
 export class NetworkService extends EventEmitter {
     private socket: dgram.Socket | null = null;
     private isDiscovering: boolean = false;
+    private servicePort: number = 12345;
+    private isRunning: boolean = false;
 
     constructor() {
         super();
@@ -52,7 +54,7 @@ export class NetworkService extends EventEmitter {
     public getLocalService() {
         return {
             name: 'LanFile Device',
-            port: 12345
+            port: this.servicePort
         };
     }
 
@@ -66,7 +68,7 @@ export class NetworkService extends EventEmitter {
             }));
 
             this.socket?.setBroadcast(true);
-            this.socket?.send(message, 0, message.length, 12345, '255.255.255.255');
+            this.socket?.send(message, 0, message.length, this.servicePort, '255.255.255.255');
         } catch (error) {
             console.error('Failed to start discovery:', error);
         }
@@ -92,7 +94,9 @@ export class NetworkService extends EventEmitter {
                 port: port
             }));
             this.socket?.setBroadcast(true);
-            this.socket?.send(message, 0, message.length, 12345, '255.255.255.255');
+            this.socket?.send(message, 0, message.length, port, '255.255.255.255');
+            this.servicePort = port;
+            this.isRunning = true;
         } catch (error) {
             console.error('Failed to publish service:', error);
         }
@@ -102,6 +106,19 @@ export class NetworkService extends EventEmitter {
         if (this.socket) {
             this.socket.close();
             this.socket = null;
+            this.isRunning = false;
+        }
+    }
+
+    updateServicePort(port: number) {
+        console.log(`更新网络服务端口: ${port}`);
+        this.servicePort = port;
+
+        // 重启服务以应用新端口
+        if (this.isRunning) {
+            console.log('重新启动网络服务以应用新端口');
+            this.unpublishService();
+            this.publishService(port);
         }
     }
 }

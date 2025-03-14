@@ -50,6 +50,23 @@ function setupIpcHandlers() {
         }
     });
 
+    ipcMain.handle('settings:setPort', (_, port: number) => {
+        try {
+            console.log("设置端口:", port);
+            store.set('servicePort', port);
+
+            // 重要：通知网络服务更新端口
+            if (networkService) {
+                networkService.updateServicePort(port);
+            }
+
+            return true;
+        } catch (error) {
+            console.error("设置端口错误:", error);
+            return false;
+        }
+    });
+
     // 文件对话框处理器
     ipcMain.handle('dialog:openDirectory', async () => {
         try {
