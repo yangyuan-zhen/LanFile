@@ -75,8 +75,8 @@ const NetworkService: React.FC<NetworkServiceProps> = ({
 
   // 使用 deviceInfo 中的真实设备名称
   const currentDevice = {
-    name: deviceInfo.currentDevice.name,
-    id: deviceInfo.currentDevice.id,
+    name: deviceInfo.name,
+    id: deviceInfo.id,
   };
 
   const handleScanClick = () => {

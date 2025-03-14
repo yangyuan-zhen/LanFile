@@ -12,6 +12,7 @@ import { setupPingHandler } from './network';
 import dgram from 'dgram';
 import { logService } from './services/LogService';
 import { setupSignalingHandlers } from './signaling';
+import { webSocketSignalingService } from './services/WebSocketSignalingService';
 
 // 创建配置存储实例
 const store = new Store();
@@ -27,6 +28,16 @@ wifi.init({
 
 // 在应用启动时尽早设置
 logService.setupConsole();
+
+// 获取设备ID
+async function getDeviceId(): Promise<string> {
+    try {
+        return hostname(); // 已导入的 os.hostname() 函数
+    } catch (error) {
+        console.error("获取设备ID失败:", error);
+        return "unknown-device";
+    }
+}
 
 // 注册所有 IPC 处理器
 function setupIpcHandlers() {
@@ -423,6 +434,9 @@ const createWindow = () => {
     });
 
     setupWebRTCHandlers(mainWindow);
+
+    // 保存窗口引用
+    (global as any).mainWindow = mainWindow;
 };
 
 // 应用初始化
@@ -464,6 +478,11 @@ app.whenReady().then(async () => {
             await configureWindowsFirewall();
         }
         // 其他平台可能需要特定配置
+
+        const deviceId = await getDeviceId();
+        const deviceName = app.getName(); // 或其他设备名称获取方式
+        await webSocketSignalingService.start(deviceId, deviceName);
+        console.log(`WebSocket 信令服务已启动，端口: ${webSocketSignalingService.getPort()}`);
 
     } catch (error) {
         console.error("应用初始化失败:", error);

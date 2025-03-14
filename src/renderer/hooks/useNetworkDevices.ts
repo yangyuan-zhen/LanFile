@@ -183,12 +183,12 @@ export const useNetworkDevices = () => {
         const ensureLocalDevice = () => {
             // 添加 IP 检查
             const currentIp = networkInfo.ip;
-            if (!currentIp || !deviceInfo.currentDevice.name) return;
+            if (!currentIp || !deviceInfo.name) return;
 
             setDevices(prev => {
                 const localDeviceIndex = prev.findIndex(d => d.ip === currentIp);
                 const localDevice: NetworkDevice = {  // 添加类型注解
-                    name: deviceInfo.currentDevice.name,
+                    name: deviceInfo.name,
                     type: "desktop",
                     icon: Monitor,
                     status: "在线",
@@ -218,7 +218,7 @@ export const useNetworkDevices = () => {
         const timer = setInterval(ensureLocalDevice, 5000);
 
         return () => clearInterval(timer);
-    }, [networkInfo.ip, deviceInfo.currentDevice.name]);
+    }, [networkInfo.ip, deviceInfo.name]);
 
     useEffect(() => {
         const handleLocalDeviceNameUpdate = (data: any) => {
@@ -608,7 +608,7 @@ export const useNetworkDevices = () => {
             if (!hasLocalDevice && networkInfo.ip) {
                 console.log('设备列表中缺少本地设备，正在添加...');
                 const localDevice = {
-                    name: deviceInfo.currentDevice.name,
+                    name: deviceInfo.name,
                     type: "desktop" as DeviceType,
                     icon: Monitor,
                     status: "在线" as DeviceStatus,

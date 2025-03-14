@@ -1,6 +1,8 @@
-import { Server as WebSocketServer } from 'ws';
-import { EventEmitter } from 'events';
 import WebSocket from 'ws';
+const WebSocketServer = WebSocket.Server || WebSocket;
+// 添加类型声明
+type WebSocketServerType = typeof WebSocketServer;
+import { EventEmitter } from 'events';
 import { ipcMain } from 'electron';
 import { logService } from './LogService';
 
@@ -15,7 +17,7 @@ interface SignalingMessage {
 }
 
 export class WebSocketSignalingService extends EventEmitter {
-    private server: WebSocketServer | null = null;
+    private server: WebSocketServerType | null = null;
     private connections: Map<string, WebSocket> = new Map();
     private deviceMap: Map<string, { deviceId: string, deviceName: string }> = new Map();
     private port: number = 8090;
@@ -34,14 +36,14 @@ export class WebSocketSignalingService extends EventEmitter {
 
         return new Promise((resolve, reject) => {
             try {
-                this.server = new WebSocketServer({ port: this.port });
+                this.server = new WebSocketServer({ port: this.port }) as any;
 
-                this.server.on('connection', (ws, request) => {
+                (this.server as any).on('connection', (ws: WebSocket, request: any) => {
                     const ip = request.socket.remoteAddress || 'unknown';
                     logService.log(`新的 WebSocket 连接来自 ${ip}`);
 
                     // 注册消息处理器
-                    ws.on('message', (message) => this.handleIncomingMessage(ws, message));
+                    ws.on('message', (message: WebSocket.RawData) => this.handleIncomingMessage(ws, message));
 
                     ws.on('close', () => {
                         logService.log(`WebSocket 连接关闭: ${ip}`);
@@ -55,17 +57,17 @@ export class WebSocketSignalingService extends EventEmitter {
                         }
                     });
 
-                    ws.on('error', (error) => {
+                    ws.on('error', (error: Error) => {
                         logService.error(`WebSocket 连接错误: ${error.message}`);
                     });
                 });
 
-                this.server.on('error', (error) => {
+                (this.server as any).on('error', (error: Error) => {
                     logService.error(`WebSocket 服务器错误: ${error.message}`);
                     reject(error);
                 });
 
-                this.server.on('listening', () => {
+                (this.server as any).on('listening', () => {
                     this.isRunning = true;
                     logService.log(`WebSocket 信令服务器运行在端口 ${this.port}`);
                     resolve();
@@ -77,28 +79,28 @@ export class WebSocketSignalingService extends EventEmitter {
         });
     }
 
-    private handleIncomingMessage(ws: WebSocket, rawMessage: WebSocket.Data) {
+    private handleIncomingMessage(ws: WebSocket, message: WebSocket.RawData): void {
         try {
-            const message = JSON.parse(rawMessage.toString()) as SignalingMessage;
+            const signalingMessage = JSON.parse(message.toString()) as SignalingMessage;
 
             // 处理注册消息，将设备ID与连接关联
-            if (message.type === 'register' && message.deviceId) {
-                this.connections.set(message.deviceId, ws);
-                this.deviceMap.set(message.deviceId, {
-                    deviceId: message.deviceId,
-                    deviceName: message.deviceName || message.deviceId
+            if (signalingMessage.type === 'register' && signalingMessage.deviceId) {
+                this.connections.set(signalingMessage.deviceId, ws);
+                this.deviceMap.set(signalingMessage.deviceId, {
+                    deviceId: signalingMessage.deviceId,
+                    deviceName: signalingMessage.deviceName || signalingMessage.deviceId
                 });
 
-                logService.log(`设备已注册: ${message.deviceName} (${message.deviceId})`);
+                logService.log(`设备已注册: ${signalingMessage.deviceName} (${signalingMessage.deviceId})`);
 
                 // 通知新设备连接
                 this.emit('deviceConnected', {
-                    id: message.deviceId,
-                    name: message.deviceName || message.deviceId
+                    id: signalingMessage.deviceId,
+                    name: signalingMessage.deviceName || signalingMessage.deviceId
                 });
 
                 // 向新设备发送当前设备信息
-                this.sendToDevice(message.deviceId, {
+                this.sendToDevice(signalingMessage.deviceId, {
                     type: 'register',
                     from: this.localDeviceId,
                     deviceId: this.localDeviceId,
@@ -110,12 +112,12 @@ export class WebSocketSignalingService extends EventEmitter {
             }
 
             // 转发消息到目标设备
-            if (message.to) {
-                this.forwardMessage(message);
+            if (signalingMessage.to) {
+                this.forwardMessage(signalingMessage);
             }
 
             // 触发事件，让应用可以处理消息
-            this.emit('message', message);
+            this.emit('message', signalingMessage);
 
         } catch (error) {
             logService.error(`处理 WebSocket 消息错误: ${error instanceof Error ? error.message : String(error)}`);
@@ -176,7 +178,7 @@ export class WebSocketSignalingService extends EventEmitter {
                     this.handleIncomingMessage(ws, message);
                 });
 
-                ws.on('error', (error) => {
+                ws.on('error', (error: Error) => {
                     logService.error(`连接到设备 ${deviceId} 错误: ${error.message}`);
                     this.connections.delete(deviceId);
                     reject(error);
@@ -284,7 +286,7 @@ export class WebSocketSignalingService extends EventEmitter {
         this.deviceMap.clear();
 
         if (this.server) {
-            this.server.close();
+            (this.server as any).close();
             this.server = null;
         }
 

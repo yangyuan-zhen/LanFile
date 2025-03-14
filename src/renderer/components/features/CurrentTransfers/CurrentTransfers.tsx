@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import FileTransferCard from "../FileTransferCard/FileTransferCard";
+import { useWebRTCWithSignaling } from "../../../hooks/useWebRTCWithSignaling";
 
 interface TransferItem {
   id: string;
@@ -27,6 +28,8 @@ export const CurrentTransfers: React.FC<CurrentTransfersProps> = ({
     null
   );
 
+  const webrtc = useWebRTCWithSignaling();
+
   const handleTransferClick = (transfer: TransferItem) => {
     setSelectedTransfer(transfer);
     setShowDetails(true);
@@ -34,6 +37,33 @@ export const CurrentTransfers: React.FC<CurrentTransfersProps> = ({
 
   const closeDetails = () => {
     setShowDetails(false);
+  };
+
+  const sendFileViaWebRTC = async (file: File, peerId: string) => {
+    try {
+      let dataChannel = webrtc.dataChannels[peerId];
+      if (!dataChannel) {
+        const targetDevice = webrtc.connectedDevices.find(
+          (device) => device.id === peerId
+        );
+        if (!targetDevice) {
+          throw new Error("未找到目标设备");
+        }
+        dataChannel = await webrtc.connectToPeer(
+          peerId,
+          targetDevice.ip,
+          targetDevice.port
+        );
+      }
+
+      // 实现文件传输逻辑...
+      // 1. 分块读取文件
+      // 2. 通过数据通道发送
+      // 3. 更新传输状态
+    } catch (error) {
+      console.error("文件传输失败:", error);
+      // 处理错误...
+    }
   };
 
   if (transfers.length === 0) {

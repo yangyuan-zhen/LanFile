@@ -195,7 +195,7 @@ const RadarView: React.FC<RadarViewProps> = ({
   const scanStartTimeRef = useRef<number | null>(null);
   const scanDuration = 5000; // 5秒扫描时间
   const networkInfo = useNetworkInfo(); // 使用网络信息钩子
-  const { currentDevice } = useDeviceInfo();
+  const deviceInfo = useDeviceInfo();
   const { devices: networkDevices, isScanning: networkScanning } =
     useNetworkDevices(); // 使用共享的设备列表
   const { connectToPeer, sendFile } = useWebRTC();
@@ -213,7 +213,7 @@ const RadarView: React.FC<RadarViewProps> = ({
 
   // 添加调试日志
   console.log("RadarView - 使用网络设备:", effectiveDevices);
-  console.log("RadarView - 当前设备:", currentDevice);
+  console.log("RadarView - 当前设备:", deviceInfo);
   console.log("RadarView - 网络信息:", networkInfo);
 
   // 绘制雷达背景
@@ -262,7 +262,7 @@ const RadarView: React.FC<RadarViewProps> = ({
     ctx.fill();
 
     // 绘制设备名称
-    const deviceName = currentDevice.name || "未知设备";
+    const deviceName = deviceInfo.name || "未知设备";
     ctx.font = "12px Arial";
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
@@ -283,7 +283,7 @@ const RadarView: React.FC<RadarViewProps> = ({
 
     // 过滤出非中心设备且在线的设备
     const otherDevices = effectiveDevices.filter(
-      (d) => d.name !== currentDevice.name && d.online
+      (d) => d.name !== deviceInfo.name && d.online
     );
 
     // 如果没有在线设备，不绘制
@@ -417,7 +417,7 @@ const RadarView: React.FC<RadarViewProps> = ({
         if (cleanup) cleanup();
       };
     }
-  }, [viewMode, effectiveDevices, currentDevice, isScanning]);
+  }, [viewMode, effectiveDevices, deviceInfo, isScanning]);
 
   // 监听扫描状态变化
   useEffect(() => {
@@ -428,7 +428,7 @@ const RadarView: React.FC<RadarViewProps> = ({
   }, [isScanning]);
 
   const handleViewChange = (view: "radar" | "list") => {
-    onViewChange?.(currentDevice.id || "");
+    onViewChange?.(deviceInfo.id || "");
   };
 
   // 计算设备在雷达上的位置
@@ -463,7 +463,7 @@ const RadarView: React.FC<RadarViewProps> = ({
     (d) => d.ip === networkInfo.ip
   ) || {
     id: "local",
-    name: currentDevice.name,
+    name: deviceInfo.name,
     type: "desktop",
     icon: Monitor,
     online: true,
