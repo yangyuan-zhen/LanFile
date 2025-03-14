@@ -174,8 +174,8 @@ const checkDeviceByHTTP = async (ip: string, port: number): Promise<boolean> => 
             setTimeout(() => reject(new Error('请求超时')), 2000);
         });
 
-        // 创建实际的 fetch 请求 - 使用正确的路径 /status
-        const fetchPromise = fetch(`http://${ip}:${port}/status`, {
+        // 创建实际的 fetch 请求 - 使用正确的路径
+        const fetchPromise = fetch(`http://${ip}:${port}/lanfile/status`, {
             method: 'GET',
             headers: { 'Accept': 'application/json' }
         });

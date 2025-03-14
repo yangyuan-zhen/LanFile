@@ -10,6 +10,7 @@ import fetch from 'node-fetch';
 import { setupWebRTCHandlers } from './webrtc';
 import { setupPingHandler } from './network';
 import dgram from 'dgram';
+import { logService } from './services/LogService';
 
 // 创建配置存储实例
 const store = new Store();
@@ -22,6 +23,9 @@ let networkService: NetworkService | null = null;
 wifi.init({
     iface: null // 使用默认网络接口
 });
+
+// 在应用启动时尽早设置
+logService.setupConsole();
 
 // 注册所有 IPC 处理器
 function setupIpcHandlers() {
@@ -309,6 +313,34 @@ function setupIpcHandlers() {
         // 存储设置到配置文件或其他存储位置
     });
 
+    // 添加 HTTP 请求处理程序
+    ipcMain.handle('http:request', async (_, options: {
+        url: string;
+        method?: string;
+        headers?: Record<string, string>;
+        body?: any;
+    }) => {
+        try {
+            console.log(`发起HTTP请求: ${options.method || 'GET'} ${options.url}`);
+
+            const response = await fetch(options.url, {
+                method: options.method || 'GET',
+                headers: options.headers || {},
+                body: options.body ? JSON.stringify(options.body) : undefined,
+            });
+
+            const data = await response.json();
+            return {
+                ok: response.ok,
+                status: response.status,
+                data,
+            };
+        } catch (error) {
+            console.error('HTTP请求失败:', error);
+            throw error;
+        }
+    });
+
     console.log("IPC 处理器注册完成");
 }
 
@@ -372,6 +404,13 @@ const createWindow = () => {
 // 应用初始化
 app.whenReady().then(async () => {
     try {
+        // 设置控制台编码（Windows平台）
+        if (process.platform === 'win32') {
+            // 设置控制台编码为UTF-8
+            require('child_process').execSync('chcp 65001', { stdio: 'ignore' });
+            console.log('已设置控制台编码为UTF-8');
+        }
+
         console.log("应用准备就绪，开始初始化...");
 
         // 先注册 IPC 处理器

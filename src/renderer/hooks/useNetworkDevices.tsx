@@ -151,12 +151,14 @@ export const useNetworkDevices = () => {
     const getNetworkInfo = async () => {
       try {
         const info = await window.electron.invoke("system:getNetworkInfo");
+        console.log("获取到的网络信息:", info);
+
         setNetworkInfo({
           id: "local",
           name: await window.electron.invoke("system:getDeviceName"),
           ip: info.ip,
           type: "desktop",
-          online: true,
+          online: true, // 强制设置为 true，确保本机总是"在线"
         });
       } catch (error) {
         console.error("获取网络信息失败:", error);
@@ -181,6 +183,8 @@ export const useNetworkDevices = () => {
         };
       }
 
+      // 注释掉网络连接检查
+      /*
       // 检查网络连接状态
       if (!networkInfo?.online) {
         console.log("网络未连接，设备状态设置为离线");
@@ -189,8 +193,9 @@ export const useNetworkDevices = () => {
           status: "离线",
         };
       }
+      */
 
-      // 使用简化的心跳服务检测其他设备 (TCP + HTTP)
+      // 直接进行设备检测
       const heartbeatPort = await window.electron.invoke("heartbeat:getPort");
       console.log(
         `检查设备状态: ${device.name} (${device.ip}:${heartbeatPort})`
