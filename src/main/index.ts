@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import Store from 'electron-store';
 import path from 'path';
-import { NetworkService } from './services/NetworkService';
+import { NetworkService, checkDeviceStatus, DEFAULT_HEARTBEAT_PORT } from './services/NetworkService';
 import MDNSService, { MDNSDevice } from './services/MDNSService';
 import { heartbeatService } from './services/HeartbeatService';
 import { networkInterfaces, hostname } from 'os';
@@ -338,6 +338,26 @@ function setupIpcHandlers() {
         } catch (error) {
             console.error('HTTP请求失败:', error);
             throw error;
+        }
+    });
+
+    // 在注册IPC处理程序部分添加
+    ipcMain.handle('transfer:checkHeartbeat', async (_, ip) => {
+        try {
+            // 确保目标设备心跳服务正常
+            const isOnline = await checkDeviceStatus(ip, DEFAULT_HEARTBEAT_PORT);
+
+            if (!isOnline) {
+                throw new Error('目标设备心跳服务不可用，无法建立连接');
+            }
+
+            return { success: true };
+        } catch (error) {
+            console.error('心跳检查失败:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            };
         }
     });
 

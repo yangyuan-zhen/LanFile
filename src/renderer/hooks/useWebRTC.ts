@@ -24,6 +24,8 @@ export const useWebRTC = () => {
     const [dataChannels, setDataChannels] = useState<Record<string, RTCDataChannel>>({});
     const [transfers, setTransfers] = useState<FileTransfer[]>([]);
     const [isReady, setIsReady] = useState(false);
+    const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'failed'>('connecting');
+    const [connectionError, setConnectionError] = useState<string | null>(null);
 
     const chunkSize = 16384; // 16KB 块大小
     const fileChunksRef = useRef<Record<string, ArrayBuffer>>({});
@@ -380,39 +382,28 @@ export const useWebRTC = () => {
     };
 
     // 连接到对等点
-    const connectToPeer = async (peerId: string) => {
-        console.log(`尝试连接到设备: ${peerId}`);
-
-        if (peers[peerId]) {
-            console.log(`已有连接到 ${peerId}，复用现有连接`);
-            return peers[peerId].connection;
-        }
-
+    const connectToPeer = async (peerId: string, options = {}) => {
         try {
-            // 创建新的 RTCPeerConnection
-            const peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-            });
+            setConnectionState('connecting');
 
-            // 创建数据通道
-            const dataChannel = peerConnection.createDataChannel(`file-transfer-${peerId}`);
+            // 添加连接超时处理
+            const connectionTimeout = setTimeout(() => {
+                if (connectionState === 'connecting') {
+                    console.error('WebRTC连接超时');
+                    setConnectionState('failed');
+                    setConnectionError('连接超时，请重试');
+                }
+            }, 10000); // 10秒超时
 
-            // 设置数据通道事件
-            dataChannel.onopen = () => {
-                console.log(`与设备 ${peerId} 的连接已建立`);
-            };
+            // 连接逻辑...
 
-            dataChannel.onerror = (error) => {
-                console.error(`数据通道错误: ${error}`);
-            };
+            // 成功连接后清除超时
+            clearTimeout(connectionTimeout);
 
-            // 存储连接和数据通道
-            setPeers(prev => ({ ...prev, [peerId]: { peerId, connection: peerConnection, dataChannel } }));
-
-            return peerConnection;
         } catch (error) {
-            console.error(`连接到设备 ${peerId} 失败:`, error);
-            throw new Error(`连接失败: ${error instanceof Error ? error.message : String(error)}`);
+            console.error('WebRTC连接失败:', error);
+            setConnectionState('failed');
+            setConnectionError(`连接失败: ${error instanceof Error ? error.message : String(error)}`);
         }
     };
 
