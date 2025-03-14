@@ -80,5 +80,29 @@ export const setupSignalingHandlers = () => {
         (global as any).mainWindow?.webContents.send('signaling:message', message);
     });
 
+    // 添加获取信令服务配置的处理程序
+    ipcMain.handle('signaling:getServerConfig', () => {
+        try {
+            // 返回信令服务器配置
+            return {
+                host: 'localhost',
+                port: 8090 // 或者从配置中读取
+            };
+        } catch (error) {
+            console.error('获取信令服务配置失败:', error);
+            throw error;
+        }
+    });
+
+    // 添加获取信令服务器URL的处理程序 (可选的替代方案)
+    ipcMain.handle('signaling:getServerUrl', () => {
+        try {
+            return 'ws://localhost:8090'; // 或者从配置中构建
+        } catch (error) {
+            console.error('获取信令服务URL失败:', error);
+            throw error;
+        }
+    });
+
     logService.log('WebSocket 信令处理程序设置完成');
 }; 

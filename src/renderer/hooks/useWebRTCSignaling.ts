@@ -12,6 +12,9 @@ export const useWebRTCSignaling = () => {
             if (!deviceInfo.id || !deviceInfo.name) return;
 
             try {
+                // 不再请求服务配置，直接连接到默认端口
+                // 默认使用内置信令服务器，不需要外部连接
+
                 // 启动信令服务
                 const result = await window.electron.invoke('signaling:start', deviceInfo.id, deviceInfo.name);
                 if (result.success) {

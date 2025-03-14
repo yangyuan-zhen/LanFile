@@ -363,6 +363,10 @@ export const useWebRTC = () => {
                 throw new Error(`数据通道未打开，当前状态: ${dataChannel.readyState}`);
             }
 
+            // 获取设置中的分块大小
+            const settings = await window.electron.invoke("settings:get");
+            const chunkSize = settings?.chunkSize || 16384; // 默认值
+
             // 创建传输记录
             const transferId = `${peerId}-${file.name}-${Date.now()}`;
             const transfer: FileTransfer = {
@@ -389,74 +393,64 @@ export const useWebRTC = () => {
             });
 
             // 将文件分块发送
-            const chunkSize = 16384; // 16KB
-            const reader = new FileReader();
             let offset = 0;
+            const fileId = `file-${Date.now()}`;
+            const reader = new FileReader();
 
-            reader.onload = async (e) => {
-                if (!e.target?.result) return;
-
-                const data = e.target.result;
-                try {
-                    // 添加文件ID到数据前面
-                    const idBytes = new TextEncoder().encode(transferId);
-                    const chunk = new Uint8Array(1 + idBytes.length + (data as ArrayBuffer).byteLength);
-                    chunk[0] = idBytes.length;
-                    chunk.set(idBytes, 1);
-                    chunk.set(new Uint8Array(data as ArrayBuffer), idBytes.length + 1);
-
-                    // 发送数据
-                    dataChannel.send(chunk);
-
-                    // 更新进度
-                    offset += (data as ArrayBuffer).byteLength;
-                    const progress = Math.min(100, Math.floor((offset / file.size) * 100));
-
-                    setTransfers(prev =>
-                        prev.map(t => t.id === transferId ?
-                            { ...t, progress, status: "transferring" as const } : t)
-                    );
-
-                    // 继续读取下一块
-                    if (offset < file.size) {
-                        readNextChunk();
-                    } else {
-                        // 文件传输完成
-                        sendControlMessage(peerId, {
-                            type: 'file-complete',
-                            transferId,
-                            fileName: file.name,
-                            fileType: file.type
-                        });
-
-                        setTransfers(prev =>
-                            prev.map(t => t.id === transferId ?
-                                { ...t, progress: 100, status: "completed" as const } : t)
-                        );
-                    }
-                } catch (error) {
-                    console.error(`发送文件块失败:`, error);
-                    setTransfers(prev =>
-                        prev.map(t => t.id === transferId ?
-                            { ...t, status: "error" as const } : t)
-                    );
-                }
-            };
-
-            reader.onerror = () => {
-                console.error(`读取文件失败`);
-                setTransfers(prev =>
-                    prev.map(t => t.id === transferId ?
-                        { ...t, status: "error" as const } : t)
-                );
-            };
+            // 通知开始传输
+            dataChannel.send(JSON.stringify({
+                type: 'file-start',
+                id: fileId,
+                name: file.name,
+                size: file.size,
+                mimeType: file.type
+            }));
 
             const readNextChunk = () => {
                 const slice = file.slice(offset, offset + chunkSize);
                 reader.readAsArrayBuffer(slice);
             };
 
-            // 开始读取第一块
+            reader.onload = (e) => {
+                if (!e.target?.result) return;
+
+                const chunk = e.target.result as ArrayBuffer;
+                // 添加文件ID标头
+                const idBytes = new TextEncoder().encode(fileId);
+                const data = new Uint8Array(1 + idBytes.length + chunk.byteLength);
+                data[0] = idBytes.length;
+                data.set(idBytes, 1);
+                data.set(new Uint8Array(chunk), 1 + idBytes.length);
+
+                // 发送数据
+                dataChannel.send(data);
+
+                // 更新进度
+                offset += chunk.byteLength;
+                const progress = Math.min(100, Math.floor((offset / file.size) * 100));
+
+                // 发送进度更新
+                if (progress % 5 === 0) {
+                    dataChannel.send(JSON.stringify({
+                        type: 'progress',
+                        id: fileId,
+                        progress: progress
+                    }));
+                }
+
+                // 检查是否完成
+                if (offset < file.size) {
+                    readNextChunk();
+                } else {
+                    // 发送传输完成信号
+                    dataChannel.send(JSON.stringify({
+                        type: 'file-complete',
+                        id: fileId
+                    }));
+                }
+            };
+
+            // 开始传输
             readNextChunk();
 
             return transferId;

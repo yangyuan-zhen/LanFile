@@ -10,6 +10,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState("network");
   const [heartbeatPort, setHeartbeatPort] = useState(8080);
   const [downloadPath, setDownloadPath] = useState("");
+  const [chunkSize, setChunkSize] = useState<number>(16384); // 默认16KB
 
   // 组件加载时获取当前设置
   useEffect(() => {
@@ -41,6 +42,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         .catch((error: Error) => {
           console.error("获取下载路径失败:", error);
           setDownloadPath("使用系统默认下载文件夹");
+        });
+
+      // 获取分块大小设置
+      window.electron
+        .invoke("settings:get")
+        .then((settings: any) => {
+          if (settings?.chunkSize) {
+            setChunkSize(settings.chunkSize);
+          }
+        })
+        .catch((error: Error) => {
+          console.error("获取分块大小设置失败:", error);
         });
     }
   }, [isOpen]);
@@ -82,11 +95,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         await window.electron.invoke("settings:setDownloadPath", downloadPath);
       }
 
+      // 保存分块大小
+      await window.electron.invoke("settings:save", {
+        chunkSize,
+      });
+
       onClose();
     } catch (error) {
       console.error("保存设置失败:", error);
     }
   };
+
+  // 预设的分块大小选项
+  const chunkSizeOptions = [
+    { label: "4KB (网络较差)", value: 4096 },
+    { label: "16KB (默认)", value: 16384 },
+    { label: "64KB (网络良好)", value: 65536 },
+    { label: "256KB (局域网)", value: 262144 },
+  ];
 
   return (
     <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
@@ -190,6 +216,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 </div>
               </div>
             )}
+
+            <div className="mt-4">
+              <label className="block mb-1 text-sm font-medium text-gray-700">
+                文件传输分块大小
+              </label>
+              <select
+                value={chunkSize}
+                onChange={(e) => setChunkSize(Number(e.target.value))}
+                className="block px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                {chunkSizeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                较小的分块大小适合不稳定网络，较大的分块大小提高传输速度
+              </p>
+            </div>
           </div>
         </div>
 

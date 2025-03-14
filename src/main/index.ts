@@ -17,6 +17,16 @@ import { webSocketSignalingService } from './services/WebSocketSignalingService'
 // 创建配置存储实例
 const store = new Store();
 
+// 创建一个用于存储设置的实例
+const settingsStore = new Store({
+    name: 'settings', // 存储文件名
+    defaults: {
+        chunkSize: 16384, // 默认分块大小为16KB
+        heartbeatPort: 8080,
+        downloadPath: app.getPath('downloads')
+    }
+});
+
 // 初始化变量
 let mainWindow: BrowserWindow | null = null;
 let networkService: NetworkService | null = null;
@@ -376,7 +386,41 @@ function setupIpcHandlers() {
     // 设置信令处理程序
     setupSignalingHandlers();
 
-    console.log("IPC 处理器注册完成");
+    // 获取设置
+    ipcMain.handle('settings:get', (event, key) => {
+        console.log("设置获取请求:", key);
+        try {
+            if (key) {
+                const value = settingsStore.get(key);
+                console.log(`获取设置 ${key}:`, value);
+                return value;
+            } else {
+                const allSettings = settingsStore.store;
+                console.log("获取所有设置:", allSettings);
+                return allSettings;
+            }
+        } catch (error) {
+            console.error("获取设置失败:", error);
+            throw error;
+        }
+    });
+
+    // 保存设置
+    ipcMain.handle('settings:save', (event, settings) => {
+        console.log("保存设置请求:", settings);
+        try {
+            for (const [key, value] of Object.entries(settings)) {
+                console.log(`保存设置 ${key}:`, value);
+                settingsStore.set(key, value);
+            }
+            return true;
+        } catch (error) {
+            console.error("保存设置失败:", error);
+            throw error;
+        }
+    });
+
+    console.log("设置处理程序注册完成");
 }
 
 // 创建窗口函数

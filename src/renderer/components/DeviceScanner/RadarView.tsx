@@ -143,6 +143,15 @@ const TransferConfirmModal: React.FC<{
   onConfirm: () => void;
   hasSelectedFiles: boolean;
 }> = ({ device, onClose, onConfirm, hasSelectedFiles }) => {
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+
+  const handleConfirm = async () => {
+    if (isTransferring) return;
+    setTransferError(null);
+    await onConfirm();
+  };
+
   return (
     <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
       <div className="p-6 w-full max-w-sm bg-white rounded-lg shadow-xl">
@@ -156,23 +165,27 @@ const TransferConfirmModal: React.FC<{
             请先在文件上传区域选择要传输的文件
           </p>
         )}
+        {transferError && (
+          <p className="mb-4 text-sm text-red-500">{transferError}</p>
+        )}
         <div className="flex justify-end space-x-3">
           <button
             onClick={onClose}
             className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+            disabled={isTransferring}
           >
             否
           </button>
           <button
-            onClick={onConfirm}
-            disabled={!hasSelectedFiles}
+            onClick={handleConfirm}
+            disabled={!hasSelectedFiles || isTransferring}
             className={`px-4 py-2 text-white rounded ${
-              hasSelectedFiles
+              hasSelectedFiles && !isTransferring
                 ? "bg-blue-500 hover:bg-blue-600"
                 : "bg-gray-400 cursor-not-allowed"
             }`}
           >
-            是
+            {isTransferring ? "传输中..." : "是"}
           </button>
         </div>
       </div>

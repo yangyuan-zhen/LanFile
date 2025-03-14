@@ -51,7 +51,13 @@ const invokeHandler = (channel: string, ...args: any[]) => {
         'webrtc:sendOffer',
         'webrtc:sendAnswer',
         'webrtc:sendIceCandidate',
-        'file:saveDownloadedFile'
+        'file:saveDownloadedFile',
+        'signaling:start',
+        'signaling:connectToDevice',
+        'signaling:sendMessage',
+        'signaling:stop',
+        'signaling:getServerConfig',
+        'signaling:getServerUrl'
     ];
 
     const isAllowed = validChannels.includes(channel) ||
