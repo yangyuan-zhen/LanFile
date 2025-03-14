@@ -9,6 +9,7 @@ import wifi from 'node-wifi';
 import fetch from 'node-fetch';
 import { setupWebRTCHandlers } from './webrtc';
 import { setupPingHandler } from './network';
+import dgram from 'dgram';
 
 // 创建配置存储实例
 const store = new Store();
@@ -246,34 +247,6 @@ function setupIpcHandlers() {
         return { success: true };
     });
 
-    // HTTP 请求处理器
-    ipcMain.handle('http:request', async (_, options: {
-        url: string;
-        method?: string;
-        headers?: Record<string, string>;
-        body?: any;
-    }) => {
-        try {
-            console.log(`发起HTTP请求: ${options.method || 'GET'} ${options.url}`);
-
-            const response = await fetch(options.url, {
-                method: options.method || 'GET',
-                headers: options.headers || {},
-                body: options.body ? JSON.stringify(options.body) : undefined,
-            });
-
-            const data = await response.json();
-            return {
-                ok: response.ok,
-                status: response.status,
-                data,
-            };
-        } catch (error) {
-            console.error('HTTP请求失败:', error);
-            throw error;
-        }
-    });
-
     // 事件监听和转发
     MDNSService.on('deviceFound', (device: MDNSDevice) => {
         if (!device) {
@@ -418,6 +391,13 @@ app.whenReady().then(async () => {
         await heartbeatService.start();
         console.log("所有服务启动完成");
 
+        // 配置防火墙规则
+        if (process.platform === 'win32') {
+            // Windows平台配置防火墙
+            await configureWindowsFirewall();
+        }
+        // 其他平台可能需要特定配置
+
     } catch (error) {
         console.error("应用初始化失败:", error);
     }
@@ -448,4 +428,49 @@ app.on('will-quit', () => {
     }
     MDNSService.destroy();
     heartbeatService.stop();
-}); 
+});
+
+// 配置Windows防火墙的辅助函数
+async function configureWindowsFirewall() {
+    const { spawn } = require('child_process');
+    const appPath = app.getPath('exe');
+    const ruleName = 'LanFile';
+
+    // 检查规则是否已存在
+    const checkRule = spawn('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${ruleName}`]);
+
+    checkRule.on('close', (code: number) => {
+        if (code !== 0) {
+            // 添加规则
+            const addRule = spawn('netsh', [
+                'advfirewall', 'firewall', 'add', 'rule',
+                `name=${ruleName}`,
+                'dir=in',
+                'action=allow',
+                'program=any',
+                'protocol=UDP',
+                'localport=32199'
+            ]);
+
+            addRule.on('error', (err: Error) => {
+                console.error('添加防火墙规则失败:', err);
+            });
+        }
+    });
+}
+
+// 检查UDP端口是否可用
+function checkUdpPortAvailability(port: number) {
+    const dgram = require('dgram');
+    const server = dgram.createSocket('udp4');
+
+    server.on('error', (err: Error) => {
+        console.error(`UDP端口 ${port} 不可用:`, err);
+        server.close();
+    });
+
+    server.bind(port, () => {
+        console.log(`UDP端口 ${port} 可用`);
+        server.close();
+    });
+} 

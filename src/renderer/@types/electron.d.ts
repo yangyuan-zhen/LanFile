@@ -44,4 +44,6 @@ export interface NetworkDevice {
     status?: string;
     stableConnectionCount?: number;
     lastChecked?: number;
+    isConnected?: boolean;
+    lastSeen?: number;
 } 

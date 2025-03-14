@@ -52,14 +52,14 @@ export const useNetworkDevices = () => {
                 }
 
                 // 设备检测
-                const isOnline = await (window as any).electron.invoke(
+                const isOnline = await window.electron.invoke(
                   "network:pingDevice",
                   device.ip,
                   32199 // 使用统一的心跳端口
                 );
 
                 console.log(
-                  `设备 ${device.name} (${device.ip}) 在线状态: ${isOnline}`
+                  `设备 ${device.name} (${device.ip}) 在线检测结果: ${isOnline}，使用端口: 32199`
                 );
 
                 // 更新稳定连接计数
@@ -136,25 +136,12 @@ export const useNetworkDevices = () => {
 
   // 自适应检测间隔
   useEffect(() => {
-    // 计算下一次检测间隔
-    const getCheckInterval = () => {
-      // 如果所有设备都很稳定，可以延长检测间隔
-      const stableDevices = devices.filter(
-        (d) => ((d as any).stableConnectionCount || 0) > 5
-      );
-
-      if (stableDevices.length === devices.length && devices.length > 0) {
-        return 30000; // 30秒
-      }
-      return 15000; // 15秒
-    };
-
-    // 设置动态检测间隔
+    // 设置固定的5秒检测间隔
     const statusCheckInterval = setInterval(() => {
       if (devices.length > 0) {
         checkAllDevicesStatus();
       }
-    }, getCheckInterval());
+    }, 5000); // 每5秒检测一次
 
     return () => clearInterval(statusCheckInterval);
   }, [devices, checkAllDevicesStatus]);
@@ -178,6 +165,62 @@ export const useNetworkDevices = () => {
 
     getNetworkInfo();
   }, []);
+
+  // 修改设备检测逻辑，只使用 TCP 和 HTTP
+
+  // 在设备检测部分
+  const checkDeviceStatus = async (device: NetworkDevice) => {
+    try {
+      // 如果是本机，始终返回在线状态
+      if (networkInfo && device.ip === networkInfo.ip) {
+        console.log("本机设备状态检查 - 始终在线");
+        return {
+          ...device,
+          status: "在线",
+          lastSeen: Date.now(),
+        };
+      }
+
+      // 检查网络连接状态
+      if (!networkInfo?.online) {
+        console.log("网络未连接，设备状态设置为离线");
+        return {
+          ...device,
+          status: "离线",
+        };
+      }
+
+      // 使用简化的心跳服务检测其他设备 (TCP + HTTP)
+      const heartbeatPort = await window.electron.invoke("heartbeat:getPort");
+      console.log(
+        `检查设备状态: ${device.name} (${device.ip}:${heartbeatPort})`
+      );
+
+      const isOnline = await window.electron.invoke(
+        "network:pingDevice",
+        device.ip,
+        heartbeatPort
+      );
+
+      console.log(
+        `设备 ${device.name} (${device.ip}) 检测结果: ${
+          isOnline ? "在线" : "离线"
+        }`
+      );
+
+      return {
+        ...device,
+        status: isOnline ? "在线" : "离线",
+        lastSeen: isOnline ? Date.now() : device.lastSeen,
+      };
+    } catch (error) {
+      console.error(`检查设备状态失败: ${device.name} (${device.ip})`, error);
+      return {
+        ...device,
+        status: "离线",
+      };
+    }
+  };
 
   return {
     devices,
