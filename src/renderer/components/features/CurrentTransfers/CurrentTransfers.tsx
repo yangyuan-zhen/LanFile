@@ -111,7 +111,7 @@ export const CurrentTransfers: React.FC<CurrentTransfersProps> = ({
           </div>
 
           <button
-            className="flex justify-center items-center py-2 w-full text-white bg-red-500 rounded hover:bg-red-600 transition-colors"
+            className="flex justify-center items-center py-2 w-full text-white bg-red-500 rounded transition-colors hover:bg-red-600"
             onClick={closeDetails}
           >
             <i className="mr-1 fas fa-times-circle"></i>

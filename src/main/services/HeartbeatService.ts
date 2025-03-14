@@ -4,7 +4,7 @@ import { EventEmitter } from 'events';
 export class HeartbeatService extends EventEmitter {
     private server: Server | null = null;
     private port: number = 8080; // 修改默认端口为8080
-    private isRunning: boolean = false;
+    public isRunning: boolean = false; // 修改为公共属性使外部可以访问
 
     constructor(port = 8080) { // 修改构造函数默认值
         super();

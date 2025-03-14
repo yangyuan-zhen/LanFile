@@ -126,7 +126,6 @@ export class NetworkService extends EventEmitter {
 
 // 增加多种检测方法
 const DEFAULT_HEARTBEAT_PORT = 8080;
-const HTTP_CHECK_PORT = 8899;
 
 // TCP 连接检测
 const checkDeviceByTCP = async (ip: string, port: number): Promise<boolean> => {
@@ -199,7 +198,7 @@ const checkDeviceByHTTP = async (ip: string, port: number): Promise<boolean> => 
 };
 
 // 简化设备检测 - 主要依赖 HTTP 检测
-const checkDeviceStatus = async (ip: string, port: number = 8080): Promise<boolean> => {
+const checkDeviceStatus = async (ip: string, port: number = DEFAULT_HEARTBEAT_PORT): Promise<boolean> => {
     try {
         // 直接使用 HTTP 检测
         return await checkDeviceByHTTP(ip, port);

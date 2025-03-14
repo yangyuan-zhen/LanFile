@@ -31,4 +31,19 @@ const SettingsModal = () => {
   };
 
   // 组件其余部分...
+
+  // 添加诊断按钮
+  <button
+    onClick={async () => {
+      const status = await window.electron.invoke("heartbeat:checkStatus");
+      alert(
+        `心跳服务状态: ${status.running ? "运行中" : "未运行"}\n端口: ${
+          status.port
+        }`
+      );
+    }}
+    className="ml-2 px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200"
+  >
+    诊断
+  </button>;
 };

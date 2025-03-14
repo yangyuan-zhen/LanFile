@@ -421,13 +421,17 @@ app.whenReady().then(async () => {
         networkService = new NetworkService();
         console.log("网络服务初始化完成");
 
+        // 确保心跳服务启动
+        console.log("开始启动心跳服务...");
+        await heartbeatService.start();
+        console.log(`心跳服务状态: ${heartbeatService.isRunning ? '已启动' : '未启动'}, 端口: ${heartbeatService.getPort()}`);
+
         // 创建窗口
         createWindow();
         console.log("主窗口创建完成");
 
         // 启动服务
         await MDNSService.publishService();
-        await heartbeatService.start();
         console.log("所有服务启动完成");
 
         // 配置防火墙规则
