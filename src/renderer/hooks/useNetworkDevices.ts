@@ -446,7 +446,7 @@ export const useNetworkDevices = () => {
 
         window.electron.invoke('mdns:startDiscovery')
             .then(() => console.log('MDNS发现服务已启动'))
-            .catch(err => console.error('启动MDNS发现服务失败:', err));
+            .catch((err: unknown) => console.error('启动MDNS发现服务失败:', err));
 
         scanTimeoutRef.current = setTimeout(() => {
             window.electron.invoke('mdns:stopDiscovery')
@@ -472,7 +472,7 @@ export const useNetworkDevices = () => {
                         return currentDevices;
                     });
                 })
-                .catch(err => console.error('停止MDNS发现服务失败:', err))
+                .catch((err: Error) => console.error('停止MDNS发现服务失败:', err))
                 .finally(() => setIsScanning(false));
         }, 5000);
     }, [networkInfo.ip]);

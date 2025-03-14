@@ -329,6 +329,13 @@ function setupIpcHandlers() {
     // 注册ping设备处理程序
     setupPingHandler();
 
+    // 在主进程中添加处理程序
+    ipcMain.handle('settings:setHeartbeatType', async (_event, type: string) => {
+        // 实现保存心跳类型设置的逻辑
+        console.log('设置心跳检测类型:', type);
+        // 存储设置到配置文件或其他存储位置
+    });
+
     console.log("IPC 处理器注册完成");
 }
 

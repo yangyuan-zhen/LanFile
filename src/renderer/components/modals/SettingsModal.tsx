@@ -10,6 +10,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState("network");
   const [heartbeatPort, setHeartbeatPort] = useState(8899);
   const [downloadPath, setDownloadPath] = useState("");
+  const [heartbeatType, setHeartbeatType] = useState("mixed"); // mixed, tcp, udp
 
   // 组件加载时获取当前设置
   useEffect(() => {
@@ -17,10 +18,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       // 获取心跳端口设置
       window.electron
         .invoke("heartbeat:getPort")
-        .then((port) => {
+        .then((port: number) => {
           setHeartbeatPort(port || 8899);
         })
-        .catch((error) => {
+        .catch((error: Error) => {
           console.error("获取心跳端口设置失败:", error);
         });
 
@@ -30,7 +31,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
       window.electron
         .invoke("settings:getDownloadPath")
-        .then((path) => {
+        .then((path: string) => {
           console.log("获取到下载路径:", path);
           if (path && typeof path === "string" && path.length > 0) {
             setDownloadPath(path);
@@ -38,7 +39,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             setDownloadPath("使用系统默认下载文件夹");
           }
         })
-        .catch((error) => {
+        .catch((error: Error) => {
           console.error("获取下载路径失败:", error);
           setDownloadPath("使用系统默认下载文件夹");
         });
@@ -53,10 +54,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       const result = await window.electron.invoke("dialog:openDirectory");
       console.log("文件保存路径选择结果:", result);
 
-      if (result && !result.canceled && result.filePath) {
-        // 注意：showSaveDialog 返回的是 filePath (单个路径)
-        // 而不是 filePaths (路径数组)
-        setDownloadPath(result.filePath);
+      if (
+        result &&
+        !result.canceled &&
+        result.filePaths &&
+        result.filePaths.length > 0
+      ) {
+        // 使用数组的第一个元素，因为 showOpenDialog 返回的是文件路径数组
+        setDownloadPath(result.filePaths[0]);
       }
     } catch (error) {
       console.error("选择文件保存路径失败:", error);
@@ -74,6 +79,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       if (downloadPath) {
         await window.electron.invoke("settings:setDownloadPath", downloadPath);
       }
+
+      // 保存心跳检测类型设置
+      await window.electron.invoke("settings:setHeartbeatType", heartbeatType);
 
       onClose();
     } catch (error) {
@@ -150,6 +158,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     />
                     <p className="mt-1 text-sm text-gray-500">
                       用于检测其他设备上的 LanFile 是否正在运行
+                    </p>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block mb-2 text-sm font-medium text-gray-700">
+                      心跳检测类型
+                    </label>
+                    <select
+                      value={heartbeatType}
+                      onChange={(e) => setHeartbeatType(e.target.value)}
+                      className="block px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="mixed">混合模式 (推荐)</option>
+                      <option value="tcp">TCP (高可靠)</option>
+                      <option value="udp">UDP (高性能)</option>
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">
+                      选择设备在线状态检测方式
                     </p>
                   </div>
                 </div>

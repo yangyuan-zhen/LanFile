@@ -1,8 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { NetworkDevice } from "../types/electron";
+import { NetworkDevice } from "../@types/electron";
+
+// 扩展 NetworkDevice 类型
+interface ExtendedNetworkDevice extends NetworkDevice {
+  stableConnectionCount?: number;
+  lastChecked?: number;
+}
 
 export const useNetworkDevices = () => {
-  const [devices, setDevices] = useState<NetworkDevice[]>([]);
+  const [devices, setDevices] = useState<ExtendedNetworkDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>(
     {}
@@ -15,47 +21,76 @@ export const useNetworkDevices = () => {
 
     try {
       console.log("开始检查所有设备状态");
-      const updatedDevices = await Promise.all(
-        devices.map(async (device) => {
-          try {
-            // 跳过本地设备
-            if (device.ip === networkInfo?.ip) {
-              return {
-                ...device,
-                online: true,
-                status: "在线",
-              };
-            }
 
-            // @ts-ignore
-            const isOnline = await (window as any).electron.invoke(
-              "network:pingDevice",
-              device.ip
-            );
-            console.log(
-              `设备 ${device.name} (${device.ip}) 在线状态: ${isOnline}`
-            );
-            return {
-              ...device,
-              online: isOnline,
-              status: isOnline ? "在线" : "离线",
-            };
-          } catch (error) {
-            console.error(
-              `检查设备 ${device.name} (${device.ip}) 状态失败:`,
-              error
-            );
-            return device;
-          }
-        })
-      );
+      // 并行检查所有设备状态，但限制并发数为5
+      const concurrentCheck = async (devices, concurrency = 5) => {
+        // 明确指定结果数组的类型
+        const results: ExtendedNetworkDevice[] = [];
+        for (let i = 0; i < devices.length; i += concurrency) {
+          const batch = devices.slice(i, i + concurrency);
+          const batchResults = await Promise.all(
+            batch.map(async (device) => {
+              try {
+                // 跳过本地设备
+                if (device.ip === networkInfo?.ip) {
+                  return {
+                    ...device,
+                    online: true,
+                    status: "在线",
+                    stableConnectionCount:
+                      (device.stableConnectionCount || 0) + 1,
+                  };
+                }
 
+                // 获取检查间隔 - 稳定设备检查频率降低
+                const isStableDevice =
+                  ((device as any).stableConnectionCount || 0) > 5;
+
+                // 对长期稳定的设备跳过一些检测，提高效率
+                if (isStableDevice && Math.random() > 0.3) {
+                  return device;
+                }
+
+                // 设备检测
+                const isOnline = await (window as any).electron.invoke(
+                  "network:pingDevice",
+                  device.ip,
+                  32199 // 使用统一的心跳端口
+                );
+
+                console.log(
+                  `设备 ${device.name} (${device.ip}) 在线状态: ${isOnline}`
+                );
+
+                // 更新稳定连接计数
+                const stableConnectionCount = isOnline
+                  ? (device.stableConnectionCount || 0) + 1
+                  : 0;
+
+                return {
+                  ...device,
+                  online: isOnline,
+                  status: isOnline ? "在线" : "离线",
+                  stableConnectionCount,
+                  lastChecked: Date.now(),
+                };
+              } catch (error) {
+                console.error(
+                  `检查设备 ${device.name} (${device.ip}) 状态失败:`,
+                  error
+                );
+                return device;
+              }
+            })
+          );
+          results.push(...batchResults);
+        }
+        return results;
+      };
+
+      const updatedDevices = await concurrentCheck(devices);
       console.log("设备状态检查完成:", updatedDevices);
       setDevices(updatedDevices);
-      console.log(
-        "网络设备端口信息:",
-        updatedDevices.map((d) => ({ name: d.name, ip: d.ip, port: d.port }))
-      );
       return updatedDevices;
     } catch (error) {
       console.error("检查设备状态失败:", error);
@@ -99,16 +134,30 @@ export const useNetworkDevices = () => {
     }
   }, [devices, checkAllDevicesStatus]);
 
+  // 自适应检测间隔
   useEffect(() => {
-    // 每15秒检查一次设备状态，原来是30秒
+    // 计算下一次检测间隔
+    const getCheckInterval = () => {
+      // 如果所有设备都很稳定，可以延长检测间隔
+      const stableDevices = devices.filter(
+        (d) => ((d as any).stableConnectionCount || 0) > 5
+      );
+
+      if (stableDevices.length === devices.length && devices.length > 0) {
+        return 30000; // 30秒
+      }
+      return 15000; // 15秒
+    };
+
+    // 设置动态检测间隔
     const statusCheckInterval = setInterval(() => {
       if (devices.length > 0) {
         checkAllDevicesStatus();
       }
-    }, 15000);
+    }, getCheckInterval());
 
     return () => clearInterval(statusCheckInterval);
-  }, [devices.length, checkAllDevicesStatus]);
+  }, [devices, checkAllDevicesStatus]);
 
   useEffect(() => {
     // 获取当前设备的网络信息
