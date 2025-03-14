@@ -27,8 +27,8 @@ export const useNetworkDevices = () => {
               };
             }
 
-            // 通过ping或其他方式检查设备在线状态
-            const isOnline = await window.electron.invoke(
+            // @ts-ignore
+            const isOnline = await (window as any).electron.invoke(
               "network:pingDevice",
               device.ip
             );

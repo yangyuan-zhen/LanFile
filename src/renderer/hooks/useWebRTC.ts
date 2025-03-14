@@ -36,7 +36,7 @@ export const useWebRTC = () => {
             try {
                 setIsReady(false);
                 // 真实初始化WebRTC
-                await window.electron.invoke('webrtc:initialize');
+                await (window as any).electron.invoke('webrtc:initialize');
                 setIsReady(true);
                 console.log('WebRTC 初始化完成');
             } catch (error) {
@@ -102,7 +102,7 @@ export const useWebRTC = () => {
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
 
-                window.electron.invoke('webrtc:sendOffer', {
+                await (window as any).electron.invoke('webrtc:sendOffer', {
                     toPeerId: peerId,
                     offer: peerConnection.localDescription
                 });
@@ -112,7 +112,7 @@ export const useWebRTC = () => {
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
 
-                window.electron.invoke('webrtc:sendAnswer', {
+                await (window as any).electron.invoke('webrtc:sendAnswer', {
                     toPeerId: peerId,
                     answer: peerConnection.localDescription
                 });

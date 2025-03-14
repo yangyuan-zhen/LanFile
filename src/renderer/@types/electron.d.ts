@@ -5,6 +5,17 @@ export interface IElectronAPI {
     invoke(channel: 'settings:setDownloadPath', path: string): Promise<void>;
     invoke(channel: 'settings:setPort', port: number): Promise<void>;
     invoke(channel: 'dialog:openDirectory'): Promise<Electron.OpenDialogReturnValue>;
+    invoke(channel: 'network:pingDevice', ip: string): Promise<boolean>;
+    invoke(channel: 'system:getNetworkInfo'): Promise<any>;
+    invoke(channel: 'system:getDeviceName'): Promise<string>;
+    invoke(channel: 'mdns:startDiscovery'): Promise<void>;
+    invoke(channel: 'webrtc:initialize'): Promise<void>;
+    invoke(channel: 'webrtc:sendIceCandidate', data: { toPeerId: string, candidate: RTCIceCandidate }): Promise<void>;
+    invoke(channel: 'webrtc:sendOffer', data: { toPeerId: string, offer: RTCSessionDescriptionInit }): Promise<void>;
+    invoke(channel: 'webrtc:sendAnswer', data: { toPeerId: string, answer: RTCSessionDescriptionInit }): Promise<void>;
+    invoke(channel: 'file:saveDownloadedFile', data: { url: string, fileName: string, fileType: string }): Promise<void>;
+    on(channel: string, listener: (...args: any[]) => void): void;
+    off(channel: string, listener: (...args: any[]) => void): void;
 }
 
 export interface IElectronRemote {

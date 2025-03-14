@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { Device } from '../renderer/types/electron';
+import { NetworkDevice as Device } from '../renderer/types/electron';
 
 // 增加更多调试日志
 console.log('预加载脚本开始执行...');
@@ -68,7 +68,9 @@ const invokeHandler = (channel: string, ...args: any[]) => {
 try {
     contextBridge.exposeInMainWorld('electron', {
         // 通用 invoke 方法
-        invoke: invokeHandler,
+        invoke: (channel: string, ...args: any[]) => {
+            return ipcRenderer.invoke(channel, ...args);
+        },
 
         // 从 main/preload.ts 合并的 API
         network: {
@@ -112,37 +114,9 @@ try {
             }
         },
 
-        on: (channel: string, func: (...args: any[]) => void) => {
-            const validChannels = [
-                'mdns:deviceFound',
-                'mdns:deviceLeft',
-                'system:deviceNameChanged',
-                'system:remoteDeviceNameChanged',
-                'device:nameUpdated',
-                'update:checking',
-                'update:available',
-                'webrtc:connectionRequest',
-                'webrtc:answer',
-                'webrtc:iceCandidate'
-            ];
-
-            if (!validChannels.includes(channel)) {
-                console.error(`无效的频道名称: ${channel}`);
-                return;
-            }
-
-            const subscription = (_event: any, data: any) => {
-                if (!data) {
-                    console.error(`从主进程接收到无效数据，频道: ${channel}`);
-                    return;
-                }
-
-                console.log(`Preload - 从主进程收到数据(${channel}):`, data);
-                func(data);
-            };
-
-            ipcRenderer.on(channel, subscription);
-            return () => ipcRenderer.removeListener(channel, subscription);
+        on: (channel: string, listener: (...args: any[]) => void) => {
+            ipcRenderer.on(channel, (event, ...args) => listener(...args));
+            return () => ipcRenderer.removeListener(channel, listener);
         },
 
         off: (channel: string, func: (...args: any[]) => void) => {
