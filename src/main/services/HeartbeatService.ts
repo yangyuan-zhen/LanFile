@@ -3,10 +3,10 @@ import { EventEmitter } from 'events';
 
 export class HeartbeatService extends EventEmitter {
     private server: Server | null = null;
-    private port: number = 8899; // 使用不同于 MDNS 的端口
+    private port: number = 8080; // 修改默认端口为8080
     private isRunning: boolean = false;
 
-    constructor(port = 8899) {
+    constructor(port = 8080) { // 修改构造函数默认值
         super();
         this.port = port;
         this.setupServer();
