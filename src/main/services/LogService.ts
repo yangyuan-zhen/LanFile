@@ -52,6 +52,18 @@ class LogService {
             (process as any)._rawDebug(`日志写入失败: ${error}`);
         }
     }
+
+    log(message: string): void {
+        console.log(message);
+    }
+
+    error(message: string): void {
+        console.error(message);
+    }
+
+    warn(message: string): void {
+        console.warn(message);
+    }
 }
 
 export const logService = new LogService(); 

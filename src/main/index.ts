@@ -11,6 +11,7 @@ import { setupWebRTCHandlers } from './webrtc';
 import { setupPingHandler } from './network';
 import dgram from 'dgram';
 import { logService } from './services/LogService';
+import { setupSignalingHandlers } from './signaling';
 
 // 创建配置存储实例
 const store = new Store();
@@ -360,6 +361,9 @@ function setupIpcHandlers() {
             };
         }
     });
+
+    // 设置信令处理程序
+    setupSignalingHandlers();
 
     console.log("IPC 处理器注册完成");
 }

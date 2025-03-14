@@ -257,21 +257,106 @@ export const useWebRTC = () => {
         return false;
     };
 
+    // 连接到对等点
+    const connectToPeer = async (peerId: string, options = {}): Promise<RTCDataChannel> => {
+        try {
+            setConnectionState('connecting');
+            console.log(`开始连接到设备 ${peerId}...`);
+
+            // 添加连接超时处理
+            const connectionTimeout = setTimeout(() => {
+                if (connectionState === 'connecting') {
+                    console.error('WebRTC连接超时');
+                    setConnectionState('failed');
+                    setConnectionError('连接超时，请重试');
+                    throw new Error('连接超时');
+                }
+            }, 10000); // 10秒超时
+
+            // 创建连接并等待完成
+            const peerConnection = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+
+            // 创建数据通道
+            const dataChannel = peerConnection.createDataChannel('fileTransfer', {
+                ordered: true
+            });
+
+            // 等待数据通道打开
+            await new Promise<void>((resolve, reject) => {
+                const channelTimeout = setTimeout(() => {
+                    reject(new Error('数据通道打开超时'));
+                }, 5000);
+
+                dataChannel.onopen = () => {
+                    clearTimeout(channelTimeout);
+                    console.log(`数据通道已成功打开: ${peerId}`);
+                    resolve();
+                };
+
+                dataChannel.onerror = (err) => {
+                    clearTimeout(channelTimeout);
+                    reject(new Error(`数据通道错误: ${err}`));
+                };
+            });
+
+            // 其他连接逻辑...
+            setupDataChannel(dataChannel, peerId);
+
+            // 更新状态
+            setPeers(prev => ({
+                ...prev,
+                [peerId]: { peerId, connection: peerConnection, dataChannel }
+            }));
+
+            // 存储数据通道
+            setDataChannels(prev => ({
+                ...prev,
+                [peerId]: dataChannel
+            }));
+
+            // 清除超时
+            clearTimeout(connectionTimeout);
+            setConnectionState('connected');
+
+            return dataChannel;
+        } catch (error) {
+            console.error('WebRTC连接失败:', error);
+            setConnectionState('failed');
+            setConnectionError(`连接失败: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    };
+
     // 发送文件的真实实现
     const sendFile = async (peerId: string, file: File) => {
         try {
             console.log(`开始传输文件 ${file.name} 到设备 ${peerId}`);
 
-            // 确保有连接
-            let dataChannel: RTCDataChannel;
-            if (peers[peerId]?.dataChannel) {
+            // 确保有连接和数据通道
+            let dataChannel: RTCDataChannel | null = null;
+
+            // 首先检查现有数据通道
+            if (dataChannels[peerId]) {
+                console.log(`找到现有数据通道: ${peerId}`);
+                dataChannel = dataChannels[peerId];
+            } else if (peers[peerId]?.dataChannel) {
+                console.log(`从peers中找到数据通道: ${peerId}`);
                 dataChannel = peers[peerId].dataChannel;
             } else {
-                await connectToPeer(peerId);
-                if (!peers[peerId]?.dataChannel) {
-                    throw new Error(`无法获取数据通道`);
+                // 如果没有数据通道，创建新连接
+                console.log(`未找到数据通道，创建新连接: ${peerId}`);
+                try {
+                    dataChannel = await connectToPeer(peerId);
+                } catch (connError) {
+                    console.error(`创建连接失败: ${connError}`);
+                    throw new Error(`无法建立连接: ${connError instanceof Error ? connError.message : String(connError)}`);
                 }
-                dataChannel = peers[peerId].dataChannel;
+            }
+
+            if (!dataChannel) {
+                throw new Error(`无法获取数据通道，连接可能已断开`);
             }
 
             if (dataChannel.readyState !== "open") {
@@ -378,32 +463,6 @@ export const useWebRTC = () => {
         } catch (error) {
             console.error(`发送文件到设备 ${peerId} 失败:`, error);
             throw new Error(`文件传输失败: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    };
-
-    // 连接到对等点
-    const connectToPeer = async (peerId: string, options = {}) => {
-        try {
-            setConnectionState('connecting');
-
-            // 添加连接超时处理
-            const connectionTimeout = setTimeout(() => {
-                if (connectionState === 'connecting') {
-                    console.error('WebRTC连接超时');
-                    setConnectionState('failed');
-                    setConnectionError('连接超时，请重试');
-                }
-            }, 10000); // 10秒超时
-
-            // 连接逻辑...
-
-            // 成功连接后清除超时
-            clearTimeout(connectionTimeout);
-
-        } catch (error) {
-            console.error('WebRTC连接失败:', error);
-            setConnectionState('failed');
-            setConnectionError(`连接失败: ${error instanceof Error ? error.message : String(error)}`);
         }
     };
 

@@ -147,6 +147,25 @@ try {
                 body?: any;
             }) => invokeHandler('http:request', options),
         },
+
+        signaling: {
+            start: (deviceId: string, deviceName: string) => ipcRenderer.invoke('signaling:start', deviceId, deviceName),
+            connectToDevice: (deviceId: string, address: string, port?: number) =>
+                ipcRenderer.invoke('signaling:connectToDevice', deviceId, address, port),
+            sendMessage: (deviceId: string, message: any) =>
+                ipcRenderer.invoke('signaling:sendMessage', deviceId, message),
+            broadcast: (message: any) => ipcRenderer.invoke('signaling:broadcast', message),
+            getConnectedDevices: () => ipcRenderer.invoke('signaling:getConnectedDevices'),
+            disconnectFromDevice: (deviceId: string) =>
+                ipcRenderer.invoke('signaling:disconnectFromDevice', deviceId),
+            stop: () => ipcRenderer.invoke('signaling:stop'),
+            onDeviceConnected: (callback: (device: any) => void) =>
+                ipcRenderer.on('signaling:deviceConnected', (_, device) => callback(device)),
+            onDeviceDisconnected: (callback: (deviceId: string) => void) =>
+                ipcRenderer.on('signaling:deviceDisconnected', (_, deviceId) => callback(deviceId)),
+            onMessage: (callback: (message: any) => void) =>
+                ipcRenderer.on('signaling:message', (_, message) => callback(message)),
+        }
     });
 
     console.log('[预加载] API 成功暴露到 window.electron');
