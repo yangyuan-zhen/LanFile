@@ -125,7 +125,7 @@ export class NetworkService extends EventEmitter {
 }
 
 // 增加多种检测方法
-const DEFAULT_HEARTBEAT_PORT = 32199;
+const DEFAULT_HEARTBEAT_PORT = 8080;
 const HTTP_CHECK_PORT = 8899;
 
 // TCP 连接检测
@@ -167,15 +167,21 @@ const checkDeviceByTCP = async (ip: string, port: number): Promise<boolean> => {
 // 修改 HTTP 检测实现
 const checkDeviceByHTTP = async (ip: string, port: number): Promise<boolean> => {
     try {
-        console.log(`HTTP检测设备: ${ip}:${port}`);
+        console.log(`开始HTTP检测设备: ${ip}:${port}`);
 
         // 创建一个带超时的 Promise
         const timeoutPromise = new Promise<Response>((_, reject) => {
-            setTimeout(() => reject(new Error('请求超时')), 2000);
+            setTimeout(() => {
+                console.log(`HTTP请求超时: ${ip}:${port}`);
+                reject(new Error('请求超时'));
+            }, 2000);
         });
 
-        // 创建实际的 fetch 请求 - 使用正确的路径
-        const fetchPromise = fetch(`http://${ip}:${port}/lanfile/status`, {
+        const url = `http://${ip}:${port}/lanfile/status`;
+        console.log(`发送HTTP请求: ${url}`);
+
+        // 创建实际的 fetch 请求
+        const fetchPromise = fetch(url, {
             method: 'GET',
             headers: { 'Accept': 'application/json' }
         });
@@ -183,11 +189,11 @@ const checkDeviceByHTTP = async (ip: string, port: number): Promise<boolean> => 
         // 使用 Promise.race 实现超时
         const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
 
-        console.log(`HTTP检测成功: ${ip}:${port}`);
+        console.log(`HTTP检测成功: ${ip}:${port}, 状态码: ${response.status}`);
         return response.ok;
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.log(`HTTP检测失败: ${ip}:${port}`, errorMessage);
+        console.log(`HTTP检测失败详细信息: ${ip}:${port}, 错误: ${errorMessage}`);
         return false;
     }
 };

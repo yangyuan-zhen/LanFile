@@ -14,6 +14,7 @@ export class HeartbeatService extends EventEmitter {
 
     private setupServer() {
         this.server = createServer((req, res) => {
+            console.log(`收到请求: ${req.url} 从 ${req.socket.remoteAddress}`);
             if (req.url === '/lanfile/status') {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
@@ -30,6 +31,7 @@ export class HeartbeatService extends EventEmitter {
         this.server.on('error', (error: any) => {
             console.error('心跳服务器错误:', error);
             if (error.code === 'EADDRINUSE') {
+                console.log(`端口 ${this.port} 已被占用，尝试使用 ${this.port + 1}`);
                 this.port++;
                 this.setupServer(); // 尝试使用下一个端口
             }
@@ -43,8 +45,8 @@ export class HeartbeatService extends EventEmitter {
                 return;
             }
 
-            this.server?.listen(this.port, () => {
-                console.log(`心跳服务已启动在端口 ${this.port}`);
+            this.server?.listen(this.port, '0.0.0.0', () => {
+                console.log(`心跳服务已启动在端口 ${this.port}，监听所有网络接口`);
                 this.isRunning = true;
                 resolve();
             }).on('error', reject);

@@ -137,13 +137,21 @@ export const useNetworkDevices = () => {
   // 自适应检测间隔
   useEffect(() => {
     // 设置固定的5秒检测间隔
+    console.log("设置设备状态检测定时器");
     const statusCheckInterval = setInterval(() => {
+      console.log("===== 定时器触发，开始检查设备状态 =====");
+      console.log(`当前设备列表数量: ${devices.length}`);
       if (devices.length > 0) {
         checkAllDevicesStatus();
+      } else {
+        console.log("没有设备需要检查");
       }
     }, 5000); // 每5秒检测一次
 
-    return () => clearInterval(statusCheckInterval);
+    return () => {
+      console.log("清理设备状态检测定时器");
+      clearInterval(statusCheckInterval);
+    };
   }, [devices, checkAllDevicesStatus]);
 
   useEffect(() => {
@@ -173,14 +181,12 @@ export const useNetworkDevices = () => {
   // 在设备检测部分
   const checkDeviceStatus = async (device: NetworkDevice) => {
     try {
+      console.log(`开始检查设备 ${device.name} (${device.ip}) 的状态`);
+
       // 如果是本机，始终返回在线状态
       if (networkInfo && device.ip === networkInfo.ip) {
-        console.log("本机设备状态检查 - 始终在线");
-        return {
-          ...device,
-          status: "在线",
-          lastSeen: Date.now(),
-        };
+        console.log(`设备 ${device.name} (${device.ip}) 是本机，设置为在线`);
+        return { ...device, status: "在线", lastSeen: Date.now() };
       }
 
       // 注释掉网络连接检查
@@ -198,19 +204,21 @@ export const useNetworkDevices = () => {
       // 直接进行设备检测
       const heartbeatPort = await window.electron.invoke("heartbeat:getPort");
       console.log(
-        `检查设备状态: ${device.name} (${device.ip}:${heartbeatPort})`
+        `检查设备心跳: ${device.name} (${device.ip}:${heartbeatPort})`
       );
 
+      const startTime = Date.now();
       const isOnline = await window.electron.invoke(
         "network:pingDevice",
         device.ip,
         heartbeatPort
       );
+      const endTime = Date.now();
 
       console.log(
-        `设备 ${device.name} (${device.ip}) 检测结果: ${
+        `设备 ${device.name} (${device.ip}) 心跳检测结果: ${
           isOnline ? "在线" : "离线"
-        }`
+        }, 耗时: ${endTime - startTime}ms`
       );
 
       return {
@@ -219,11 +227,8 @@ export const useNetworkDevices = () => {
         lastSeen: isOnline ? Date.now() : device.lastSeen,
       };
     } catch (error) {
-      console.error(`检查设备状态失败: ${device.name} (${device.ip})`, error);
-      return {
-        ...device,
-        status: "离线",
-      };
+      console.error(`检查设备 ${device.name} (${device.ip}) 心跳异常:`, error);
+      return { ...device, status: "离线" };
     }
   };
 
