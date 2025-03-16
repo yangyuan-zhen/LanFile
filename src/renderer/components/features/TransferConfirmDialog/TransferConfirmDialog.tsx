@@ -22,8 +22,10 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
   const [isSelectingFile, setIsSelectingFile] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { connectToPeer, sendFile } = useWebRTC();
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setIsSelectingFile(true);
     // 打开文件选择器
     setTimeout(() => {
@@ -36,6 +38,9 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
       setIsSelectingFile(false);
       return;
     }
+
+    setIsLoading(true);
+    setErrorMsg("");
 
     try {
       // 连接到设备
@@ -53,17 +58,18 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
 
       onClose();
     } catch (error: unknown) {
-      console.error("文件传输失败:", error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      alert(`文件传输失败: ${errorMessage}`);
+      console.error("文件传输失败:", error);
+      setErrorMsg(`传输失败: ${errorMessage}`);
       setIsSelectingFile(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="p-6 max-w-md w-full bg-white rounded-lg shadow-xl">
+    <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+      <div className="p-6 w-full max-w-md bg-white rounded-lg shadow-xl">
         <h3 className="mb-4 text-xl font-bold text-gray-800">传输文件</h3>
         <p className="mb-6 text-gray-600">
           是否要向 <span className="font-medium">{device.name}</span> (
@@ -80,7 +86,19 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
           />
         </div>
 
-        <div className="flex space-x-3 justify-end">
+        {errorMsg && (
+          <div className="p-3 mb-4 text-red-700 bg-red-100 rounded-md">
+            <p>{errorMsg}</p>
+            <button
+              onClick={handleConfirm}
+              className="px-3 py-1 mt-2 text-sm bg-red-50 rounded hover:bg-red-200"
+            >
+              重试
+            </button>
+          </div>
+        )}
+
+        <div className="flex justify-end space-x-3">
           <Button onClick={onClose} variant="outline">
             取消
           </Button>

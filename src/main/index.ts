@@ -558,6 +558,11 @@ app.on('will-quit', () => {
     }
     MDNSService.destroy();
     heartbeatService.stop();
+
+    // 关闭信令服务
+    if (webSocketSignalingService && webSocketSignalingService.isRunning) {
+        webSocketSignalingService.stop();
+    }
 });
 
 // 配置Windows防火墙的辅助函数
