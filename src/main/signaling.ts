@@ -7,16 +7,22 @@ export const setupSignalingHandlers = () => {
     // 启动信令服务
     ipcMain.handle('signaling:start', async (_, deviceId, deviceName) => {
         try {
+            logService.log(`正在启动信令服务，设备ID: ${deviceId}, 设备名称: ${deviceName}`);
             await webSocketSignalingService.start(deviceId, deviceName);
+            const port = webSocketSignalingService.getPort();
+            logService.log(`信令服务成功启动在端口: ${port}`);
             return {
                 success: true,
-                port: webSocketSignalingService.getPort()
+                port: port
             };
         } catch (error) {
-            logService.error(`启动信令服务失败: ${error instanceof Error ? error.message : String(error)}`);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorStack = error instanceof Error ? error.stack : '';
+            logService.error(`启动信令服务失败: ${errorMessage}`);
+            logService.error(`错误堆栈: ${errorStack}`);
             return {
                 success: false,
-                error: error instanceof Error ? error.message : String(error)
+                error: errorMessage
             };
         }
     });
@@ -96,12 +102,10 @@ export const setupSignalingHandlers = () => {
 
     // 添加获取信令服务器URL的处理程序 (可选的替代方案)
     ipcMain.handle('signaling:getServerUrl', () => {
-        try {
-            return 'ws://localhost:8090'; // 或者从配置中构建
-        } catch (error) {
-            console.error('获取信令服务URL失败:', error);
-            throw error;
-        }
+        // 返回正确格式的 WebSocket URL 字符串
+        const host = 'localhost'; // 或从配置获取
+        const port = 8090; // 或从配置获取
+        return `ws://${host}:${port}`;
     });
 
     logService.log('WebSocket 信令处理程序设置完成');

@@ -17,6 +17,8 @@ export const useWebRTCSignaling = () => {
 
                 // 启动信令服务
                 const result = await window.electron.invoke('signaling:start', deviceInfo.id, deviceInfo.name);
+                console.log('信令服务启动结果:', result); // 详细记录结果对象的结构
+
                 if (result.success) {
                     console.log(`信令服务已启动，端口: ${result.port}`);
                     setIsConnected(true);
@@ -24,7 +26,10 @@ export const useWebRTCSignaling = () => {
                     console.error('启动信令服务失败:', result.error);
                 }
             } catch (error) {
-                console.error('信令服务初始化错误:', error);
+                console.error('信令服务初始化详细错误:', error);
+                if (error instanceof Error) {
+                    console.error('错误堆栈:', error.stack);
+                }
             }
         };
 
@@ -61,10 +66,13 @@ export const useWebRTCSignaling = () => {
     // 连接到设备
     const connectToDevice = useCallback(async (deviceId: string, address: string, port?: number) => {
         try {
+            console.log(`尝试连接到设备: ${deviceId}, 地址: ${address}, 端口: ${port || '默认'}`);
             const result = await window.electron.invoke('signaling:connectToDevice', deviceId, address, port);
+            console.log(`连接结果:`, result);
             return result.success;
         } catch (error) {
-            console.error('连接到设备失败:', error);
+            console.error('连接设备详细错误:', error);
+            if (error instanceof Error) console.error('错误堆栈:', error.stack);
             return false;
         }
     }, []);
