@@ -272,65 +272,134 @@ export const useWebRTC = () => {
                 }
             }
 
-            // 创建 RTCPeerConnection
+            // 更丰富的 ICE 服务器配置
             const peerConnection = new RTCPeerConnection({
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' }
-                ]
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' }
+                ],
+                // 为局域网环境优化
+                iceTransportPolicy: 'all',
+                iceCandidatePoolSize: 10
             });
 
-            // 创建数据通道
+            // 记录所有ICE连接状态变化
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log(`ICE 连接状态变化: ${peerConnection.iceConnectionState}`);
+                if (peerConnection.iceConnectionState === 'failed') {
+                    console.error('ICE 连接失败');
+                }
+            };
+
+            // 记录ICE收集状态
+            peerConnection.onicegatheringstatechange = () => {
+                console.log(`ICE 收集状态: ${peerConnection.iceGatheringState}`);
+            };
+
+            // 优化数据通道参数
             const dataChannel = peerConnection.createDataChannel('fileTransfer', {
                 ordered: true,
-                // 增加可靠性设置
-                maxRetransmits: 30
+                // 确保可靠传输
+                maxRetransmits: 30,
+                maxPacketLifeTime: 5000
             });
 
-            // 设置更长的连接超时时间 (30秒)
+            // 设置更长的连接超时时间 (60秒)
             const connectionTimeout = setTimeout(() => {
-                console.log('WebRTC连接超时');
+                console.log('WebRTC连接超时 - 60秒已过');
+                // 不要立即抛出错误，而是仅关闭连接
                 cleanupConnection();
-                throw new Error('连接超时');
-            }, 30000); // 增加到30秒
+            }, 60000);
 
-            // 更长的数据通道超时时间 (20秒)
+            // 更长的数据通道超时时间 (40秒)
             const dataChannelTimeout = setTimeout(() => {
-                console.log('数据通道打开超时');
+                console.log('数据通道打开超时 - 40秒已过');
                 cleanupConnection();
                 throw new Error('数据通道打开超时');
-            }, 20000); // 增加到20秒
+            }, 40000);
 
             // 清理函数
             const cleanupConnection = () => {
                 clearTimeout(connectionTimeout);
                 clearTimeout(dataChannelTimeout);
-                // 其他清理代码...
+                if (peerConnection) {
+                    peerConnection.close();
+                }
+                // 从状态中删除
+                setPeers(prev => {
+                    const newPeers = { ...prev };
+                    delete newPeers[peerId];
+                    return newPeers;
+                });
+                setDataChannels(prev => {
+                    const newChannels = { ...prev };
+                    delete newChannels[peerId];
+                    return newChannels;
+                });
             };
 
             // 数据通道事件处理
             dataChannel.onopen = () => {
                 console.log(`与 ${peerId} 的数据通道已打开`);
                 clearTimeout(dataChannelTimeout);
-                // 记录连接和状态...
+                clearTimeout(connectionTimeout);
+
+                setPeers(prev => ({
+                    ...prev,
+                    [peerId]: { peerId, connection: peerConnection }
+                }));
+
+                setDataChannels(prev => ({
+                    ...prev,
+                    [peerId]: dataChannel
+                }));
+
+                setConnectionState('connected');
+            };
+
+            dataChannel.onclose = () => {
+                console.log(`数据通道已关闭: ${peerId}`);
             };
 
             dataChannel.onerror = (error) => {
                 console.error(`数据通道错误:`, error);
-                cleanupConnection();
             };
 
-            // 其他事件处理代码...
+            // 手动发送ICE候选
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('发送ICE候选', event.candidate);
+                    signalingService.sendSignalingMessage(peerId, {
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    });
+                }
+            };
 
-            // 发起WebRTC连接
-            console.log('发送WebRTC连接信息...');
-            // ...其余代码
+            // 创建并发送SDP offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            console.log('发送WebRTC offer');
+            await signalingService.sendSignalingMessage(peerId, {
+                type: 'offer',
+                offer: peerConnection.localDescription
+            });
+
+            // 临时存储连接，等待答复
+            setPeers(prev => ({
+                ...prev,
+                [peerId]: { peerId, connection: peerConnection, dataChannel }
+            }));
+
         } catch (error) {
             console.error('WebRTC连接失败:', error);
             throw error;
         }
-    }, [peers, dataChannels]);
+    }, [setPeers, setDataChannels, signalingService, peers, dataChannels]);
 
     // 发送文件的真实实现
     const sendFile = useCallback(async (peerId: string, file: File) => {

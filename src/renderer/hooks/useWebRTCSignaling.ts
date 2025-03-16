@@ -6,6 +6,66 @@ export const useWebRTCSignaling = () => {
     const [connectedDevices, setConnectedDevices] = useState<Record<string, any>>({});
     const deviceInfo = useDeviceInfo();
 
+    // 1. 先定义处理函数
+    const handleOfferMessage = useCallback(async (message: any) => {
+        try {
+            console.log('处理 offer 消息:', message);
+            // 实现处理代码...
+        } catch (error) {
+            console.error('处理 offer 消息失败:', error);
+        }
+    }, []);
+
+    const handleAnswerMessage = useCallback(async (message: any) => {
+        try {
+            console.log('处理 answer 消息:', message);
+            // 实现处理代码...
+        } catch (error) {
+            console.error('处理 answer 消息失败:', error);
+        }
+    }, []);
+
+    const handleIceCandidateMessage = useCallback(async (message: any) => {
+        try {
+            console.log('处理 ICE 候选消息:', message);
+            // 实现处理代码...
+        } catch (error) {
+            console.error('处理 ICE 候选消息失败:', error);
+        }
+    }, []);
+
+    // 2. 然后定义使用这些函数的 useEffect
+    useEffect(() => {
+        // 处理传入的信令消息
+        const handleSignalingMessage = (message: any) => {
+            console.log('收到信令消息:', message);
+
+            if (message.type === 'offer' && message.from) {
+                // 处理offer
+                handleOfferMessage(message);
+            } else if (message.type === 'answer' && message.from) {
+                // 处理answer
+                handleAnswerMessage(message);
+            } else if (message.type === 'ice-candidate' && message.from) {
+                // 处理ICE候选
+                handleIceCandidateMessage(message);
+            }
+        };
+
+        // 添加事件监听
+        window.electron.signaling.onMessage(handleSignalingMessage);
+
+        return () => {
+            // 检查函数是否存在
+            if (typeof window.electron.signaling.offMessage === 'function') {
+                window.electron.signaling.offMessage(handleSignalingMessage);
+            } else {
+                console.warn('window.electron.signaling.offMessage 未定义，无法移除监听器');
+                // 可能需要在 preload.js 中添加此函数
+            }
+        };
+    }, [handleOfferMessage, handleAnswerMessage, handleIceCandidateMessage]);
+
     // 初始化信令服务
     useEffect(() => {
         const initSignaling = async () => {
