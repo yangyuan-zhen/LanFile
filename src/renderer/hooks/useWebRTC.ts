@@ -71,7 +71,27 @@ export const useWebRTC = () => {
     const createPeerConnection = async (peerId: string, isInitiator = true, remoteOffer?: RTCSessionDescriptionInit) => {
         try {
             const peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ],
+                iceTransportPolicy: 'all',
+                iceCandidatePoolSize: 5
             });
 
             // 创建数据通道
@@ -121,6 +141,15 @@ export const useWebRTC = () => {
                     answer: peerConnection.localDescription
                 });
             }
+
+            // 添加ICE候选收集完成日志
+            peerConnection.onicegatheringstatechange = () => {
+                console.log(`ICE收集状态: ${peerConnection.iceGatheringState}`);
+                if (peerConnection.iceGatheringState === 'complete') {
+                    console.log('ICE候选收集完成，检查候选项类型');
+                    // 此时应该有局域网直连候选项
+                }
+            };
 
             return peerConnection;
         } catch (error) {
@@ -281,13 +310,25 @@ export const useWebRTC = () => {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' }
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
                 ],
                 // 为局域网环境优化 - 使用 all 确保尝试所有连接类型
                 iceTransportPolicy: 'all',
-                iceCandidatePoolSize: 10
+                iceCandidatePoolSize: 5
             });
 
             // 记录所有ICE连接状态变化

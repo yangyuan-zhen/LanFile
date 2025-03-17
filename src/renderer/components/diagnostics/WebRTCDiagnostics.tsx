@@ -172,6 +172,24 @@ async function detectNatType(): Promise<string> {
   });
 }
 
+// 添加局域网设备连通性测试
+async function testLocalDeviceConnectivity(
+  deviceIP: string,
+  port: number = 8092
+) {
+  try {
+    // 尝试连接对方设备的信令服务端口
+    const result = await window.electron.invoke(
+      "network:pingDevice",
+      deviceIP,
+      port
+    );
+    return result ? "可连接" : "无法连接";
+  } catch {
+    return "测试失败";
+  }
+}
+
 // 格式化键名
 function formatKey(key: string): string {
   const keyMap: Record<string, string> = {

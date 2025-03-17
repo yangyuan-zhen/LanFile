@@ -43,7 +43,7 @@ export const FileTransferCard: React.FC<FileTransferCardProps> = ({
 
   return (
     <div
-      className="p-4 mb-4 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+      className="p-4 mb-4 rounded-lg border border-gray-200 transition-colors cursor-pointer hover:bg-gray-50"
       onClick={onClick}
     >
       <div className="flex justify-between items-center mb-2">

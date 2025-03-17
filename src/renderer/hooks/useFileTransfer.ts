@@ -37,5 +37,27 @@ export const useFileTransfer = (dataChannel: RTCDataChannel | null) => {
         }
     };
 
-    return { sendFile };
+    // 添加基于IP的直接传输回退方案
+    const transferFile = async (peerId: string, file: File, peerIp?: string) => {
+        try {
+            // 先尝试WebRTC
+            await webrtcSendFile(peerId, file);
+        } catch (error) {
+            console.log('WebRTC传输失败，尝试直接IP连接', error);
+
+            if (peerIp) {
+                // 尝试直接IP连接作为备选
+                try {
+                    await directIpSendFile(peerIp, file);
+                } catch (directError) {
+                    console.error('所有传输方法均失败', directError);
+                    throw new Error('文件传输失败：无法建立任何类型的连接');
+                }
+            } else {
+                throw error;
+            }
+        }
+    };
+
+    return { sendFile, transferFile };
 }; 
