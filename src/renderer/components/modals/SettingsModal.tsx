@@ -117,21 +117,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
-      <div className="w-full max-w-2xl bg-white rounded-lg shadow-lg">
-        {/* 标题栏 */}
+      <div className="flex overflow-hidden flex-col w-4/5 max-w-4xl bg-white rounded-lg shadow-lg">
         <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-semibold">设置</h2>
+          <h2 className="text-xl font-medium">设置</h2>
           <button
             onClick={onClose}
-            className="p-1 rounded-full hover:bg-gray-100"
+            className="text-gray-400 hover:text-gray-600"
           >
-            <X size={20} />
+            <X size={24} />
           </button>
         </div>
 
-        {/* 内容区 */}
-        <div className="flex h-96">
-          {/* 左侧导航 */}
+        <div className="flex overflow-hidden flex-1">
           <div className="w-1/4 border-r">
             <nav className="p-4">
               <ul className="space-y-2">
@@ -175,8 +172,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             </nav>
           </div>
 
-          {/* 右侧内容 */}
-          <div className="p-6 w-3/4">
+          <div
+            className="overflow-y-auto p-6 w-3/4"
+            style={{ maxHeight: "calc(80vh - 130px)" }}
+          >
             {activeTab === "network" && (
               <div>
                 <h3 className="mb-4 text-lg font-medium">网络设置</h3>
@@ -263,7 +262,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* 底部按钮 */}
         <div className="flex justify-end p-4 border-t">
           <button
             onClick={onClose}

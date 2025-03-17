@@ -260,7 +260,7 @@ export const useWebRTC = () => {
     };
 
     // 连接到对等点
-    const connectToPeer = useCallback(async (peerId: string) => {
+    const connectToPeer = useCallback(async (peerId: string, peerIp?: string) => {
         try {
             console.log(`尝试建立与 ${peerId} 的 WebRTC 连接`);
 

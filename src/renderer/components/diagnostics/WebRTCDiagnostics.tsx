@@ -52,30 +52,34 @@ export const WebRTCDiagnostics = () => {
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow">
-      <h2 className="text-lg font-medium mb-4">WebRTC网络诊断</h2>
+    <div className="p-4 bg-white rounded-lg shadow">
+      <h2 className="mb-4 text-lg font-medium">WebRTC网络诊断</h2>
 
       <button
         onClick={runDiagnostics}
         disabled={isRunning}
-        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+        className="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600 disabled:bg-gray-400"
       >
         {isRunning ? "诊断中..." : "开始诊断"}
       </button>
 
       {Object.keys(results).length > 0 && (
-        <div className="mt-4">
-          <h3 className="font-medium mb-2">诊断结果:</h3>
-          <ul className="space-y-2">
-            {Object.entries(results).map(([key, value]) => (
-              <li key={key} className="flex">
-                <span className="font-medium mr-2">{formatKey(key)}:</span>
-                <span className={getValueClass(value)}>
-                  {formatValue(value)}
-                </span>
-              </li>
-            ))}
-          </ul>
+        <div className="mt-3">
+          <h3 className="mb-1 text-sm font-medium">诊断结果:</h3>
+          <div className="max-h-[200px] overflow-y-auto pr-2">
+            <ul className="space-y-1">
+              {Object.entries(results).map(([key, value]) => (
+                <li key={key} className="flex py-1 text-sm">
+                  <span className="font-medium mr-2 min-w-[120px]">
+                    {formatKey(key)}:
+                  </span>
+                  <span className={getValueClass(value)}>
+                    {formatValue(value)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
     </div>
