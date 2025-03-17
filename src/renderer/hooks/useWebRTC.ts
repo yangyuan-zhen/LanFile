@@ -262,13 +262,17 @@ export const useWebRTC = () => {
     // 连接到对等点
     const connectToPeer = useCallback(async (peerId: string, peerIp?: string) => {
         try {
-            console.log(`尝试建立与 ${peerId} 的 WebRTC 连接`);
+            console.log(`尝试建立与 ${peerId} 的 WebRTC 连接 (IP: ${peerIp || '未知'})`);
 
             // 检查是否已经连接
             if (peers[peerId] && dataChannels[peerId]) {
                 if (dataChannels[peerId].readyState === 'open') {
                     console.log(`已经连接到设备 ${peerId}`);
                     return;
+                } else {
+                    console.log(`数据通道状态: ${dataChannels[peerId].readyState}，尝试重新连接`);
+                    // 关闭现有连接，重新建立
+                    closeConnectionToPeer(peerId);
                 }
             }
 
@@ -281,124 +285,100 @@ export const useWebRTC = () => {
                     { urls: 'stun:stun3.l.google.com:19302' },
                     { urls: 'stun:stun4.l.google.com:19302' }
                 ],
-                // 为局域网环境优化
+                // 为局域网环境优化 - 使用 all 确保尝试所有连接类型
                 iceTransportPolicy: 'all',
                 iceCandidatePoolSize: 10
             });
 
             // 记录所有ICE连接状态变化
             peerConnection.oniceconnectionstatechange = () => {
-                console.log(`ICE 连接状态变化: ${peerConnection.iceConnectionState}`);
+                console.log(`ICE 连接状态变化: ${peerConnection.iceConnectionState} (peer: ${peerId})`);
+
+                // 特别处理失败状态
                 if (peerConnection.iceConnectionState === 'failed') {
-                    console.error('ICE 连接失败');
+                    console.error(`ICE 连接失败 (peer: ${peerId})`);
+                    // 尝试重启 ICE - 这可能有助于解决某些连接问题
+                    if (peerConnection.restartIce) {
+                        console.log(`尝试重启 ICE 连接 (peer: ${peerId})`);
+                        peerConnection.restartIce();
+                    }
                 }
             };
 
-            // 记录ICE收集状态
-            peerConnection.onicegatheringstatechange = () => {
-                console.log(`ICE 收集状态: ${peerConnection.iceGatheringState}`);
+            // 增加连接超时保护
+            const connectionTimeoutId = setTimeout(() => {
+                if (!dataChannels[peerId] || dataChannels[peerId].readyState !== 'open') {
+                    console.error(`连接到 ${peerId} 超时`);
+                    closeConnectionToPeer(peerId);
+                    throw new Error(`连接超时 - 检查网络环境和防火墙设置`);
+                }
+            }, 20000); // 20秒超时
+
+            // 添加数据通道开启处理
+            const setupDataChannelWithTimeout = (dataChannel: RTCDataChannel) => {
+                return new Promise((resolve, reject) => {
+                    let isDone = false;
+
+                    // 设置通道监听器
+                    dataChannel.onopen = () => {
+                        console.log(`数据通道已打开 (peer: ${peerId})`);
+                        clearTimeout(connectionTimeoutId);
+                        isDone = true;
+                        resolve(true);
+                    };
+
+                    dataChannel.onerror = (error) => {
+                        console.error(`数据通道错误 (peer: ${peerId}):`, error);
+                        if (!isDone) {
+                            isDone = true;
+                            // 使用错误事件中的错误描述或提供默认消息
+                            const errorMessage = error.error?.message || '未知错误';
+                            reject(new Error(`数据通道错误: ${errorMessage}`));
+                        }
+                    };
+
+                    dataChannel.onclose = () => {
+                        console.log(`数据通道已关闭 (peer: ${peerId})`);
+                    };
+                });
             };
 
-            // 优化数据通道参数
+            // 使用局域网优化的数据通道选项
             const dataChannel = peerConnection.createDataChannel('fileTransfer', {
                 ordered: true,
-                // 只保留一个可靠性参数，不要同时使用两个
                 maxRetransmits: 30
             });
 
-            // 设置更长的连接超时时间 (60秒)
-            const connectionTimeout = setTimeout(() => {
-                console.log('WebRTC连接超时 - 60秒已过');
-                // 不要立即抛出错误，而是仅关闭连接
-                cleanupConnection();
-            }, 60000);
-
-            // 更长的数据通道超时时间 (40秒)
-            const dataChannelTimeout = setTimeout(() => {
-                console.log('数据通道打开超时 - 40秒已过');
-                cleanupConnection();
-                throw new Error('数据通道打开超时');
-            }, 40000);
-
-            // 清理函数
-            const cleanupConnection = () => {
-                clearTimeout(connectionTimeout);
-                clearTimeout(dataChannelTimeout);
-                if (peerConnection) {
-                    peerConnection.close();
-                }
-                // 从状态中删除
-                setPeers(prev => {
-                    const newPeers = { ...prev };
-                    delete newPeers[peerId];
-                    return newPeers;
-                });
-                setDataChannels(prev => {
-                    const newChannels = { ...prev };
-                    delete newChannels[peerId];
-                    return newChannels;
-                });
+            // 保存连接信息
+            peers[peerId] = {
+                peerId,
+                connection: peerConnection
             };
+            dataChannels[peerId] = dataChannel;
 
-            // 数据通道事件处理
-            dataChannel.onopen = () => {
-                console.log(`与 ${peerId} 的数据通道已打开`);
-                clearTimeout(dataChannelTimeout);
-                clearTimeout(connectionTimeout);
+            // 设置数据通道
+            const dataChannelPromise = setupDataChannelWithTimeout(dataChannel);
 
-                setPeers(prev => ({
-                    ...prev,
-                    [peerId]: { peerId, connection: peerConnection }
-                }));
-
-                setDataChannels(prev => ({
-                    ...prev,
-                    [peerId]: dataChannel
-                }));
-
-                setConnectionState('connected');
-            };
-
-            dataChannel.onclose = () => {
-                console.log(`数据通道已关闭: ${peerId}`);
-            };
-
-            dataChannel.onerror = (error) => {
-                console.error(`数据通道错误:`, error);
-            };
-
-            // 手动发送ICE候选
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    console.log('发送ICE候选', event.candidate);
-                    signalingService.sendSignalingMessage(peerId, {
-                        type: 'ice-candidate',
-                        candidate: event.candidate
-                    });
-                }
-            };
-
-            // 创建并发送SDP offer
+            // 创建和发送 offer
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
 
-            console.log('发送WebRTC offer');
-            await signalingService.sendSignalingMessage(peerId, {
-                type: 'offer',
+            // 通过信令发送 offer
+            await window.electron.invoke('webrtc:sendOffer', {
+                toPeerId: peerId,
                 offer: peerConnection.localDescription
             });
 
-            // 临时存储连接，等待答复
-            setPeers(prev => ({
-                ...prev,
-                [peerId]: { peerId, connection: peerConnection, dataChannel }
-            }));
+            // 等待数据通道连接
+            await dataChannelPromise;
+            console.log(`已成功建立与 ${peerId} 的 WebRTC 连接`);
 
         } catch (error) {
-            console.error('WebRTC连接失败:', error);
-            throw error;
+            console.error(`建立连接失败:`, error);
+            closeConnectionToPeer(peerId);
+            throw new Error('无法建立数据通道连接');
         }
-    }, [setPeers, setDataChannels, signalingService, peers, dataChannels]);
+    }, [peers, dataChannels]);
 
     // 发送文件的真实实现
     const sendFile = useCallback(async (peerId: string, file: File) => {
@@ -425,6 +405,34 @@ export const useWebRTC = () => {
             throw error;
         }
     }, [dataChannels, connectToPeer, signalingService]);
+
+    // 添加在 useWebRTC 钩子内，其他函数旁边
+    const closeConnectionToPeer = (peerId: string) => {
+        console.log(`关闭与 ${peerId} 的连接`);
+
+        // 关闭数据通道
+        if (dataChannels[peerId]) {
+            dataChannels[peerId].close();
+        }
+
+        // 关闭对等连接
+        if (peers[peerId]) {
+            peers[peerId].connection.close();
+        }
+
+        // 从状态中移除
+        setPeers(prev => {
+            const newPeers = { ...prev };
+            delete newPeers[peerId];
+            return newPeers;
+        });
+
+        setDataChannels(prev => {
+            const newChannels = { ...prev };
+            delete newChannels[peerId];
+            return newChannels;
+        });
+    };
 
     return {
         isReady,
