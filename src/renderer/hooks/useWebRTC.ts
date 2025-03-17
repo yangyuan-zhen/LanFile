@@ -302,9 +302,8 @@ export const useWebRTC = () => {
             // 优化数据通道参数
             const dataChannel = peerConnection.createDataChannel('fileTransfer', {
                 ordered: true,
-                // 确保可靠传输
-                maxRetransmits: 30,
-                maxPacketLifeTime: 5000
+                // 只保留一个可靠性参数，不要同时使用两个
+                maxRetransmits: 30
             });
 
             // 设置更长的连接超时时间 (60秒)
