@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Folder } from "lucide-react";
+import { WebRTCDiagnostics } from "../diagnostics/WebRTCDiagnostics";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -158,6 +159,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     下载设置
                   </button>
                 </li>
+                <li>
+                  <button
+                    className={`w-full text-left px-3 py-2 rounded ${
+                      activeTab === "diagnostics"
+                        ? "bg-blue-50 text-blue-600"
+                        : "hover:bg-gray-50"
+                    }`}
+                    onClick={() => setActiveTab("diagnostics")}
+                  >
+                    网络诊断
+                  </button>
+                </li>
               </ul>
             </nav>
           </div>
@@ -182,6 +195,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     />
                     <p className="mt-1 text-sm text-gray-500">
                       用于检测其他设备上的 LanFile 是否正在运行
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      文件传输分块大小
+                    </label>
+                    <select
+                      value={chunkSize}
+                      onChange={(e) => setChunkSize(Number(e.target.value))}
+                      className="block px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {chunkSizeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      较小的分块大小适合不稳定网络，较大的分块大小提高传输速度
                     </p>
                   </div>
                 </div>
@@ -217,25 +250,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               </div>
             )}
 
-            <div className="mt-4">
-              <label className="block mb-1 text-sm font-medium text-gray-700">
-                文件传输分块大小
-              </label>
-              <select
-                value={chunkSize}
-                onChange={(e) => setChunkSize(Number(e.target.value))}
-                className="block px-3 py-2 w-full rounded-md border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                {chunkSizeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                较小的分块大小适合不稳定网络，较大的分块大小提高传输速度
-              </p>
-            </div>
+            {activeTab === "diagnostics" && (
+              <div>
+                <h3 className="mb-4 text-lg font-medium">网络诊断工具</h3>
+                <p className="mb-4 text-sm text-gray-600">
+                  使用此工具检测您的网络环境是否支持 WebRTC 连接和 NAT 穿透。
+                  这有助于确定文件传输可能遇到的问题。
+                </p>
+                <WebRTCDiagnostics />
+              </div>
+            )}
           </div>
         </div>
 

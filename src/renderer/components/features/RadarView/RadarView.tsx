@@ -26,10 +26,15 @@ export const RadarView = () => {
   const handleTransferConfirm = async (device: Device) => {
     try {
       setStatus("connecting");
-      console.log(`正在连接到设备: ${device.name} (${device.id})`);
+      console.log(
+        `正在连接到设备: ${device.name} (${device.id}, ${device.ip})`
+      );
 
-      // 使用可靠的连接超时设置
-      const connectPromise = connectToPeer(device.id);
+      // 加入更多调试日志
+      console.log("开始建立 WebRTC 连接...");
+
+      // 确保同时传递设备ID和IP地址
+      const connectPromise = connectToPeer(device.id, device.ip);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(
           () => reject(new Error("连接超时 - 请检查目标设备是否在线")),

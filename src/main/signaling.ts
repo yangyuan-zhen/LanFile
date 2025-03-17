@@ -108,5 +108,13 @@ export const setupSignalingHandlers = () => {
         return `ws://${host}:${port}`;
     });
 
+    // 添加检查状态的 IPC 处理程序
+    ipcMain.handle('signaling:getStatus', () => {
+        return {
+            running: webSocketSignalingService.isRunning,
+            port: webSocketSignalingService.getPort()
+        };
+    });
+
     logService.log('WebSocket 信令处理程序设置完成');
 }; 

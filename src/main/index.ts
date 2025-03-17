@@ -523,10 +523,17 @@ app.whenReady().then(async () => {
         }
         // 其他平台可能需要特定配置
 
+        // 获取设备信息用于信令服务
         const deviceId = await getDeviceId();
         const deviceName = app.getName(); // 或其他设备名称获取方式
-        await webSocketSignalingService.start(deviceId, deviceName);
-        console.log(`WebSocket 信令服务已启动，端口: ${webSocketSignalingService.getPort()}`);
+
+        // 启动信令服务
+        try {
+            await webSocketSignalingService.start(deviceId, deviceName);
+            console.log('信令服务启动成功，端口:', webSocketSignalingService.getPort());
+        } catch (error) {
+            console.error('信令服务启动失败:', error);
+        }
 
     } catch (error) {
         console.error("应用初始化失败:", error);
