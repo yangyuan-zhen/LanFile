@@ -34,7 +34,7 @@ export const RadarView = () => {
       console.log("开始建立 WebRTC 连接...");
 
       // 确保同时传递设备ID和IP地址
-      const connectPromise = connectToPeer(device.id, device.ip);
+      const connectPromise = connectToPeer(device.id);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(
           () => reject(new Error("连接超时 - 请检查目标设备是否在线")),
