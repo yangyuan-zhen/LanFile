@@ -18,93 +18,101 @@ export class WebSocketSignalingService extends EventEmitter {
     private server: any = null;
     private connections: Map<string, WebSocket> = new Map();
     private deviceMap: Map<string, { deviceId: string, deviceName: string }> = new Map();
-    private port: number = 8090;
+    private port: number = 8092;
     public isRunning: boolean = false;
     private localDeviceId: string = '';
     private localDeviceName: string = '';
 
-    constructor(port = 8090) {
+    constructor(port = 8092) {
         super();
         this.port = port;
     }
 
-    public start(deviceId: string, deviceName: string): Promise<void> {
-        this.localDeviceId = deviceId;
-        this.localDeviceName = deviceName;
+    public start(deviceId: string, deviceName: string, port?: number): Promise<boolean> {
+        try {
+            this.localDeviceId = deviceId;
+            this.localDeviceName = deviceName;
 
-        return new Promise((resolve, reject) => {
-            const tryStartServer = (port: number, maxRetries = 5, retryCount = 0) => {
-                if (retryCount >= maxRetries) {
-                    logService.error(`无法启动信令服务：尝试了${maxRetries}个端口后仍失败`);
-                    reject(new Error(`无法启动信令服务：尝试了${maxRetries}个端口后仍失败`));
-                    return;
-                }
+            if (port && port > 0) {
+                this.port = port;
+            }
 
-                try {
-                    logService.log(`尝试在端口 ${port} 上启动 WebSocket 服务器`);
+            return new Promise((resolve, reject) => {
+                const tryStartServer = (port: number, maxRetries = 5, retryCount = 0) => {
+                    if (retryCount >= maxRetries) {
+                        logService.error(`无法启动信令服务：尝试了${maxRetries}个端口后仍失败`);
+                        reject(new Error(`无法启动信令服务：尝试了${maxRetries}个端口后仍失败`));
+                        return;
+                    }
 
-                    const server = new WebSocketServer({ port });
+                    try {
+                        logService.log(`尝试在端口 ${port} 上启动 WebSocket 服务器`);
 
-                    // 添加错误处理
-                    server.on('error', (error: any) => {
-                        if (error.code === 'EADDRINUSE') {
+                        const server = new WebSocketServer({ port });
+
+                        // 添加错误处理
+                        server.on('error', (error: any) => {
+                            if (error.code === 'EADDRINUSE') {
+                                logService.log(`端口 ${port} 已被占用，尝试端口 ${port + 1}`);
+                                // 递增端口并重试
+                                tryStartServer(port + 1, maxRetries, retryCount + 1);
+                            } else {
+                                logService.error(`启动 WebSocket 服务器失败：${error.message}`);
+                                reject(error);
+                            }
+                        });
+
+                        server.on('listening', () => {
+                            this.server = server;
+                            this.isRunning = true;
+                            logService.log(`WebSocket 信令服务器成功运行在端口 ${port}`);
+                            resolve(true);
+                        });
+
+                        // 设置连接处理器
+                        server.on('connection', (ws: WebSocket, request: any) => {
+                            const ip = request.socket.remoteAddress || 'unknown';
+                            logService.log(`新的 WebSocket 连接来自 ${ip}`);
+
+                            // 注册消息处理器
+                            ws.on('message', (message: WebSocket.RawData) => this.handleIncomingMessage(ws, message));
+
+                            ws.on('close', () => {
+                                logService.log(`WebSocket 连接关闭: ${ip}`);
+                                // 查找并删除断开的设备
+                                for (const [deviceId, connection] of this.connections.entries()) {
+                                    if (connection === ws) {
+                                        this.connections.delete(deviceId);
+                                        this.emit('deviceDisconnected', deviceId);
+                                        break;
+                                    }
+                                }
+                            });
+
+                            ws.on('error', (error: Error) => {
+                                logService.error(`WebSocket 连接错误: ${error.message}`);
+                            });
+                        });
+
+                    } catch (error) {
+                        if (error instanceof Error && error.message.includes('EADDRINUSE')) {
                             logService.log(`端口 ${port} 已被占用，尝试端口 ${port + 1}`);
                             // 递增端口并重试
                             tryStartServer(port + 1, maxRetries, retryCount + 1);
                         } else {
-                            logService.error(`启动 WebSocket 服务器失败：${error.message}`);
+                            logService.error(`启动 WebSocket 服务器失败：${error instanceof Error ? error.message : String(error)}`);
                             reject(error);
                         }
-                    });
-
-                    server.on('listening', () => {
-                        this.server = server;
-                        this.port = port;
-                        this.isRunning = true;
-                        logService.log(`WebSocket 信令服务器成功运行在端口 ${port}`);
-                        resolve();
-                    });
-
-                    // 设置连接处理器
-                    server.on('connection', (ws: WebSocket, request: any) => {
-                        const ip = request.socket.remoteAddress || 'unknown';
-                        logService.log(`新的 WebSocket 连接来自 ${ip}`);
-
-                        // 注册消息处理器
-                        ws.on('message', (message: WebSocket.RawData) => this.handleIncomingMessage(ws, message));
-
-                        ws.on('close', () => {
-                            logService.log(`WebSocket 连接关闭: ${ip}`);
-                            // 查找并删除断开的设备
-                            for (const [deviceId, connection] of this.connections.entries()) {
-                                if (connection === ws) {
-                                    this.connections.delete(deviceId);
-                                    this.emit('deviceDisconnected', deviceId);
-                                    break;
-                                }
-                            }
-                        });
-
-                        ws.on('error', (error: Error) => {
-                            logService.error(`WebSocket 连接错误: ${error.message}`);
-                        });
-                    });
-
-                } catch (error) {
-                    if (error instanceof Error && error.message.includes('EADDRINUSE')) {
-                        logService.log(`端口 ${port} 已被占用，尝试端口 ${port + 1}`);
-                        // 递增端口并重试
-                        tryStartServer(port + 1, maxRetries, retryCount + 1);
-                    } else {
-                        logService.error(`启动 WebSocket 服务器失败：${error instanceof Error ? error.message : String(error)}`);
-                        reject(error);
                     }
-                }
-            };
+                };
 
-            // 从设置的初始端口开始尝试
-            tryStartServer(this.port);
-        });
+                // 从设置的初始端口开始尝试
+                tryStartServer(this.port);
+            });
+        } catch (error) {
+            console.error('启动信令服务失败:', error);
+            return Promise.resolve(false);
+        }
     }
 
     private handleIncomingMessage(ws: WebSocket, message: WebSocket.RawData): void {

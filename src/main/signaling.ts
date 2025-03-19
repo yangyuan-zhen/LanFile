@@ -2,6 +2,9 @@ import { ipcMain } from 'electron';
 import { webSocketSignalingService } from './services/WebSocketSignalingService';
 import { logService } from './services/LogService';
 
+// 假设已有的信令服务实例
+let signalPort = 8092; // 默认端口
+
 // 设置 WebSocket 信令相关的 IPC 处理程序
 export const setupSignalingHandlers = () => {
     // 启动信令服务
@@ -114,6 +117,59 @@ export const setupSignalingHandlers = () => {
             running: webSocketSignalingService.isRunning,
             port: webSocketSignalingService.getPort()
         };
+    });
+
+    // 获取当前信令服务端口
+    ipcMain.handle('signaling:getPort', () => {
+        try {
+            // 使用类型断言
+            if ((global as any).webSocketSignalingService && typeof (global as any).webSocketSignalingService.getPort === 'function') {
+                return (global as any).webSocketSignalingService.getPort();
+            }
+            // 否则返回保存的端口值
+            return signalPort;
+        } catch (error) {
+            console.error('获取信令端口失败:', error);
+            return 8092; // 默认端口
+        }
+    });
+
+    // 设置信令服务端口
+    ipcMain.handle('signaling:setPort', async (_, port: number) => {
+        try {
+            console.log(`设置信令端口为: ${port}`);
+            signalPort = port;
+
+            // 如果WebSocketSignalingService实例存在并有相关方法，重启服务
+            if ((global as any).webSocketSignalingService) {
+                if (typeof (global as any).webSocketSignalingService.stop === 'function') {
+                    await (global as any).webSocketSignalingService.stop();
+                }
+
+                if (typeof (global as any).webSocketSignalingService.start === 'function') {
+                    // 获取设备信息
+                    let deviceId = '';
+                    let deviceName = '';
+
+                    try {
+                        deviceId = await (global as any).deviceInfo?.id || 'unknown-device';
+                        deviceName = await (global as any).deviceInfo?.name || 'Unknown Device';
+                    } catch (e) {
+                        console.warn('获取设备信息失败，使用默认值', e);
+                    }
+
+                    await (global as any).webSocketSignalingService.start(deviceId, deviceName, port);
+                }
+            }
+
+            return { success: true, port };
+        } catch (error) {
+            console.error('设置信令端口失败:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            };
+        }
     });
 
     logService.log('WebSocket 信令处理程序设置完成');
