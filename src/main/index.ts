@@ -481,6 +481,9 @@ const createWindow = () => {
 
     // 保存窗口引用
     (global as any).mainWindow = mainWindow;
+
+    // 在 createWindow 函数中的某处添加
+    (global as any).webSocketSignalingService = webSocketSignalingService;
 };
 
 // 应用初始化
