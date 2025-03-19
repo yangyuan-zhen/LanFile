@@ -1,9 +1,10 @@
 import { ipcMain } from 'electron';
 import { webSocketSignalingService } from './services/WebSocketSignalingService';
 import { logService } from './services/LogService';
+import store from './store';
 
-// 假设已有的信令服务实例
-let signalPort = 8092; // 默认端口
+// 修改默认端口获取方式
+let signalPort = store.get('signalingPort', 8092); // 从存储中获取，默认为8092
 
 // 设置 WebSocket 信令相关的 IPC 处理程序
 export const setupSignalingHandlers = () => {
@@ -139,6 +140,9 @@ export const setupSignalingHandlers = () => {
         try {
             console.log(`设置信令端口为: ${port}`);
             signalPort = port;
+
+            // 保存到存储
+            store.set('signalingPort', port);
 
             // 如果WebSocketSignalingService实例存在并有相关方法，重启服务
             if ((global as any).webSocketSignalingService) {

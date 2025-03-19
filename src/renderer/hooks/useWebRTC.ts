@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNetworkInfo } from './useNetworkInfo';
 import { useWebRTCSignaling } from './useWebRTCSignaling';
+import { Device } from '../services/ZeroconfService';
 
 interface RTCPeerData {
     peerId: string;
@@ -26,8 +27,18 @@ export const useWebRTC = () => {
     const [dataChannels, setDataChannels] = useState<Record<string, RTCDataChannel>>({});
     const [transfers, setTransfers] = useState<FileTransfer[]>([]);
     const [isReady, setIsReady] = useState(false);
+    const [status, setStatus] = useState<'idle' | 'checking' | 'connecting' | 'connected' | 'disconnected' | 'error'>('idle');
+    const [error, setError] = useState<string | null>(null);
     const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'failed'>('connecting');
     const [connectionError, setConnectionError] = useState<string | null>(null);
+    const [activeConnection, setActiveConnection] = useState<{
+        peerConnection: RTCPeerConnection,
+        dataChannel: RTCDataChannel
+    } | null>(null);
+    const [peerConnections, setPeerConnections] = useState<Record<string, {
+        pc: RTCPeerConnection,
+        dataChannel: RTCDataChannel
+    }>>({});
 
     const chunkSize = 16384; // 16KB 块大小
     const fileChunksRef = useRef<Record<string, ArrayBuffer>>({});
@@ -289,137 +300,155 @@ export const useWebRTC = () => {
     };
 
     // 连接到对等点
-    const connectToPeer = useCallback(async (peerId: string, peerIp?: string) => {
+    const connectToPeer = useCallback(async (peerInfoOrId: Device | string) => {
         try {
-            console.log(`尝试建立与 ${peerId} 的 WebRTC 连接 (IP: ${peerIp || '未知'})`);
+            setStatus('connecting');
 
-            // 检查是否已经连接
-            if (peers[peerId] && dataChannels[peerId]) {
-                if (dataChannels[peerId].readyState === 'open') {
-                    console.log(`已经连接到设备 ${peerId}`);
-                    return;
-                } else {
-                    console.log(`数据通道状态: ${dataChannels[peerId].readyState}，尝试重新连接`);
-                    // 关闭现有连接，重新建立
-                    closeConnectionToPeer(peerId);
+            // 如果传入的是字符串ID，转换为设备对象
+            let peerInfo: Device;
+            if (typeof peerInfoOrId === 'string') {
+                // 查找设备信息
+                const devices = await window.electron.invoke('mdns:getDiscoveredDevices');
+                const device = devices.find((d: Device) => d.host === peerInfoOrId);
+                if (!device) {
+                    throw new Error(`找不到ID为 ${peerInfoOrId} 的设备信息`);
                 }
+                peerInfo = device;
+            } else {
+                peerInfo = peerInfoOrId;
             }
 
-            // 更丰富的 ICE 服务器配置
-            const peerConnection = new RTCPeerConnection({
+            // 添加详细日志
+            console.log(`开始连接到设备: ${peerInfo.name} (${peerInfo.host})`);
+
+            // 创建新的RTCPeerConnection
+            const pc = new RTCPeerConnection({
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:443',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    }
+                    { urls: 'stun:stun2.l.google.com:19302' }
                 ],
-                // 为局域网环境优化 - 使用 all 确保尝试所有连接类型
+                // 添加ICE传输策略，优先使用UDP
                 iceTransportPolicy: 'all',
-                iceCandidatePoolSize: 5
+                // 增加ICE收集超时时间
+                iceCandidatePoolSize: 10
             });
 
-            // 记录所有ICE连接状态变化
-            peerConnection.oniceconnectionstatechange = () => {
-                console.log(`ICE 连接状态变化: ${peerConnection.iceConnectionState} (peer: ${peerId})`);
+            // 设置断开连接的超时时间
+            const connectionTimeout = setTimeout(() => {
+                console.log(`连接到 ${peerInfo.name} 超时`);
+                pc.close();
+                setStatus('error');
+                setError('连接超时 - 检查网络环境和防火墙设置');
+                throw new Error('连接超时 - 检查网络环境和防火墙设置');
+            }, 30000); // 增加超时时间为30秒
 
-                // 特别处理失败状态
-                if (peerConnection.iceConnectionState === 'failed') {
-                    console.error(`ICE 连接失败 (peer: ${peerId})`);
-                    // 尝试重启 ICE - 这可能有助于解决某些连接问题
-                    if (peerConnection.restartIce) {
-                        console.log(`尝试重启 ICE 连接 (peer: ${peerId})`);
-                        peerConnection.restartIce();
-                    }
+            // 更详细的连接状态监控
+            pc.oniceconnectionstatechange = () => {
+                console.log(`ICE连接状态: ${pc.iceConnectionState}`);
+
+                if (pc.iceConnectionState === 'failed') {
+                    clearTimeout(connectionTimeout);
+                    pc.close();
+                    setStatus('error');
+                    setError('ICE连接失败 - 可能是NAT穿透问题');
+                } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                    console.log('ICE连接已建立！');
                 }
             };
 
-            // 增加连接超时保护
-            const connectionTimeoutId = setTimeout(() => {
-                if (!dataChannels[peerId] || dataChannels[peerId].readyState !== 'open') {
-                    console.error(`连接到 ${peerId} 超时`);
-                    closeConnectionToPeer(peerId);
-                    throw new Error(`连接超时 - 检查网络环境和防火墙设置`);
-                }
-            }, 20000); // 20秒超时
-
-            // 添加数据通道开启处理
-            const setupDataChannelWithTimeout = (dataChannel: RTCDataChannel) => {
-                return new Promise((resolve, reject) => {
-                    let isDone = false;
-
-                    // 设置通道监听器
-                    dataChannel.onopen = () => {
-                        console.log(`数据通道已打开 (peer: ${peerId})`);
-                        clearTimeout(connectionTimeoutId);
-                        isDone = true;
-                        resolve(true);
-                    };
-
-                    dataChannel.onerror = (error) => {
-                        console.error(`数据通道错误 (peer: ${peerId}):`, error);
-                        if (!isDone) {
-                            isDone = true;
-                            // 使用错误事件中的错误描述或提供默认消息
-                            const errorMessage = error.error?.message || '未知错误';
-                            reject(new Error(`数据通道错误: ${errorMessage}`));
-                        }
-                    };
-
-                    dataChannel.onclose = () => {
-                        console.log(`数据通道已关闭 (peer: ${peerId})`);
-                    };
-                });
+            pc.onicegatheringstatechange = () => {
+                console.log(`ICE收集状态: ${pc.iceGatheringState}`);
             };
 
-            // 使用局域网优化的数据通道选项
-            const dataChannel = peerConnection.createDataChannel('fileTransfer', {
+            pc.onsignalingstatechange = () => {
+                console.log(`信令状态: ${pc.signalingState}`);
+            };
+
+            pc.onconnectionstatechange = () => {
+                console.log(`连接状态: ${pc.connectionState}`);
+
+                if (pc.connectionState === 'connected') {
+                    clearTimeout(connectionTimeout);
+                    console.log('WebRTC连接成功建立！');
+                    setStatus('connected');
+                } else if (pc.connectionState === 'failed') {
+                    clearTimeout(connectionTimeout);
+                    pc.close();
+                    setStatus('error');
+                    setError('连接失败 - 检查网络和防火墙设置');
+                }
+            };
+
+            // 监听ICE候选项
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('收集到ICE候选项:', event.candidate.candidate);
+
+                    // 发送ICE候选项到对方设备
+                    window.electron.invoke('signaling:sendMessage', peerInfo.host, {
+                        type: 'ice-candidate',
+                        from: deviceInfo.id,
+                        to: peerInfo.host,
+                        data: event.candidate,
+                        timestamp: Date.now()
+                    });
+                } else {
+                    console.log('ICE候选项收集完成');
+                }
+            };
+
+            // 创建数据通道
+            const dataChannel = pc.createDataChannel('fileTransfer', {
                 ordered: true,
-                maxRetransmits: 30
+            });
+
+            // 更详细的数据通道状态监控
+            dataChannel.onopen = () => {
+                console.log('数据通道已打开');
+                clearTimeout(connectionTimeout);
+                setStatus('connected');
+                setActiveConnection({ peerConnection: pc, dataChannel });
+            };
+
+            dataChannel.onclose = () => {
+                console.log('数据通道已关闭');
+                setStatus('disconnected');
+            };
+
+            dataChannel.onerror = (error) => {
+                console.error('数据通道错误:', error);
+                setStatus('error');
+                setError(`数据通道错误: ${error}`);
+            };
+
+            // 创建并发送offer
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            console.log('发送WebRTC offer到:', peerInfo.host);
+            window.electron.invoke('signaling:sendMessage', peerInfo.host, {
+                type: 'offer',
+                from: deviceInfo.id,
+                to: peerInfo.host,
+                data: offer,
+                timestamp: Date.now()
             });
 
             // 保存连接信息
-            peers[peerId] = {
-                peerId,
-                connection: peerConnection
-            };
-            dataChannels[peerId] = dataChannel;
+            setPeerConnections(prev => ({
+                ...prev,
+                [peerInfo.host]: { pc, dataChannel }
+            }));
 
-            // 设置数据通道
-            const dataChannelPromise = setupDataChannelWithTimeout(dataChannel);
-
-            // 创建和发送 offer
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-
-            // 通过信令发送 offer
-            await window.electron.invoke('webrtc:sendOffer', {
-                toPeerId: peerId,
-                offer: peerConnection.localDescription
-            });
-
-            // 等待数据通道连接
-            await dataChannelPromise;
-            console.log(`已成功建立与 ${peerId} 的 WebRTC 连接`);
-
+            return true;
         } catch (error) {
-            console.error(`建立连接失败:`, error);
-            closeConnectionToPeer(peerId);
-            throw new Error('无法建立数据通道连接');
+            console.error('建立WebRTC连接失败:', error);
+            setStatus('error');
+            setError(`连接失败: ${error instanceof Error ? error.message : String(error)}`);
+            return false;
         }
-    }, [peers, dataChannels]);
+    }, [deviceInfo]);
 
     // 发送文件的真实实现
     const sendFile = useCallback(async (peerId: string, file: File) => {
@@ -432,12 +461,12 @@ export const useWebRTC = () => {
             // 检查数据通道是否已打开
             if (!dataChannels[peerId] || dataChannels[peerId].readyState !== 'open') {
                 console.log('数据通道未打开，尝试连接...');
-                await connectToPeer(peerId);
-
-                // 二次检查数据通道状态
-                if (!dataChannels[peerId] || dataChannels[peerId].readyState !== 'open') {
-                    throw new Error('无法建立数据通道连接');
+                // 查找设备信息后再连接
+                const deviceInfo = await findDeviceById(peerId);
+                if (!deviceInfo) {
+                    throw new Error(`找不到ID为 ${peerId} 的设备信息`);
                 }
+                await connectToPeer(deviceInfo);
             }
 
             // 文件传输逻辑...
@@ -446,6 +475,18 @@ export const useWebRTC = () => {
             throw error;
         }
     }, [dataChannels, connectToPeer, signalingService]);
+
+    // 添加一个辅助函数来查找设备
+    const findDeviceById = async (id: string): Promise<Device | null> => {
+        // 可以从全局状态或通过API获取设备信息
+        try {
+            const devices = await window.electron.invoke('mdns:getDiscoveredDevices');
+            return devices.find((d: Device) => d.host === id) || null;
+        } catch (error) {
+            console.error('查找设备失败:', error);
+            return null;
+        }
+    };
 
     // 添加在 useWebRTC 钩子内，其他函数旁边
     const closeConnectionToPeer = (peerId: string) => {
@@ -473,6 +514,181 @@ export const useWebRTC = () => {
             delete newChannels[peerId];
             return newChannels;
         });
+    };
+
+    // 将这些处理函数移到这里（checkIceConnectivity 函数之后，useEffect 之前）
+    const handleOffer = useCallback(async (message: any) => {
+        try {
+            const { from, data: offer } = message;
+            console.log(`处理来自 ${from} 的 WebRTC offer`);
+
+            // 如果已有与此对等方的连接，先关闭
+            if (peerConnections[from]) {
+                peerConnections[from].pc.close();
+            }
+
+            // 创建新的RTCPeerConnection
+            const pc = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            });
+
+            // 设置远程描述
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+            // 创建应答
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            // 发送应答到对等方
+            window.electron.invoke('signaling:sendMessage', from, {
+                type: 'answer',
+                from: deviceInfo.id,
+                to: from,
+                data: answer,
+                timestamp: Date.now()
+            });
+
+            // 处理ICE候选项
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    window.electron.invoke('signaling:sendMessage', from, {
+                        type: 'ice-candidate',
+                        from: deviceInfo.id,
+                        to: from,
+                        data: event.candidate,
+                        timestamp: Date.now()
+                    });
+                }
+            };
+
+            // 保存连接
+            setPeerConnections(prev => ({
+                ...prev,
+                [from]: { pc, dataChannel: null as any }
+            }));
+        } catch (error) {
+            console.error('处理offer失败:', error);
+        }
+    }, [deviceInfo, peerConnections]);
+
+    const handleAnswer = useCallback(async (message: any) => {
+        try {
+            const { from, data: answer } = message;
+            console.log(`处理来自 ${from} 的 WebRTC answer`);
+
+            // 获取对应的对等连接
+            const peerConnection = peerConnections[from]?.pc;
+            if (!peerConnection) {
+                console.error(`未找到与 ${from} 的连接`);
+                return;
+            }
+
+            // 设置远程描述
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (error) {
+            console.error('处理answer失败:', error);
+        }
+    }, [peerConnections]);
+
+    const handleIceCandidate = useCallback(async (message: any) => {
+        try {
+            const { from, data: candidate } = message;
+            console.log(`处理来自 ${from} 的 ICE候选项`);
+
+            // 获取对应的对等连接
+            const peerConnection = peerConnections[from]?.pc;
+            if (!peerConnection) {
+                console.error(`未找到与 ${from} 的连接`);
+                return;
+            }
+
+            // 添加ICE候选项
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (error) {
+            console.error('处理ICE候选项失败:', error);
+        }
+    }, [peerConnections]);
+
+    // 在useEffect中处理信令消息
+    useEffect(() => {
+        const handleSignalingMessage = async (message: any) => {
+            console.log('收到信令消息:', message);
+
+            if (!message || !message.type) {
+                console.error('收到无效信令消息');
+                return;
+            }
+
+            // 确保消息是发给本设备的
+            if (message.to && message.to !== deviceInfo.id) {
+                console.log(`消息不是发给当前设备的 (目标=${message.to}, 当前=${deviceInfo.id})`);
+                return;
+            }
+
+            switch (message.type) {
+                case 'offer':
+                    console.log('收到WebRTC offer');
+                    handleOffer(message);
+                    break;
+
+                case 'answer':
+                    console.log('收到WebRTC answer');
+                    handleAnswer(message);
+                    break;
+
+                case 'ice-candidate':
+                    console.log('收到ICE候选项');
+                    handleIceCandidate(message);
+                    break;
+
+                default:
+                    console.log(`未处理的消息类型: ${message.type}`);
+            }
+        };
+
+        // 添加信令消息监听器
+        window.electron.on('signaling:message', handleSignalingMessage);
+
+        return () => {
+            window.electron.off('signaling:message', handleSignalingMessage);
+        };
+    }, [deviceInfo, handleOffer, handleAnswer, handleIceCandidate]);
+
+    // 在连接前进行ICE检测
+    const checkIceConnectivity = async () => {
+        try {
+            const pc = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            });
+
+            let hasCandidate = false;
+
+            return new Promise<boolean>((resolve) => {
+                setTimeout(() => {
+                    pc.close();
+                    resolve(hasCandidate);
+                }, 5000);
+
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        console.log('ICE候选项检测:', event.candidate.candidate);
+                        hasCandidate = true;
+                    }
+                };
+
+                const dc = pc.createDataChannel('connectivity-test');
+                pc.createOffer().then(offer => pc.setLocalDescription(offer));
+            });
+        } catch (error) {
+            console.error('ICE连接检测失败:', error);
+            return false;
+        }
     };
 
     return {
