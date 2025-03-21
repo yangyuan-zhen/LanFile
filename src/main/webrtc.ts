@@ -4,7 +4,18 @@ import path from 'path';
 
 // 这个文件负责主进程中的 WebRTC 相关功能
 
+// 添加一个标志来跟踪处理程序是否已注册
+let handlersRegistered = false;
+
 export function setupWebRTCHandlers(mainWindow: BrowserWindow) {
+    // 如果处理程序已经注册，直接返回
+    if (handlersRegistered) {
+        console.log('WebRTC 处理程序已注册，跳过');
+        return;
+    }
+
+    console.log('注册 WebRTC 处理程序');
+
     // 初始化 WebRTC
     ipcMain.handle('webrtc:initialize', async () => {
         console.log('WebRTC 初始化请求');
@@ -95,4 +106,7 @@ export function setupWebRTCHandlers(mainWindow: BrowserWindow) {
             return { success: false, message: `处理失败: ${errorMessage}` };
         }
     });
+
+    // 标记处理程序已注册
+    handlersRegistered = true;
 } 

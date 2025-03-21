@@ -39,6 +39,10 @@ export const useWebRTC = () => {
         pc: RTCPeerConnection,
         dataChannel: RTCDataChannel
     }>>({});
+    const [deviceInfo, setDeviceInfo] = useState<{ id: string, name: string }>({
+        id: 'device-' + Math.random().toString(36).substring(2, 10),
+        name: '本地设备'
+    });
 
     const chunkSize = 16384; // 16KB 块大小
     const fileChunksRef = useRef<Record<string, ArrayBuffer>>({});
@@ -77,6 +81,22 @@ export const useWebRTC = () => {
             Object.values(peers).forEach(peer => peer.connection.close());
         };
     }, [networkInfo.isConnected, networkInfo.ip]);
+
+    // 添加在 useEffect 中获取设备信息
+    useEffect(() => {
+        const getDeviceInfo = async () => {
+            try {
+                // 尝试获取真实设备信息
+                const info = await window.electron.invoke('device:getInfo');
+                setDeviceInfo(info);
+            } catch (error) {
+                console.log('使用随机生成的设备信息');
+                // 已经有默认值，不需要额外处理
+            }
+        };
+
+        getDeviceInfo();
+    }, []);
 
     // 创建对等连接
     const createPeerConnection = async (peerId: string, isInitiator = true, remoteOffer?: RTCSessionDescriptionInit) => {
