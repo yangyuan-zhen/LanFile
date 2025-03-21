@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Monitor, Smartphone, Laptop, Tablet } from "lucide-react";
 import { useNetworkInfo } from "./useNetworkInfo";
 import { useDeviceInfo } from "./useDeviceInfo";
+import { checkDeviceStatus as checkDeviceOnlineStatus } from '../services/deviceService';
 
 const DEVICE_CACHE_KEY = "lanfile_cached_devices";
 const DEVICE_NAME_MAP_KEY = "lanfile_device_name_map";
@@ -547,29 +548,16 @@ export const useNetworkDevices = () => {
                 };
             }
 
-            // 使用心跳服务检测其他设备
-            try {
-                const heartbeatPort = await window.electron.invoke('heartbeat:getPort');
-                console.log(`检查设备状态: ${device.name} (${device.ip}:${heartbeatPort})`);
+            // 使用WebSocket信令服务检测
+            const status = await checkDeviceOnlineStatus(device.ip);
 
-                const response = await window.electron.http.request({
-                    url: `http://${device.ip}:${heartbeatPort}/lanfile/status`,
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                    },
-                });
-
-                if (response.ok && response.data.status === 'online') {
-                    console.log(`设备 ${device.name} (${device.ip}) 在线`);
-                    return {
-                        ...device,
-                        status: "在线" as DeviceStatus,
-                        lastSeen: Date.now()
-                    };
-                }
-            } catch (err) {
-                console.log(`设备 ${device.name} (${device.ip}) 心跳检测失败:`, err);
+            if (status.online) {
+                console.log(`设备 ${device.name} (${device.ip}) 在线`);
+                return {
+                    ...device,
+                    status: "在线" as DeviceStatus,
+                    lastSeen: Date.now()
+                };
             }
 
             return {
@@ -577,15 +565,7 @@ export const useNetworkDevices = () => {
                 status: "离线" as DeviceStatus
             };
         } catch (error) {
-            console.error(`检查设备 ${device.name} (${device.ip}) 状态失败:`, error);
-            // 如果是本机，即使发生错误也保持在线状态
-            if (device.ip === networkInfo.ip) {
-                return {
-                    ...device,
-                    status: "在线" as DeviceStatus,
-                    lastSeen: Date.now()
-                };
-            }
+            console.error(`设备状态检查失败: ${device.name} (${device.ip})`, error);
             return {
                 ...device,
                 status: "离线" as DeviceStatus

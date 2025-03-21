@@ -5,13 +5,14 @@ import { ipcMain } from 'electron';
 import { logService } from './LogService';
 
 interface SignalingMessage {
-    type: 'offer' | 'answer' | 'ice-candidate' | 'register' | 'disconnect';
+    type: 'offer' | 'answer' | 'ice-candidate' | 'register' | 'disconnect' | 'ping' | 'pong';
     from: string;
     to?: string;
     deviceId?: string;
     deviceName?: string;
     data?: any;
     timestamp?: number;
+    originalTimestamp?: number;
 }
 
 export class WebSocketSignalingService extends EventEmitter {
@@ -144,6 +145,25 @@ export class WebSocketSignalingService extends EventEmitter {
                     timestamp: Date.now()
                 });
 
+                return;
+            }
+
+            // 处理ping请求，立即返回pong响应
+            if (signalingMessage.type === 'ping') {
+                console.log(`收到来自 ${signalingMessage.from} 的ping请求`);
+                this.sendToDevice(signalingMessage.from, {
+                    type: 'pong',
+                    from: this.localDeviceId,
+                    timestamp: Date.now(),
+                    originalTimestamp: signalingMessage.timestamp
+                });
+                return;
+            }
+
+            // 处理pong响应
+            if (signalingMessage.type === 'pong') {
+                console.log(`收到来自 ${signalingMessage.from} 的pong响应`);
+                this.emit(`pong:${signalingMessage.from}`);
                 return;
             }
 
@@ -371,6 +391,36 @@ export class WebSocketSignalingService extends EventEmitter {
                 this.start(this.localDeviceId, this.localDeviceName);
             }
         }
+    }
+
+    /**
+     * 发送ping消息并等待pong响应
+     */
+    public async pingDevice(deviceId: string): Promise<boolean> {
+        return new Promise((resolve) => {
+            // 设置超时
+            const timeoutId = setTimeout(() => {
+                this.removeListener(`pong:${deviceId}`, responseHandler);
+                console.log(`设备 ${deviceId} ping超时`);
+                resolve(false);
+            }, 3000);
+
+            // 定义响应处理器
+            const responseHandler = () => {
+                clearTimeout(timeoutId);
+                resolve(true);
+            };
+
+            // 注册一次性监听器
+            this.once(`pong:${deviceId}`, responseHandler);
+
+            // 使用sendToDevice替代sendMessage
+            this.sendToDevice(deviceId, {
+                type: 'ping',
+                from: this.localDeviceId,
+                timestamp: Date.now()
+            });
+        });
     }
 }
 
