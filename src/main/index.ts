@@ -13,6 +13,7 @@ import dgram from 'dgram';
 import { logService } from './services/LogService';
 import { setupSignalingHandlers } from './signaling';
 import { webSocketSignalingService } from './services/WebSocketSignalingService';
+import { registerNetworkHandlers } from './services/NetworkService';
 
 // 在应用顶部添加
 app.commandLine.appendSwitch('lang', 'zh-CN');
@@ -465,6 +466,9 @@ function setupIpcHandlers() {
             return { success: false, error: String(error) };
         }
     });
+
+    // 注册网络处理程序
+    registerNetworkHandlers();
 
     console.log("设置处理程序注册完成");
 }

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import { ipcMain } from 'electron';
+import { webSocketSignalingService } from '../services/WebSocketSignalingService';
 
 export interface NetworkDevice {
     name: string;
@@ -122,7 +123,16 @@ export class NetworkService extends EventEmitter {
     }
 }
 
-// 简化注册处理程序，移除旧的ping处理函数
+// 重新实现处理程序，使用WebSocket信令服务
 export const registerNetworkHandlers = () => {
-    // 保留其他网络相关处理程序，但移除network:pingDevice
+    // 处理设备状态检查请求
+    ipcMain.handle('network:pingDevice', async (_event, ip, port) => {
+        try {
+            console.log(`通过WebSocket信令检测设备: ${ip}`);
+            return await webSocketSignalingService.pingDevice(ip);
+        } catch (error) {
+            console.error('检查设备状态失败:', error);
+            return false;
+        }
+    });
 }; 
