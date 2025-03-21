@@ -523,15 +523,18 @@ const createWindow = () => {
 // 应用初始化
 app.whenReady().then(async () => {
     try {
-        // 先设置IPC处理程序
+        // 设置IPC处理程序
         setupIpcHandlers();
 
-        // 然后创建窗口
+        // 启动信令服务
+        const deviceId = await getDeviceId();
+        await webSocketSignalingService.start(deviceId, "本地设备");
+        console.log("信令服务已启动，端口:", webSocketSignalingService.getPort());
+
+        // 创建窗口
         if (!mainWindow) {
             createWindow();
         }
-
-        // 其他初始化代码...
     } catch (error) {
         console.error("应用初始化失败:", error);
     }
