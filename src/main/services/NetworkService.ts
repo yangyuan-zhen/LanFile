@@ -1,8 +1,6 @@
 import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import { ipcMain } from 'electron';
-import * as net from 'net';
-import fetch from 'node-fetch';
 
 export interface NetworkDevice {
     name: string;
@@ -124,101 +122,7 @@ export class NetworkService extends EventEmitter {
     }
 }
 
-// 增加多种检测方法
-export const DEFAULT_HEARTBEAT_PORT = 8080;
-
-// TCP 连接检测
-const checkDeviceByTCP = async (ip: string, port: number): Promise<boolean> => {
-    return new Promise<boolean>((resolve) => {
-        try {
-            console.log(`TCP检测设备: ${ip}:${port}`);
-            const socket = new net.Socket();
-            const timeout = 1000;
-
-            socket.setTimeout(timeout);
-
-            socket.on('connect', () => {
-                socket.destroy();
-                console.log(`TCP连接成功: ${ip}:${port}`);
-                resolve(true);
-            });
-
-            socket.on('timeout', () => {
-                socket.destroy();
-                console.log(`TCP连接超时: ${ip}:${port}`);
-                resolve(false);
-            });
-
-            socket.on('error', (err) => {
-                socket.destroy();
-                console.log(`TCP连接错误: ${ip}:${port}`, err.message);
-                resolve(false);
-            });
-
-            socket.connect(port, ip);
-        } catch (error) {
-            console.error(`TCP检测异常: ${ip}:${port}`, error);
-            resolve(false);
-        }
-    });
-};
-
-// 修改 HTTP 检测实现
-const checkDeviceByHTTP = async (ip: string, port: number): Promise<boolean> => {
-    try {
-        console.log(`开始HTTP检测设备: ${ip}:${port}`);
-
-        // 创建一个带超时的 Promise
-        const timeoutPromise = new Promise<Response>((_, reject) => {
-            setTimeout(() => {
-                console.log(`HTTP请求超时: ${ip}:${port}`);
-                reject(new Error('请求超时'));
-            }, 2000);
-        });
-
-        const url = `http://${ip}:${port}/lanfile/status`;
-        console.log(`发送HTTP请求: ${url}`);
-
-        // 创建实际的 fetch 请求
-        const fetchPromise = fetch(url, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        });
-
-        // 使用 Promise.race 实现超时
-        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-
-        console.log(`HTTP检测成功: ${ip}:${port}, 状态码: ${response.status}`);
-        return response.ok;
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.log(`HTTP检测失败详细信息: ${ip}:${port}, 错误: ${errorMessage}`);
-        return false;
-    }
-};
-
-// 简化设备检测 - 主要依赖 HTTP 检测
-export const checkDeviceStatus = async (ip: string, port: number = DEFAULT_HEARTBEAT_PORT): Promise<boolean> => {
-    try {
-        // 直接使用 HTTP 检测
-        return await checkDeviceByHTTP(ip, port);
-    } catch (error) {
-        console.error(`设备检测异常: ${ip}:${port}`, error);
-        return false;
-    }
-};
-
-// 注册简化的IPC处理程序
+// 简化注册处理程序，移除旧的ping处理函数
 export const registerNetworkHandlers = () => {
-    // 处理设备状态检查请求
-    ipcMain.handle('network:pingDevice', async (_event, ip, port = DEFAULT_HEARTBEAT_PORT) => {
-        try {
-            return await checkDeviceStatus(ip, port);
-        } catch (error) {
-            console.error('检查设备状态失败:', error);
-            return false;
-        }
-    });
-
-    // 移除 UDP 相关的处理程序
+    // 保留其他网络相关处理程序，但移除network:pingDevice
 }; 

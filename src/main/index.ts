@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import Store from 'electron-store';
 import path from 'path';
-import { NetworkService, checkDeviceStatus, DEFAULT_HEARTBEAT_PORT } from './services/NetworkService';
+import { NetworkService } from './services/NetworkService';
 import MDNSService, { MDNSDevice } from './services/MDNSService';
 import { heartbeatService } from './services/HeartbeatService';
 import { networkInterfaces, hostname } from 'os';
@@ -384,10 +384,10 @@ function setupIpcHandlers() {
     ipcMain.handle('transfer:checkHeartbeat', async (_, ip) => {
         try {
             // 确保目标设备心跳服务正常
-            const isOnline = await checkDeviceStatus(ip, DEFAULT_HEARTBEAT_PORT);
+            const isOnline = await webSocketSignalingService.pingDevice(ip);
 
             if (!isOnline) {
-                throw new Error('目标设备心跳服务不可用，无法建立连接');
+                throw new Error('目标设备信令服务不可用，无法建立连接');
             }
 
             return { success: true };
