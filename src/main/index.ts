@@ -14,6 +14,10 @@ import { logService } from './services/LogService';
 import { setupSignalingHandlers } from './signaling';
 import { webSocketSignalingService } from './services/WebSocketSignalingService';
 
+// 在应用顶部添加
+app.commandLine.appendSwitch('lang', 'zh-CN');
+app.commandLine.appendSwitch('force-color-profile', 'srgb');
+
 // 创建配置存储实例
 const store = new Store();
 
@@ -254,6 +258,19 @@ function setupIpcHandlers() {
         return MDNSService.unpublishService();
     });
 
+    // 获取发现的设备
+    ipcMain.handle('mdns:getDiscoveredDevices', () => {
+        try {
+            console.log("获取已发现设备列表");
+            const devices = (MDNSService.constructor as any).getDiscoveredDevices();
+            console.log("发现的设备:", devices);
+            return devices;
+        } catch (error) {
+            console.error("获取设备列表失败:", error);
+            return [];
+        }
+    });
+
     // 心跳服务处理器
     ipcMain.handle('heartbeat:start', () => {
         return heartbeatService.start();
@@ -420,6 +437,23 @@ function setupIpcHandlers() {
         }
     });
 
+    // 添加设备信息处理程序
+    ipcMain.handle('device:getInfo', async () => {
+        try {
+            // 获取设备ID和名称
+            const deviceId = await getDeviceId();
+            const deviceName = hostname(); // 使用计算机名称作为设备名称
+
+            return {
+                id: deviceId,
+                name: deviceName
+            };
+        } catch (error) {
+            console.error('获取设备信息失败:', error);
+            throw error;
+        }
+    });
+
     console.log("设置处理程序注册完成");
 }
 
@@ -489,55 +523,15 @@ const createWindow = () => {
 // 应用初始化
 app.whenReady().then(async () => {
     try {
-        // 设置控制台编码（Windows平台）
-        if (process.platform === 'win32') {
-            // 设置控制台编码为UTF-8
-            require('child_process').execSync('chcp 65001', { stdio: 'ignore' });
-            console.log('已设置控制台编码为UTF-8');
-        }
-
-        console.log("应用准备就绪，开始初始化...");
-
-        // 先注册 IPC 处理器
+        // 先设置IPC处理程序
         setupIpcHandlers();
-        console.log("IPC 处理器设置完成");
 
-        // 初始化网络服务
-        networkService = new NetworkService();
-        console.log("网络服务初始化完成");
-
-        // 确保心跳服务启动
-        console.log("开始启动心跳服务...");
-        await heartbeatService.start();
-        console.log(`心跳服务状态: ${heartbeatService.isRunning ? '已启动' : '未启动'}, 端口: ${heartbeatService.getPort()}`);
-
-        // 创建窗口
-        createWindow();
-        console.log("主窗口创建完成");
-
-        // 启动服务
-        await MDNSService.publishService();
-        console.log("所有服务启动完成");
-
-        // 配置防火墙规则
-        if (process.platform === 'win32') {
-            // Windows平台配置防火墙
-            await configureWindowsFirewall();
-        }
-        // 其他平台可能需要特定配置
-
-        // 获取设备信息用于信令服务
-        const deviceId = await getDeviceId();
-        const deviceName = app.getName(); // 或其他设备名称获取方式
-
-        // 启动信令服务
-        try {
-            await webSocketSignalingService.start(deviceId, deviceName);
-            console.log('信令服务启动成功，端口:', webSocketSignalingService.getPort());
-        } catch (error) {
-            console.error('信令服务启动失败:', error);
+        // 然后创建窗口
+        if (!mainWindow) {
+            createWindow();
         }
 
+        // 其他初始化代码...
     } catch (error) {
         console.error("应用初始化失败:", error);
     }

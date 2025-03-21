@@ -21,6 +21,7 @@ class MDNSService {
     private eventListeners: { [key: string]: Function[] } = {};
     private SERVICE_TYPE = '_lanfile._tcp.local';
     private SERVICE_PORT = 8898; // 可以在设置中配置或随机生成
+    private static discoveredDevices: Map<string, MDNSDevice> = new Map();
 
     constructor() {
         this.bonjour = new Bonjour();
@@ -182,6 +183,10 @@ class MDNSService {
         this.unpublishService();
         this.bonjour.destroy();
         this.eventListeners = {};
+    }
+
+    public getDiscoveredDevices(): MDNSDevice[] {
+        return Array.from((this.constructor as any).discoveredDevices.values());
     }
 }
 
