@@ -397,6 +397,30 @@ export class WebSocketSignalingService extends EventEmitter {
      * 发送ping消息并等待pong响应
      */
     public async pingDevice(deviceId: string): Promise<boolean> {
+        // 检查连接状态
+        const isConnected = this.connections.has(deviceId);
+
+        // 如果未连接，先尝试建立连接
+        if (!isConnected) {
+            try {
+                // 从IP解析主机名和端口
+                const [ip, port] = deviceId.includes(':')
+                    ? deviceId.split(':')
+                    : [deviceId, '8092'];
+
+                console.log(`设备未连接，尝试建立连接: ${ip}:${port}`);
+
+                // 尝试连接(使用默认端口8092，或从deviceId中提取)
+                await this.connectToDevice(deviceId, ip, parseInt(port));
+
+                // 给连接建立一些时间
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (error) {
+                console.error(`连接设备失败: ${deviceId}`, error);
+                return false;
+            }
+        }
+
         return new Promise((resolve) => {
             // 设置超时
             const timeoutId = setTimeout(() => {
@@ -414,12 +438,19 @@ export class WebSocketSignalingService extends EventEmitter {
             // 注册一次性监听器
             this.once(`pong:${deviceId}`, responseHandler);
 
-            // 使用sendToDevice替代sendMessage
-            this.sendToDevice(deviceId, {
-                type: 'ping',
-                from: this.localDeviceId,
-                timestamp: Date.now()
-            });
+            // 发送ping消息
+            try {
+                this.sendToDevice(deviceId, {
+                    type: 'ping',
+                    from: this.localDeviceId,
+                    timestamp: Date.now()
+                });
+            } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.warn(`发送ping消息失败: ${errorMessage}`);
+                clearTimeout(timeoutId);
+                resolve(false);
+            }
         });
     }
 }

@@ -123,16 +123,53 @@ export class NetworkService extends EventEmitter {
     }
 }
 
-// 重新实现处理程序，使用WebSocket信令服务
+// 注册网络处理程序
 export const registerNetworkHandlers = () => {
     // 处理设备状态检查请求
     ipcMain.handle('network:pingDevice', async (_event, ip, port) => {
         try {
             console.log(`通过WebSocket信令检测设备: ${ip}`);
-            return await webSocketSignalingService.pingDevice(ip);
-        } catch (error) {
+
+            // 先尝试WebSocket信令ping
+            const wsResult = await webSocketSignalingService.pingDevice(ip);
+
+            if (wsResult) {
+                return wsResult;
+            } else {
+                // WebSocket ping失败后使用TCP连接检测
+                console.log(`WebSocket信令ping失败，尝试TCP连接检测: ${ip}`);
+                return checkTcpConnection(ip, port || 8092);
+            }
+        } catch (error: unknown) {
             console.error('检查设备状态失败:', error);
             return false;
         }
     });
-}; 
+};
+
+// 使用TCP连接检测
+async function checkTcpConnection(ip: string, port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        const socket = require('net').Socket();
+        const timeout = 2000;
+
+        socket.setTimeout(timeout);
+
+        socket.on('connect', () => {
+            socket.end();
+            resolve(true);
+        });
+
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve(false);
+        });
+
+        socket.on('error', () => {
+            socket.destroy();
+            resolve(false);
+        });
+
+        socket.connect(port, ip);
+    });
+} 
