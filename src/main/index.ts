@@ -343,9 +343,6 @@ function setupIpcHandlers() {
         return true;
     });
 
-    // 注册ping设备处理程序
-    setupPingHandler();
-
     // 在主进程中添加处理程序
     ipcMain.handle('settings:setHeartbeatType', async (_event, type: string) => {
         // 实现保存心跳类型设置的逻辑
