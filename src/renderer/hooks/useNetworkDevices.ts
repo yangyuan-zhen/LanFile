@@ -666,6 +666,63 @@ export const useNetworkDevices = () => {
         return () => clearInterval(statusCheckInterval);
     }, [devices.length]);
 
+    useEffect(() => {
+        // 监听设备断开事件
+        const handleDeviceDisconnected = (deviceId: string) => {
+            console.log(`收到设备断开事件: ${deviceId}`);
+            setDevices(prevDevices =>
+                prevDevices.map(device =>
+                    device.ip === deviceId
+                        ? { ...device, status: '离线', lastSeen: Date.now() }
+                        : device
+                )
+            );
+        };
+
+        // 注册事件监听
+        window.electron.on('signaling:deviceDisconnected', handleDeviceDisconnected);
+
+        // 清理函数
+        return () => {
+            window.electron.removeListener('signaling:deviceDisconnected', handleDeviceDisconnected);
+        };
+    }, []);
+
+    // 监听设备连接事件
+    const handleDeviceConnected = (device: { id: string, name: string }) => {
+        console.log(`收到设备连接事件: ${device.name} (${device.id})`);
+
+        setDevices(prevDevices => {
+            // 检查设备是否已经存在
+            const existingDeviceIndex = prevDevices.findIndex(d => d.ip === device.id);
+
+            if (existingDeviceIndex >= 0) {
+                // 如果设备已存在，更新其状态
+                const updatedDevices = [...prevDevices];
+                updatedDevices[existingDeviceIndex] = {
+                    ...updatedDevices[existingDeviceIndex],
+                    status: '在线',
+                    name: device.name,
+                    lastSeen: Date.now()
+                };
+                return updatedDevices;
+            } else {
+                // 如果是新设备，添加到列表
+                return [...prevDevices, {
+                    name: device.name,
+                    ip: device.id,
+                    type: 'desktop', // 默认类型，可以根据实际情况调整
+                    icon: getDeviceIcon('desktop'),
+                    status: '在线',
+                    port: 8092,
+                    lastSeen: Date.now()
+                }];
+            }
+        });
+    };
+
+    window.electron.on('signaling:deviceConnected', handleDeviceConnected);
+
     return {
         devices,
         setDevices,

@@ -122,6 +122,24 @@ export class WebSocketSignalingService extends EventEmitter {
 
             // 处理注册消息，将设备ID与连接关联
             if (signalingMessage.type === 'register' && signalingMessage.deviceId) {
+                // 检查设备是否已注册且连接是否相同
+                const existingConnection = this.connections.get(signalingMessage.deviceId);
+                if (existingConnection === ws) {
+                    console.log(`设备 ${signalingMessage.deviceName} 已经注册，忽略重复注册`);
+                    return;
+                }
+
+                // 如果有旧连接但不是当前连接，先关闭旧连接
+                if (existingConnection && existingConnection !== ws) {
+                    console.log(`设备 ${signalingMessage.deviceName} 有旧连接，关闭旧连接并重新注册`);
+                    try {
+                        existingConnection.close();
+                    } catch (err) {
+                        console.error('关闭旧连接失败:', err);
+                    }
+                }
+
+                // 注册新连接
                 this.connections.set(signalingMessage.deviceId, ws);
                 this.deviceMap.set(signalingMessage.deviceId, {
                     deviceId: signalingMessage.deviceId,
@@ -134,15 +152,6 @@ export class WebSocketSignalingService extends EventEmitter {
                 this.emit('deviceConnected', {
                     id: signalingMessage.deviceId,
                     name: signalingMessage.deviceName || signalingMessage.deviceId
-                });
-
-                // 向新设备发送当前设备信息
-                this.sendToDevice(signalingMessage.deviceId, {
-                    type: 'register',
-                    from: this.localDeviceId,
-                    deviceId: this.localDeviceId,
-                    deviceName: this.localDeviceName,
-                    timestamp: Date.now()
                 });
 
                 return;
