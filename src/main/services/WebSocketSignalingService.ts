@@ -23,6 +23,8 @@ export class WebSocketSignalingService extends EventEmitter {
     public isRunning: boolean = false;
     private localDeviceId: string = '';
     private localDeviceName: string = '';
+    private ipToDeviceIdMap: Map<string, string> = new Map();
+    private keepAliveInterval: NodeJS.Timeout | null = null;
 
     constructor(port = 8092) {
         super();
@@ -49,7 +51,25 @@ export class WebSocketSignalingService extends EventEmitter {
                     try {
                         logService.log(`尝试在端口 ${port} 上启动 WebSocket 服务器`);
 
-                        const server = new WebSocketServer({ port });
+                        const server = new WebSocketServer({
+                            port,
+                            perMessageDeflate: {
+                                zlibDeflateOptions: {
+                                    chunkSize: 1024,
+                                    memLevel: 7,
+                                    level: 3
+                                },
+                                zlibInflateOptions: {
+                                    chunkSize: 10 * 1024
+                                },
+                                serverNoContextTakeover: true,
+                                clientNoContextTakeover: true,
+                                clientMaxWindowBits: 10,
+                                concurrencyLimit: 10,
+                                threshold: 1024
+                            },
+                            maxPayload: 50 * 1024 * 1024
+                        });
 
                         // 添加错误处理
                         server.on('error', (error: any) => {
@@ -66,6 +86,20 @@ export class WebSocketSignalingService extends EventEmitter {
                         server.on('listening', () => {
                             this.server = server;
                             this.isRunning = true;
+
+                            // 设置定时心跳
+                            this.keepAliveInterval = setInterval(() => {
+                                for (const [deviceId, connection] of this.connections.entries()) {
+                                    if (connection.readyState === WebSocket.OPEN) {
+                                        try {
+                                            connection.ping();
+                                        } catch (error) {
+                                            console.error(`向设备 ${deviceId} 发送ping失败:`, error);
+                                        }
+                                    }
+                                }
+                            }, 30000); // 每30秒ping一次
+
                             logService.log(`WebSocket 信令服务器成功运行在端口 ${port}`);
                             resolve(true);
                         });
@@ -122,6 +156,14 @@ export class WebSocketSignalingService extends EventEmitter {
 
             // 处理注册消息，将设备ID与连接关联
             if (signalingMessage.type === 'register' && signalingMessage.deviceId) {
+                // 获取客户端IP地址
+                const clientIp = this.getClientIp(ws);
+                if (clientIp) {
+                    // 记录IP到设备ID的映射
+                    this.ipToDeviceIdMap.set(clientIp, signalingMessage.deviceId);
+                    console.log(`记录IP映射: ${clientIp} -> ${signalingMessage.deviceId}`);
+                }
+
                 // 检查设备是否已注册且连接是否相同
                 const existingConnection = this.connections.get(signalingMessage.deviceId);
                 if (existingConnection === ws) {
@@ -359,6 +401,10 @@ export class WebSocketSignalingService extends EventEmitter {
     }
 
     public stop(): void {
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
         // 向所有连接发送断开消息
         this.broadcastMessage({
             type: 'disconnect',
@@ -406,6 +452,13 @@ export class WebSocketSignalingService extends EventEmitter {
      * 发送ping消息并等待pong响应
      */
     public async pingDevice(deviceId: string): Promise<boolean> {
+        // 先检查是否是IP地址，如果是则尝试查找映射
+        if (/^(\d{1,3}\.){3}\d{1,3}$/.test(deviceId) && this.ipToDeviceIdMap.has(deviceId)) {
+            const mappedId = this.ipToDeviceIdMap.get(deviceId)!;
+            console.log(`使用设备映射: ${deviceId} -> ${mappedId}`);
+            deviceId = mappedId;
+        }
+
         // 检查连接状态
         const isConnected = this.connections.has(deviceId);
 
@@ -461,6 +514,15 @@ export class WebSocketSignalingService extends EventEmitter {
                 resolve(false);
             }
         });
+    }
+
+    private getClientIp(ws: WebSocket): string | null {
+        const req = (ws as any)._socket?.remoteAddress;
+        // 处理IPv6格式的IPv4地址 (::ffff:192.168.31.118)
+        if (req && req.startsWith('::ffff:')) {
+            return req.substr(7);
+        }
+        return req || null;
     }
 }
 
