@@ -29,6 +29,7 @@ export class WebSocketSignalingService extends EventEmitter {
     constructor(port = 8092) {
         super();
         this.port = port;
+        this.setupAutoReconnect();
     }
 
     public start(deviceId: string, deviceName: string, port?: number): Promise<boolean> {
@@ -523,6 +524,31 @@ export class WebSocketSignalingService extends EventEmitter {
             return req.substr(7);
         }
         return req || null;
+    }
+
+    // 添加自动重连功能
+    private setupAutoReconnect(): void {
+        // 监听设备断开事件
+        this.on('deviceDisconnected', (deviceId: string) => {
+            // 检查是否是IP地址
+            if (/^(\d{1,3}\.){3}\d{1,3}$/.test(deviceId)) {
+                console.log(`设备 ${deviceId} 断开，5秒后尝试重连...`);
+                // 延迟5秒后尝试重连
+                setTimeout(async () => {
+                    try {
+                        console.log(`开始重新连接设备: ${deviceId}`);
+                        const [ip, port] = deviceId.includes(':')
+                            ? deviceId.split(':')
+                            : [deviceId, '8092'];
+
+                        await this.connectToDevice(deviceId, ip, parseInt(port));
+                        console.log(`设备 ${deviceId} 重连成功`);
+                    } catch (error) {
+                        console.error(`设备 ${deviceId} 重连失败:`, error);
+                    }
+                }, 5000);
+            }
+        });
     }
 }
 
