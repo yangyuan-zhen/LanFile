@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import { ipcMain } from 'electron';
-import { webSocketSignalingService } from '../services/WebSocketSignalingService';
 
 export interface NetworkDevice {
     name: string;
@@ -123,31 +122,41 @@ export class NetworkService extends EventEmitter {
     }
 }
 
-// 注册网络处理程序
+// 修改设备检测策略，完全使用TCP检测
 export const registerNetworkHandlers = () => {
-    // 处理设备状态检查请求
     ipcMain.handle('network:pingDevice', async (_event, ip, port) => {
         try {
-            console.log(`通过WebSocket信令检测设备: ${ip}`);
+            // 使用TCP端口检测 (快速且轻量)
+            console.log(`TCP端口检测设备: ${ip}:${port || 8092}`);
+            const tcpResult = await checkTcpConnection(ip, port || 8092);
 
-            // 先尝试WebSocket信令ping
-            const wsResult = await webSocketSignalingService.pingDevice(ip);
-
-            if (wsResult) {
-                return wsResult;
-            } else {
-                // WebSocket ping失败后使用TCP连接检测
-                console.log(`WebSocket信令ping失败，尝试TCP连接检测: ${ip}`);
-                return checkTcpConnection(ip, port || 8092);
+            if (tcpResult) {
+                console.log(`TCP检测成功: ${ip}:${port || 8092}`);
+                return true;
             }
-        } catch (error: unknown) {
-            console.error('检查设备状态失败:', error);
+
+            console.log(`TCP检测失败: ${ip}:${port || 8092}`);
             return false;
+        } catch (error) {
+            console.error('设备检测失败:', error);
+            return false;
+        }
+    });
+
+    // 为保持兼容性，注册device:ping处理程序，但内部使用TCP检测
+    ipcMain.handle('device:ping', async (_event, ip, port) => {
+        try {
+            console.log(`设备状态检查请求: ${ip}`);
+            const isOnline = await checkTcpConnection(ip, port || 8092);
+            return { success: isOnline };
+        } catch (error) {
+            console.error('设备状态检查失败:', error);
+            return { success: false };
         }
     });
 };
 
-// 使用TCP连接检测
+// 保留TCP连接检测的代码，移除HTTP检测代码
 async function checkTcpConnection(ip: string, port: number): Promise<boolean> {
     return new Promise((resolve) => {
         const socket = require('net').Socket();

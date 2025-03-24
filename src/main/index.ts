@@ -452,18 +452,6 @@ function setupIpcHandlers() {
         }
     });
 
-    // 设备ping检测
-    ipcMain.handle('device:ping', async (_, deviceId: string) => {
-        try {
-            console.log(`尝试ping设备: ${deviceId}`);
-            const isOnline = await webSocketSignalingService.pingDevice(deviceId);
-            return { success: isOnline };
-        } catch (error) {
-            console.error(`ping设备失败: ${deviceId}`, error);
-            return { success: false, error: String(error) };
-        }
-    });
-
     // 注册网络处理程序
     registerNetworkHandlers();
 

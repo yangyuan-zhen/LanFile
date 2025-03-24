@@ -265,91 +265,89 @@ export class WebSocketSignalingService extends EventEmitter {
     }
 
     // 连接到远程信令服务器
-    public connectToDevice(deviceId: string, address: string, port?: number): Promise<void> {
-        return new Promise((resolve, reject) => {
-            try {
-                // 检查设备是否已连接
-                if (this.connections.has(deviceId)) {
-                    logService.log(`设备 ${deviceId} 已连接`);
-                    resolve();
-                    return;
+    public async connectToDevice(deviceId: string, host: string, port: number): Promise<boolean> {
+        try {
+            const url = `ws://${host}:${port}`;
+
+            console.log(`尝试连接到设备: ${deviceId}, URL: ${url}`);
+
+            // 创建WebSocket并添加稳定性参数
+            const ws = new WebSocket(url, {
+                // 增加超时时间
+                handshakeTimeout: 10000,
+                // 禁用Nagle算法
+                perMessageDeflate: false,
+                // 禁用ping/pong自动响应
+                skipUTF8Validation: true,
+                // 增加重试能力
+                followRedirects: true,
+                // 最大消息大小
+                maxPayload: 10 * 1024 * 1024
+            });
+
+            // 记录此连接为服务器主动发起
+            this.serverInitiatedConnections.add(deviceId);
+
+            // 设置连接超时
+            const connectionTimeout = setTimeout(() => {
+                ws.terminate();
+                logService.error(`连接设备 ${deviceId} 超时`);
+                this.connections.delete(deviceId);
+                this.emit('deviceDisconnected', deviceId);
+            }, 10000);
+
+            // 确保连接关闭时清理超时
+            const clearConnectionTimeout = () => {
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
                 }
+            };
 
-                // 构建正确的 WebSocket URL
-                const wsUrl = `ws://${address}:${port || this.port}`;
+            ws.on('open', () => {
+                clearConnectionTimeout();
+                this.connections.set(deviceId, ws);
 
-                // 添加详细日志
-                logService.log(`尝试连接到设备: ${deviceId}, URL: ${wsUrl}`);
-
-                // 创建 WebSocket 对象
-                let socket: WebSocket;
-                try {
-                    socket = new WebSocket(wsUrl);
-                } catch (error) {
-                    logService.error(`创建 WebSocket 失败: ${error}`);
-                    logService.error(`参数: URL=${wsUrl}`);
-                    reject(error);
-                    return;
-                }
-
-                // 设置连接超时
-                const connectionTimeout = setTimeout(() => {
-                    socket.terminate();
-                    logService.error(`连接设备 ${deviceId} 超时`);
-                    reject(new Error(`连接到设备 ${deviceId} 超时`));
-                }, 10000);
-
-                // 确保连接关闭时清理超时
-                const clearConnectionTimeout = () => {
-                    if (connectionTimeout) {
-                        clearTimeout(connectionTimeout);
-                    }
+                // 发送注册消息
+                const registerMessage = {
+                    type: 'register',
+                    from: this.localDeviceId,
+                    deviceId: this.localDeviceId,
+                    deviceName: this.localDeviceName,
+                    timestamp: Date.now()
                 };
 
-                socket.on('open', () => {
-                    clearConnectionTimeout();
-                    this.connections.set(deviceId, socket);
-
-                    // 发送注册消息
-                    const registerMessage = {
-                        type: 'register',
-                        from: this.localDeviceId,
-                        deviceId: this.localDeviceId,
-                        deviceName: this.localDeviceName,
-                        timestamp: Date.now()
-                    };
-
-                    try {
-                        socket.send(JSON.stringify(registerMessage));
-                        logService.log(`成功连接到设备 ${deviceId}`);
-                        resolve();
-                    } catch (error) {
-                        logService.error(`发送注册消息失败: ${error}`);
-                        reject(error);
-                    }
-                });
-
-                socket.on('message', (message) => {
-                    this.handleIncomingMessage(socket, message);
-                });
-
-                socket.on('error', (error) => {
-                    clearConnectionTimeout();
-                    logService.error(`WebSocket 错误: ${error}`);
-                    this.connections.delete(deviceId);
-                    reject(error);
-                });
-
-                socket.on('close', () => {
-                    logService.log(`与设备 ${deviceId} 的连接已关闭`);
+                try {
+                    ws.send(JSON.stringify(registerMessage));
+                    logService.log(`成功连接到设备 ${deviceId}`);
+                } catch (error) {
+                    logService.error(`发送注册消息失败: ${error}`);
                     this.connections.delete(deviceId);
                     this.emit('deviceDisconnected', deviceId);
-                });
-            } catch (error) {
-                logService.error(`创建连接失败, 完整错误: ${error}`);
-                reject(error);
-            }
-        });
+                }
+            });
+
+            ws.on('message', (message) => {
+                this.handleIncomingMessage(ws, message);
+            });
+
+            ws.on('error', (error) => {
+                clearConnectionTimeout();
+                logService.error(`WebSocket 错误: ${error}`);
+                this.connections.delete(deviceId);
+                this.emit('deviceDisconnected', deviceId);
+            });
+
+            ws.on('close', () => {
+                logService.log(`与设备 ${deviceId} 的连接已关闭`);
+                this.connections.delete(deviceId);
+                this.emit('deviceDisconnected', deviceId);
+            });
+
+            return true;
+        } catch (error) {
+            logService.error(`创建连接失败, 完整错误: ${error}`);
+            return false;
+        }
     }
 
     // 发送信令消息到特定设备
@@ -467,33 +465,36 @@ export class WebSocketSignalingService extends EventEmitter {
      * 发送ping消息并等待pong响应
      */
     public async pingDevice(deviceId: string): Promise<boolean> {
-        // 先检查是否是IP地址，如果是则尝试查找映射
+        // 保存原始IP地址，使用IP连接而非主机名
+        const originalIp = deviceId;
+        let actualDeviceId = deviceId;
+
+        // 先检查是否是IP地址，如果是则尝试查找映射用于事件监听
         if (/^(\d{1,3}\.){3}\d{1,3}$/.test(deviceId) && this.ipToDeviceIdMap.has(deviceId)) {
-            const mappedId = this.ipToDeviceIdMap.get(deviceId)!;
-            console.log(`使用设备映射: ${deviceId} -> ${mappedId}`);
-            deviceId = mappedId;
+            actualDeviceId = this.ipToDeviceIdMap.get(deviceId)!;
+            console.log(`使用设备映射处理消息: ${deviceId} -> ${actualDeviceId}`);
         }
 
         // 检查连接状态
-        const isConnected = this.connections.has(deviceId);
+        const isConnected = this.connections.has(actualDeviceId);
 
-        // 如果未连接，先尝试建立连接
+        // 如果未连接，先尝试建立连接 - 但使用原始IP而非主机名
         if (!isConnected) {
             try {
-                // 从IP解析主机名和端口
-                const [ip, port] = deviceId.includes(':')
-                    ? deviceId.split(':')
-                    : [deviceId, '8092'];
+                // 使用原始IP建立连接
+                const [ip, port] = originalIp.includes(':')
+                    ? originalIp.split(':')
+                    : [originalIp, '8092'];
 
                 console.log(`设备未连接，尝试建立连接: ${ip}:${port}`);
 
-                // 尝试连接(使用默认端口8092，或从deviceId中提取)
-                await this.connectToDevice(deviceId, ip, parseInt(port));
+                // 尝试连接
+                await this.connectToDevice(actualDeviceId, ip, parseInt(port));
 
                 // 给连接建立一些时间
                 await new Promise(resolve => setTimeout(resolve, 500));
             } catch (error) {
-                console.error(`连接设备失败: ${deviceId}`, error);
+                console.error(`连接设备失败: ${originalIp}`, error);
                 return false;
             }
         }
@@ -501,8 +502,8 @@ export class WebSocketSignalingService extends EventEmitter {
         return new Promise((resolve) => {
             // 设置超时
             const timeoutId = setTimeout(() => {
-                this.removeListener(`pong:${deviceId}`, responseHandler);
-                console.log(`设备 ${deviceId} ping超时`);
+                this.removeListener(`pong:${actualDeviceId}`, responseHandler);
+                console.log(`设备 ${actualDeviceId} ping超时`);
                 resolve(false);
             }, 3000);
 
@@ -513,11 +514,11 @@ export class WebSocketSignalingService extends EventEmitter {
             };
 
             // 注册一次性监听器
-            this.once(`pong:${deviceId}`, responseHandler);
+            this.once(`pong:${actualDeviceId}`, responseHandler);
 
             // 发送ping消息
             try {
-                this.sendToDevice(deviceId, {
+                this.sendToDevice(actualDeviceId, {
                     type: 'ping',
                     from: this.localDeviceId,
                     timestamp: Date.now()
