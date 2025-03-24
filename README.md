@@ -65,6 +65,7 @@
 
 项目目录结构
 
+```
 LanFile_PC/
 ├── src/
 │ ├── main/ # Electron 主进程
@@ -72,6 +73,7 @@ LanFile_PC/
 │ └── shared/ # 共享代码
 ├── tests/ # 测试文件
 └── dist/ # 构建输出目录
+```
 
 ## 开发指南
 
