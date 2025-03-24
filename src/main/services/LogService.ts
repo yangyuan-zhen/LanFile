@@ -17,6 +17,7 @@ class LogService {
     setupConsole() {
         const originalConsoleLog = console.log;
         const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
 
         // 替换 console.log
         console.log = (...args) => {
@@ -31,6 +32,14 @@ class LogService {
             originalConsoleError.apply(console, args);
             // 写入文件日志
             this.writeLog('error', args);
+        };
+
+        // 添加对 console.warn 的重写
+        console.warn = (...args) => {
+            // 原始输出
+            originalConsoleWarn.apply(console, args);
+            // 写入文件日志
+            this.writeLog('warn', args);
         };
     }
 
@@ -64,6 +73,33 @@ class LogService {
     warn(message: string): void {
         console.warn(message);
     }
+
+    // 添加日志清理方法
+    cleanOldLogs(daysToKeep: number = 7): void {
+        try {
+            const files = fs.readdirSync(this.logPath);
+            const now = new Date();
+
+            files.forEach(file => {
+                if (!file.endsWith('.log')) return;
+
+                const filePath = path.join(this.logPath, file);
+                const fileDate = new Date(file.split('.')[0]);
+
+                // 计算日志文件的天数差
+                const diffDays = Math.floor((now.getTime() - fileDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                if (diffDays > daysToKeep) {
+                    fs.unlinkSync(filePath);
+                    console.log(`已删除旧日志文件: ${file}`);
+                }
+            });
+        } catch (error) {
+            console.error(`清理旧日志文件失败: ${error}`);
+        }
+    }
 }
 
-export const logService = new LogService(); 
+export const logService = new LogService();
+// 初始化控制台重写
+logService.setupConsole(); 
