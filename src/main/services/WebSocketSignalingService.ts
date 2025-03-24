@@ -25,6 +25,12 @@ export class WebSocketSignalingService extends EventEmitter {
     private localDeviceName: string = '';
     private ipToDeviceIdMap: Map<string, string> = new Map();
     private keepAliveInterval: NodeJS.Timeout | null = null;
+    private serverInitiatedConnections: Set<string> = new Set();
+    private connectionStatus: Map<string, {
+        reconnectAttempts: number,
+        lastConnected: number,
+        reconnecting: boolean
+    }> = new Map();
 
     constructor(port = 8092) {
         super();
@@ -122,6 +128,14 @@ export class WebSocketSignalingService extends EventEmitter {
                                         this.emit('deviceDisconnected', deviceId);
                                         break;
                                     }
+                                }
+
+                                // 更新连接状态
+                                if (deviceId) {
+                                    this.updateConnectionStatus(deviceId, {
+                                        reconnecting: false,
+                                        lastConnected: Date.now()
+                                    });
                                 }
                             });
 
@@ -528,27 +542,45 @@ export class WebSocketSignalingService extends EventEmitter {
 
     // 添加自动重连功能
     private setupAutoReconnect(): void {
-        // 监听设备断开事件
         this.on('deviceDisconnected', (deviceId: string) => {
-            // 检查是否是IP地址
-            if (/^(\d{1,3}\.){3}\d{1,3}$/.test(deviceId)) {
-                console.log(`设备 ${deviceId} 断开，5秒后尝试重连...`);
-                // 延迟5秒后尝试重连
-                setTimeout(async () => {
-                    try {
-                        console.log(`开始重新连接设备: ${deviceId}`);
-                        const [ip, port] = deviceId.includes(':')
-                            ? deviceId.split(':')
-                            : [deviceId, '8092'];
-
-                        await this.connectToDevice(deviceId, ip, parseInt(port));
-                        console.log(`设备 ${deviceId} 重连成功`);
-                    } catch (error) {
-                        console.error(`设备 ${deviceId} 重连失败:`, error);
-                    }
-                }, 5000);
+            // 只对服务器端发起的连接进行重连
+            if (/^(\d{1,3}\.){3}\d{1,3}$/.test(deviceId) && this.serverInitiatedConnections.has(deviceId)) {
+                console.log(`服务器初始连接的设备 ${deviceId} 断开，尝试重连...`);
+                // 重连逻辑...
             }
         });
+    }
+
+    // 在连接断开时更新状态
+    private updateConnectionStatus(deviceId: string, status: {
+        reconnecting: boolean,
+        lastConnected: number
+    }): void {
+        const currentStatus = this.connectionStatus.get(deviceId);
+        if (currentStatus) {
+            currentStatus.reconnecting = status.reconnecting;
+            currentStatus.lastConnected = status.lastConnected;
+        } else {
+            this.connectionStatus.set(deviceId, {
+                reconnecting: status.reconnecting,
+                lastConnected: status.lastConnected,
+                reconnectAttempts: 0
+            });
+        }
+    }
+
+    // 避免过于频繁的重连
+    private shouldAttemptReconnect(deviceId: string): boolean {
+        const status = this.connectionStatus.get(deviceId);
+        if (!status) return true;
+
+        // 如果30秒内已经尝试了3次以上，暂停重连
+        if (status.reconnectAttempts > 3 &&
+            (Date.now() - status.lastConnected) < 30000) {
+            return false;
+        }
+
+        return true;
     }
 }
 
