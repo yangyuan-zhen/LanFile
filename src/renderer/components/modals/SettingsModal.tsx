@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Folder } from "lucide-react";
 import { WebRTCDiagnostics } from "../diagnostics/WebRTCDiagnostics";
+import { usePeerJS } from "../../hooks/usePeerJS";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -14,6 +15,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [downloadPath, setDownloadPath] = useState("");
   const [chunkSize, setChunkSize] = useState<number>(16384); // 默认16KB
   const [detectedPorts, setDetectedPorts] = useState<string[]>([]);
+
+  const { isReady: peerJSReady, deviceId } = usePeerJS();
 
   // 组件加载时获取当前设置
   useEffect(() => {
@@ -392,6 +395,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     <strong>提示：</strong>{" "}
                     确保所有设备使用相同的信令端口才能建立连接
                   </p>
+                </div>
+
+                <div className="setting-item">
+                  <h3>PeerJS 连接</h3>
+                  <div className="status-indicator">
+                    状态: {peerJSReady ? "已就绪" : "初始化中"}
+                  </div>
+                  <div className="info-text">
+                    设备 ID: {deviceId || "未初始化"}
+                  </div>
+                  {/* 可能的 PeerJS 配置选项 */}
                 </div>
               </div>
             )}

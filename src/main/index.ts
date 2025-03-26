@@ -7,12 +7,9 @@ import { heartbeatService } from './services/HeartbeatService';
 import { networkInterfaces, hostname } from 'os';
 import wifi from 'node-wifi';
 import fetch from 'node-fetch';
-import { setupWebRTCHandlers } from './webrtc';
 import { setupPingHandler } from './network';
 import dgram from 'dgram';
 import { logService } from './services/LogService';
-import { setupSignalingHandlers } from './signaling';
-import { webSocketSignalingService } from './services/WebSocketSignalingService';
 import { registerNetworkHandlers } from './services/NetworkService';
 import { peerDiscoveryService } from './services/PeerDiscoveryService';
 
@@ -379,29 +376,6 @@ function setupIpcHandlers() {
         }
     });
 
-    // 在注册IPC处理程序部分添加
-    ipcMain.handle('transfer:checkHeartbeat', async (_, ip) => {
-        try {
-            // 确保目标设备心跳服务正常
-            const isOnline = await webSocketSignalingService.pingDevice(ip);
-
-            if (!isOnline) {
-                throw new Error('目标设备信令服务不可用，无法建立连接');
-            }
-
-            return { success: true };
-        } catch (error) {
-            console.error('心跳检查失败:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : String(error)
-            };
-        }
-    });
-
-    // 设置信令处理程序
-    setupSignalingHandlers();
-
     // 获取设置
     ipcMain.handle('settings:get', (event, key) => {
         console.log("设置获取请求:", key);
@@ -513,13 +487,8 @@ const createWindow = () => {
         mainWindow = null;
     });
 
-    setupWebRTCHandlers(mainWindow);
-
     // 保存窗口引用
     (global as any).mainWindow = mainWindow;
-
-    // 在 createWindow 函数中的某处添加
-    (global as any).webSocketSignalingService = webSocketSignalingService;
 };
 
 // 应用初始化
@@ -527,11 +496,6 @@ app.whenReady().then(async () => {
     try {
         // 设置IPC处理程序
         setupIpcHandlers();
-
-        // 启动信令服务
-        const deviceId = await getDeviceId();
-        await webSocketSignalingService.start(deviceId, "本地设备");
-        console.log("信令服务已启动，端口:", webSocketSignalingService.getPort());
 
         // 创建窗口
         if (!mainWindow) {
@@ -567,12 +531,6 @@ app.on('will-quit', () => {
     }
     MDNSService.destroy();
     heartbeatService.stop();
-
-    // 关闭信令服务
-    if (webSocketSignalingService && webSocketSignalingService.isRunning) {
-        webSocketSignalingService.stop();
-    }
-
     peerDiscoveryService.stop();
 });
 
