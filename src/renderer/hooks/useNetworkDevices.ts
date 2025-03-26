@@ -3,6 +3,7 @@ import { Monitor, Smartphone, Laptop, Tablet } from "lucide-react";
 import { useNetworkInfo } from "./useNetworkInfo";
 import { useDeviceInfo } from "./useDeviceInfo";
 import { checkDeviceStatus as checkDeviceOnlineStatus } from '../services/deviceService';
+import { usePeerJS } from './usePeerJS';
 
 const DEVICE_CACHE_KEY = "lanfile_cached_devices";
 const DEVICE_NAME_MAP_KEY = "lanfile_device_name_map";
@@ -124,6 +125,7 @@ export const useNetworkDevices = () => {
     const [isScanning, setIsScanning] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
     const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>(loadDeviceNameMap());
+    const { connectToPeer } = usePeerJS();
 
     const statusCheckIntervalRef = useRef<NodeJS.Timeout>();
     const scanTimeoutRef = useRef<NodeJS.Timeout>();
@@ -729,6 +731,11 @@ export const useNetworkDevices = () => {
         };
     }, []);
 
+    const connectToDevice = async (device: NetworkDevice) => {
+        const result = await connectToPeer(device.ip);
+        return result;
+    };
+
     return {
         devices,
         setDevices,
@@ -737,6 +744,7 @@ export const useNetworkDevices = () => {
         checkAllDevicesStatus,
         clearDeviceCache,
         handleNameChange,
-        deviceNameMap
+        deviceNameMap,
+        connectToDevice
     };
 }; 

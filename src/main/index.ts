@@ -470,6 +470,11 @@ app.whenReady().then(async () => {
         // 设置IPC处理程序
         setupIpcHandlers();
 
+        // 添加以下代码确保心跳服务启动
+        console.log("启动心跳服务...");
+        await heartbeatService.start();
+        console.log(`心跳服务状态: ${heartbeatService.isRunning ? '已启动' : '未启动'}, 端口: ${heartbeatService.getPort()}`);
+
         // 创建窗口
         if (!mainWindow) {
             createWindow();
@@ -532,6 +537,17 @@ async function configureWindowsFirewall() {
             addRule.on('error', (err: Error) => {
                 console.error('添加防火墙规则失败:', err);
             });
+
+            // 添加 PeerDiscoveryService 端口
+            const addPeerDiscoveryRule = spawn('netsh', [
+                'advfirewall', 'firewall', 'add', 'rule',
+                `name=LanFilePeerDiscovery`,
+                'dir=in',
+                'action=allow',
+                'program=any',
+                'protocol=TCP',
+                'localport=8765'
+            ]);
         }
     });
 }

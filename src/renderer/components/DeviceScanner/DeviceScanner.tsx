@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Device } from "../../types/electron";
+import { usePeerJS } from "../../hooks/usePeerJS";
 
 interface DeviceScannerProps {
   onDeviceFound?: (device: Device) => void;
@@ -16,6 +17,8 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
   const [foundDevices, setFoundDevices] = useState<Device[]>([]);
   const startTimeRef = useRef<number | null>(null);
   const animationFrameIdRef = useRef<number>();
+  const [connectingDevice, setConnectingDevice] = useState<string | null>(null);
+  const { connectToPeer } = usePeerJS();
 
   // 绘制雷达背景
   const drawRadarBackground = (
@@ -111,7 +114,8 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
 
     foundDevices.forEach((device) => {
       // 根据设备索引计算位置
-      const angle = (2 * Math.PI * foundDevices.indexOf(device)) / foundDevices.length;
+      const angle =
+        (2 * Math.PI * foundDevices.indexOf(device)) / foundDevices.length;
       const distance = maxRadius * 0.6; // 60% 半径位置
       const x = centerX + distance * Math.cos(angle);
       const y = centerY + distance * Math.sin(angle);
@@ -218,6 +222,24 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
     }
   };
 
+  // 修改连接逻辑，使用设备的 IP 地址
+  const handleConnect = async (device: Device) => {
+    try {
+      setConnectingDevice(device.id);
+      // 直接使用设备 IP 连接
+      const success = await connectToPeer(device.ip);
+      if (success) {
+        // 连接成功逻辑
+      } else {
+        // 错误处理
+      }
+    } catch (error) {
+      console.error(`连接到设备 ${device.name} 失败:`, error);
+    } finally {
+      setConnectingDevice(null);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm">
       <h3 className="mb-4 text-lg text-gray-900">设备扫描器</h3>
@@ -246,16 +268,14 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({
           停止扫描
         </button>
       </div>
-      <div className="mt-4 flex gap-4">
+      <div className="flex gap-4 mt-4">
         <button
-          className="px-4 py-2 bg-blue-500 text-white rounded-md"
+          className="px-4 py-2 text-white bg-blue-500 rounded-md"
           disabled
         >
           雷达
         </button>
-        <button
-          className="px-4 py-2 bg-gray-300 text-gray-600 rounded-md"
-        >
+        <button className="px-4 py-2 text-gray-600 bg-gray-300 rounded-md">
           列表
         </button>
       </div>

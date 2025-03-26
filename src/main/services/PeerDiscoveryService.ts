@@ -10,6 +10,7 @@ class PeerDiscoveryService {
     private myPeerId = '';
 
     constructor() {
+        console.log('初始化 PeerDiscoveryService');
         this.setupAPI();
         this.setupIPC();
     }
@@ -54,9 +55,10 @@ class PeerDiscoveryService {
     }
 
     async start(): Promise<boolean> {
+        console.log(`尝试在端口 ${this.port} 启动 PeerDiscoveryService`);
         return new Promise((resolve) => {
-            this.server = this.app.listen(this.port, () => {
-                console.log(`PeerJS ID 发现服务已启动，端口 ${this.port}`);
+            this.server = this.app.listen(this.port, '0.0.0.0', () => {
+                console.log(`PeerJS ID 发现服务已启动，监听端口 ${this.port} 和所有网络接口`);
                 resolve(true);
             });
 
