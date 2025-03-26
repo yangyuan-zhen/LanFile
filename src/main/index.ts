@@ -307,33 +307,6 @@ function setupIpcHandlers() {
         }
     });
 
-    // 处理WebRTC初始化
-    ipcMain.handle('webrtc:initialize', async () => {
-        console.log('WebRTC初始化');
-        return true;
-    });
-
-    // 处理发送提议
-    ipcMain.handle('webrtc:sendOffer', async (_, data) => {
-        console.log('发送WebRTC提议:', data);
-        // 这里应添加实际的信令服务器通信代码
-        return true;
-    });
-
-    // 处理发送应答
-    ipcMain.handle('webrtc:sendAnswer', async (_, data) => {
-        console.log('发送WebRTC应答:', data);
-        // 这里应添加实际的信令服务器通信代码
-        return true;
-    });
-
-    // 处理ICE候选
-    ipcMain.handle('webrtc:sendIceCandidate', async (_, data) => {
-        console.log('发送ICE候选:', data);
-        // 这里应添加实际的信令服务器通信代码
-        return true;
-    });
-
     // 处理文件保存
     ipcMain.handle('file:saveDownloadedFile', async (_, data) => {
         console.log('保存下载的文件:', data);

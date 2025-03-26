@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { X, Folder } from "lucide-react";
-import { WebRTCDiagnostics } from "../diagnostics/WebRTCDiagnostics";
 import { usePeerJS } from "../../hooks/usePeerJS";
 
 interface SettingsModalProps {
@@ -11,10 +10,8 @@ interface SettingsModalProps {
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState("network");
   const [heartbeatPort, setHeartbeatPort] = useState(8080);
-  const [signalingPort, setSignalingPort] = useState(8092);
   const [downloadPath, setDownloadPath] = useState("");
   const [chunkSize, setChunkSize] = useState<number>(16384); // 默认16KB
-  const [detectedPorts, setDetectedPorts] = useState<string[]>([]);
 
   const { isReady: peerJSReady, deviceId } = usePeerJS();
 
@@ -30,21 +27,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         .catch((error: Error) => {
           console.error("获取心跳端口设置失败:", error);
         });
-
-      // 获取信令服务端口
-      window.electron
-        .invoke("signaling:getPort")
-        .then((port: number) => {
-          setSignalingPort(port || 8092);
-        })
-        .catch((error: Error) => {
-          console.error("获取信令端口设置失败:", error);
-          // 如果API不存在，使用默认值
-          setSignalingPort(8092);
-        });
-
-      // 扫描局域网中的活跃端口
-      scanNetworkPorts();
 
       // 获取下载路径
       window.electron
@@ -75,43 +57,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         });
     }
   }, [isOpen]);
-
-  // 修改扫描网络端口方法以处理未实现的后端API
-  const scanNetworkPorts = async () => {
-    try {
-      // 检查是否实现了获取设备的API
-      try {
-        const devices = await window.electron.invoke(
-          "mdns:getDiscoveredDevices"
-        );
-
-        // 提取并存储所有检测到的设备的端口
-        const ports: string[] = [];
-        if (Array.isArray(devices)) {
-          devices.forEach((device: any) => {
-            if (device.port && !ports.includes(String(device.port))) {
-              ports.push(String(device.port));
-            }
-            if (
-              device.signalingPort &&
-              !ports.includes(String(device.signalingPort))
-            ) {
-              ports.push(String(device.signalingPort));
-            }
-          });
-
-          setDetectedPorts(ports);
-        }
-      } catch (error) {
-        // 如果API未实现，使用备用方法
-        console.log("端口扫描API未实现，使用备用方案");
-        // 添加常用端口作为备选
-        setDetectedPorts(["8092", "8102", "8112"]);
-      }
-    } catch (error) {
-      console.error("扫描网络端口失败:", error);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -145,18 +90,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         "heartbeat:setPort",
         parseInt(heartbeatPort.toString())
       );
-
-      // 尝试保存信令端口
-      try {
-        await window.electron.invoke(
-          "signaling:setPort",
-          parseInt(signalingPort.toString())
-        );
-      } catch (error) {
-        console.warn("信令端口设置API未实现，无法保存信令端口设置", error);
-        // 显示友好提示
-        alert("注意：信令端口设置未保存，请手动配置或等待下一版本支持。");
-      }
 
       // 保存下载路径
       if (downloadPath && downloadPath !== "使用系统默认下载文件夹") {
@@ -223,18 +156,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     下载设置
                   </button>
                 </li>
-                <li>
-                  <button
-                    className={`w-full text-left px-3 py-2 rounded ${
-                      activeTab === "diagnostics"
-                        ? "bg-blue-50 text-blue-600"
-                        : "hover:bg-gray-50"
-                    }`}
-                    onClick={() => setActiveTab("diagnostics")}
-                  >
-                    网络诊断
-                  </button>
-                </li>
               </ul>
             </nav>
           </div>
@@ -261,51 +182,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     />
                     <p className="mt-1 text-sm text-gray-500">
                       用于检测其他设备上的 LanFile 是否正在运行
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block mb-1 text-sm font-medium">
-                      信令服务端口
-                    </label>
-                    <div className="flex items-center">
-                      <input
-                        type="number"
-                        value={signalingPort}
-                        onChange={(e) =>
-                          setSignalingPort(Number(e.target.value))
-                        }
-                        className="px-3 py-2 w-32 rounded border"
-                        min="1024"
-                        max="65535"
-                      />
-                      {detectedPorts.length > 0 && (
-                        <div className="ml-4">
-                          <span className="text-sm text-gray-600">
-                            检测到的端口:{" "}
-                          </span>
-                          {detectedPorts.map((port, index) => (
-                            <span
-                              key={port}
-                              className={`cursor-pointer px-2 py-1 rounded ml-1 text-sm
-                                ${
-                                  port === signalingPort.toString()
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-blue-50 text-blue-600 hover:bg-blue-100"
-                                }`}
-                              onClick={() => setSignalingPort(Number(port))}
-                            >
-                              {port}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm text-gray-500">
-                      用于WebRTC连接建立所需的信令交换。
-                      <span className="text-red-500">
-                        注意: 必须与其他设备一致才能建立连接！
-                      </span>
                     </p>
                   </div>
 
@@ -357,55 +233,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       从其他设备接收的文件将保存在此文件夹中
                     </p>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "diagnostics" && (
-              <div>
-                <h3 className="mb-4 text-lg font-medium">网络诊断工具</h3>
-                <p className="mb-4 text-sm text-gray-600">
-                  使用此工具检测您的网络环境是否支持 WebRTC 连接和 NAT 穿透。
-                  这有助于确定文件传输可能遇到的问题。
-                </p>
-                <WebRTCDiagnostics />
-
-                <div className="p-4 mt-6 bg-gray-50 rounded-md">
-                  <h4 className="mb-2 font-medium text-md">信令服务端口检测</h4>
-                  <p className="mb-2 text-sm text-gray-600">
-                    这些是在局域网中检测到的其他LanFile设备使用的端口：
-                  </p>
-                  {detectedPorts.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {detectedPorts.map((port) => (
-                        <div
-                          key={port}
-                          className="px-3 py-1 text-blue-700 bg-blue-50 rounded"
-                        >
-                          {port} {port === signalingPort.toString() && "(当前)"}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">
-                      未检测到其他设备的端口
-                    </p>
-                  )}
-                  <p className="mt-3 text-sm text-amber-600">
-                    <strong>提示：</strong>{" "}
-                    确保所有设备使用相同的信令端口才能建立连接
-                  </p>
-                </div>
-
-                <div className="setting-item">
-                  <h3>PeerJS 连接</h3>
-                  <div className="status-indicator">
-                    状态: {peerJSReady ? "已就绪" : "初始化中"}
-                  </div>
-                  <div className="info-text">
-                    设备 ID: {deviceId || "未初始化"}
-                  </div>
-                  {/* 可能的 PeerJS 配置选项 */}
                 </div>
               </div>
             )}

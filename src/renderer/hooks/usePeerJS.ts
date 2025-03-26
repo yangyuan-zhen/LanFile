@@ -28,12 +28,18 @@ export const usePeerJS = () => {
             try {
                 setStatus('connecting');
 
-                // 获取设备信息，但生成更唯一的 ID
+                // 获取设备信息
                 const deviceInfo = await window.electron.invoke('device:getInfo');
-                const randomSuffix = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-                const peerId = `lanfile-${deviceInfo.id.substring(0, 8)}-${randomSuffix}`;
 
-                console.log("生成的唯一 PeerJS ID:", peerId);
+                // 生成规范的 PeerJS ID
+                // 1. 清理 ID 中的非法字符
+                const cleanId = deviceInfo.id.replace(/[^a-zA-Z0-9]/g, '');
+                // 2. 添加随机后缀
+                const randomSuffix = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+                // 3. 组合成有效的 ID
+                const peerId = `lanfile${cleanId.substring(0, 8)}${randomSuffix}`;
+
+                console.log("生成的 PeerJS ID:", peerId);
                 setDeviceId(peerId);
 
                 // 创建 Peer 实例
