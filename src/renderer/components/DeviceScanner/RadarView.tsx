@@ -215,7 +215,7 @@ const RadarView: React.FC<RadarViewProps> = ({
 
   // 整合设备数据 - 优先使用networkDevices以保持一致性
   const effectiveDevices = networkDevices.map((device) => ({
-    id: device.ip + device.name,
+    id: device.ip,
     name: device.name,
     type: device.type || "desktop",
     icon: device.icon || Monitor,
@@ -518,13 +518,13 @@ const RadarView: React.FC<RadarViewProps> = ({
 
     try {
       // 建立连接
-      console.log(`尝试连接到设备: ${selectedDevice.id}`);
-      await connectToPeer(selectedDevice.id);
+      console.log(`尝试连接到设备: ${selectedDevice.ip}`);
+      await connectToPeer(selectedDevice.ip);
 
       // 发送所有选中的文件
       for (let i = 0; i < selectedFiles.length; i++) {
         console.log(`准备发送文件: ${selectedFiles[i].name}`);
-        await sendFile(selectedDevice.id, selectedFiles[i]);
+        await sendFile(selectedDevice.ip, selectedFiles[i]);
       }
 
       // 传输已开始，关闭对话框即可，进度由CurrentTransfers组件显示

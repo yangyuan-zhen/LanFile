@@ -20,11 +20,11 @@ export const FileTransfer: React.FC<FileTransferProps> = ({ targetDevice }) => {
 
     try {
       // 确保连接已建立
-      await connectToPeer(targetDevice.id);
+      await connectToPeer(targetDevice.ip);
 
       // 发送每个选择的文件
       for (let i = 0; i < e.target.files.length; i++) {
-        await sendFile(targetDevice.id, e.target.files[i]);
+        await sendFile(targetDevice.ip, e.target.files[i]);
       }
 
       // 清除选择的文件
@@ -40,7 +40,7 @@ export const FileTransfer: React.FC<FileTransferProps> = ({ targetDevice }) => {
   };
 
   // 获取与当前设备相关的传输
-  const deviceTransfers = transfers.filter((t) => t.peerId === targetDevice.id);
+  const deviceTransfers = transfers.filter((t) => t.peerId === targetDevice.ip);
 
   return (
     <div className="p-4 space-y-4">

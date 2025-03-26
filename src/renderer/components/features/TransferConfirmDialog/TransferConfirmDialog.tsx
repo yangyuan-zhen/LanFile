@@ -44,11 +44,11 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
 
     try {
       // 连接到设备
-      await connectToPeer(device.id);
+      await connectToPeer(device.ip);
 
       // 发送选中的文件
       for (let i = 0; i < e.target.files.length; i++) {
-        await sendFile(device.id, e.target.files[i]);
+        await sendFile(device.ip, e.target.files[i]);
       }
 
       // 清除选择的文件

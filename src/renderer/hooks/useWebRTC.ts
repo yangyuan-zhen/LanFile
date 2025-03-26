@@ -409,15 +409,25 @@ export const useWebRTC = () => {
                 throw new Error('信令服务未连接，无法发送文件');
             }
 
-            // 检查数据通道是否已打开
-            if (!dataChannels[peerId] || dataChannels[peerId].readyState !== 'open') {
-                console.log('数据通道未打开，尝试连接...');
-                // 查找设备信息后再连接
-                const deviceInfo = await findDeviceById(peerId);
-                if (!deviceInfo) {
-                    throw new Error(`找不到ID为 ${peerId} 的设备信息`);
+            // 处理可能的复合ID，提取纯IP部分
+            let pureIpId = peerId;
+            if (peerId.match(/^(\d{1,3}\.){3}\d{1,3}/)) {
+                // 提取IP地址部分
+                const ipMatch = peerId.match(/^(\d{1,3}\.){3}\d{1,3}/);
+                if (ipMatch) {
+                    pureIpId = ipMatch[0];
                 }
-                await connectToPeer(peerId);
+            }
+
+            // 检查数据通道是否已打开，使用纯IP
+            if (!dataChannels[pureIpId] || dataChannels[pureIpId].readyState !== 'open') {
+                console.log('数据通道未打开，尝试连接...');
+                // 使用纯IP查找设备并连接
+                const deviceInfo = await findDeviceById(pureIpId);
+                if (!deviceInfo) {
+                    throw new Error(`找不到IP为 ${pureIpId} 的设备信息`);
+                }
+                await connectToPeer(pureIpId);
             }
 
             // 文件传输逻辑...
@@ -429,10 +439,20 @@ export const useWebRTC = () => {
 
     // 添加一个辅助函数来查找设备
     const findDeviceById = async (id: string): Promise<Device | null> => {
-        // 可以从全局状态或通过API获取设备信息
         try {
+            // 处理可能的复合ID，提取纯IP部分
+            let pureIpId = id;
+            if (id.match(/^(\d{1,3}\.){3}\d{1,3}/)) {
+                const ipMatch = id.match(/^(\d{1,3}\.){3}\d{1,3}/);
+                if (ipMatch) {
+                    pureIpId = ipMatch[0];
+                }
+            }
+
             const devices = await window.electron.invoke('mdns:getDiscoveredDevices');
-            return devices.find((d: Device) => d.host === id) || null;
+            return devices.find((d: Device) =>
+                d.host === pureIpId || d.addresses.includes(pureIpId)
+            ) || null;
         } catch (error) {
             console.error('查找设备失败:', error);
             return null;
