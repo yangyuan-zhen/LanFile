@@ -1,4 +1,5 @@
 import { useWebRTC } from "@/hooks/useWebRTC";
+import { Device } from "@/services/ZeroconfService";
 
 const RadarView = () => {
   // 获取WebRTC相关功能
@@ -9,7 +10,7 @@ const RadarView = () => {
     deviceName: string
   ) => {
     try {
-      // 使用纯IP地址作为设备ID
+      // 直接使用IP地址作为设备ID
       const connected = await connectToPeer(deviceIp);
 
       if (!connected) {
@@ -25,4 +26,13 @@ const RadarView = () => {
       return false;
     }
   };
+
+  // 需要检查调用handleTransferConfirm的地方，确保传入的是纯IP地址
+  const handleDeviceSelect = (device: Device) => {
+    // 使用device.host或device.addresses[0]作为设备ID
+    const deviceIp = device.host;
+    handleTransferConfirm(deviceIp, device.name);
+  };
 };
+
+export default RadarView;
