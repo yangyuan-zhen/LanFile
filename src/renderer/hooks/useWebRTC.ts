@@ -446,149 +446,70 @@ export const useWebRTC = () => {
     };
 
     // 连接到对等点
-    const connectToPeer = useCallback(
-        async (peerId: string) => {
-            if (isConnecting.current) {
-                console.log('已有连接请求进行中，请稍后再试');
-                return false;
+    const connectToPeer = useCallback(async (peerId: string) => {
+        if (isConnecting.current) {
+            console.log("已有连接请求进行中，请稍后再试");
+            return false;
+        }
+
+        isConnecting.current = true;
+        console.log(`尝试连接到设备: ${peerId}`);
+
+        try {
+            // 检查信令服务是否已连接
+            if (!signalingService.isConnected) {
+                await signalingService.connect();
+                if (!signalingService.isConnected) {
+                    throw new Error('信令服务连接失败');
+                }
             }
 
-            isConnecting.current = true;
-            setStatus('connecting');
-            console.log(`尝试连接到设备: ${peerId}`);
+            // 使用纯IP地址尝试直接连接
+            console.log(`直接连接IP: ${peerId}`);
+            const result = await window.electron.invoke('signaling:connectToDevice', peerId, peerId);
+            console.log("连接到设备结果:", result);
 
-            try {
-                let pureIpId = peerId;
-                if (peerId.match(/^(\d{1,3}\.){3}\d{1,3}/)) {
-                    const ipMatch = peerId.match(/^(\d{1,3}\.){3}\d{1,3}/);
-                    if (ipMatch) {
-                        pureIpId = ipMatch[0];
-                    }
-                }
+            // 创建标准WebRTC连接
+            const peerConnection = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            });
 
-                let device = findPeerDevice(pureIpId);
+            // 创建数据通道
+            const dataChannel = peerConnection.createDataChannel('fileTransfer');
+            setupDataChannel(dataChannel, peerId);
 
-                if (!device) {
-                    console.log('本地缓存找不到设备，尝试从 mDNS 直接获取');
-                    device = await findDeviceById(pureIpId);
-                    if (device) {
-                        setAllDevices(prev => {
-                            if (prev.some(d => d.host === device.host)) {
-                                return prev.map(d => d.host === device.host ? device : d);
-                            }
-                            return [...prev, device] as Device[];
-                        });
-                    }
-                }
+            // 保存连接
+            setPeers(prev => ({
+                ...prev,
+                [peerId]: { peerId, connection: peerConnection, dataChannel }
+            }));
 
-                retryAttempts.current[pureIpId] = retryAttempts.current[pureIpId] || 0;
+            // 创建并发送提议
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
 
-                if (retryAttempts.current[pureIpId] >= maxRetries) {
-                    setError(`连接到 ${pureIpId} 失败，已达到最大重试次数 (${maxRetries})`);
-                    setStatus('error');
-                    isConnecting.current = false;
-                    return false;
-                }
-
-                if (!device) {
-                    console.log(`找不到 IP 为 ${pureIpId} 的设备信息，执行强制连接`);
-                    const peerConnection = new RTCPeerConnection({
-                        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-                        iceTransportPolicy: 'all',
-                        iceCandidatePoolSize: 0,
+            // 发送ICE候选
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    window.electron.invoke('signaling:sendMessage', peerId, {
+                        type: 'ice-candidate',
+                        candidate: event.candidate,
+                        from: deviceInfo.id
                     });
-
-                    const dataChannel = peerConnection.createDataChannel('fileTransfer');
-                    setupDataChannel(dataChannel, pureIpId);
-
-                    setPeers(prev => ({
-                        ...prev,
-                        [pureIpId]: { peerId: pureIpId, connection: peerConnection, dataChannel },
-                    }));
-
-                    const offer = await peerConnection.createOffer();
-                    await peerConnection.setLocalDescription(offer);
-                    console.log(`强制连接 - 发送 Offer 到 ${pureIpId}:`, offer);
-
-                    await window.electron.invoke('signaling:connectToDevice', pureIpId, pureIpId);
-
-                    peerConnection.onicecandidate = (event) => {
-                        if (event.candidate) {
-                            window.electron.invoke('signaling:sendMessage', pureIpId, {
-                                type: 'ice-candidate',
-                                candidate: event.candidate,
-                                from: deviceInfo.id,
-                            });
-                        }
-                    };
-
-                    peerConnection.oniceconnectionstatechange = () => {
-                        console.log(`强制连接状态变化: ${peerConnection.iceConnectionState}`);
-                        if (peerConnection.iceConnectionState === 'connected') {
-                            setConnectionState('connected');
-                            setConnectionError(null);
-                            setStatus('connected');
-                        } else if (peerConnection.iceConnectionState === 'failed') {
-                            setConnectionError(
-                                '强制连接失败，可能是以下原因：\n1. 路由器启用了设备隔离（AP 隔离）。请登录路由器管理界面（192.168.31.1），在"无线设置"或"高级设置"中关闭"AP 隔离"或"客户端隔离"。\n2. 设备防火墙阻止了 WebRTC 流量。请在防火墙中允许 UDP 端口 50000-60000。'
-                            );
-                            setConnectionState('failed');
-                            setStatus('error');
-                        }
-                    };
-
-                    const connectionTimeout = setTimeout(() => {
-                        if (!dataChannels[pureIpId] || dataChannels[pureIpId].readyState !== 'open') {
-                            setError(`连接到 ${pureIpId} 超时`);
-                            setStatus('error');
-                            closeConnectionToPeer(pureIpId);
-                            throw new Error('连接超时');
-                        }
-                    }, 20000);
-
-                    await new Promise<void>((resolve, reject) => {
-                        const checkConnection = () => {
-                            if (dataChannels[pureIpId]?.readyState === 'open') {
-                                clearTimeout(connectionTimeout);
-                                resolve();
-                            } else if (peerConnection.iceConnectionState === 'failed') {
-                                clearTimeout(connectionTimeout);
-                                reject(new Error('ICE 连接失败'));
-                            } else {
-                                setTimeout(checkConnection, 500);
-                            }
-                        };
-                        checkConnection();
-                    });
-
-                    isConnecting.current = false;
-                    return true;
                 }
+            };
 
-                console.log('找到设备，准备建立标准连接:', device);
-                await createPeerConnection(pureIpId, true);
-
-                isConnecting.current = false;
-                return true;
-            } catch (error) {
-                console.error('连接到对等设备失败:', error);
-                retryAttempts.current[peerId] = (retryAttempts.current[peerId] || 0) + 1;
-                setError(
-                    `连接失败 (${retryAttempts.current[peerId]}/${maxRetries})：${error instanceof Error ? error.message : String(error)}`
-                );
-                setStatus('error');
-                closeConnectionToPeer(peerId);
-                if (retryAttempts.current[peerId] < maxRetries) {
-                    console.log(`重试连接 (${retryAttempts.current[peerId]}/${maxRetries})`);
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    return connectToPeer(peerId);
-                }
-                isConnecting.current = false;
-                return false;
-            }
-        },
-        [allDevices, deviceInfo.id]
-    );
+            isConnecting.current = false;
+            return true;
+        } catch (error) {
+            console.error("连接到对等设备失败:", error);
+            isConnecting.current = false;
+            return false;
+        }
+    }, [deviceInfo.id, signalingService, setupDataChannel]);
 
     // 发送文件
     const sendFile = useCallback(
