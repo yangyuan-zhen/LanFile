@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import { ipcMain } from 'electron';
+import { networkInterfaces } from 'os';
 
 export interface NetworkDevice {
     name: string;
@@ -13,9 +14,16 @@ export class NetworkService extends EventEmitter {
     private isDiscovering: boolean = false;
     private servicePort: number = 12345;
     private isRunning: boolean = false;
+    private deviceId: string;
+    private deviceName: string;
+    private port: number;
+    private udpServer: dgram.Socket | null = null;
 
-    constructor() {
+    constructor(deviceId: string, deviceName: string, port: number) {
         super();
+        this.deviceId = deviceId;
+        this.deviceName = deviceName;
+        this.port = port;
         this.setupSocket();
     }
 
@@ -119,6 +127,47 @@ export class NetworkService extends EventEmitter {
             this.unpublishService();
             this.publishService(port);
         }
+    }
+
+    broadcastPresence() {
+        if (!this.udpServer) return;
+
+        const interfaces = networkInterfaces();
+        const broadcastAddresses: string[] = [];
+
+        // 获取所有广播地址
+        Object.values(interfaces).forEach(iface => {
+            if (!iface) return;
+            iface.forEach(details => {
+                if (details.family === 'IPv4' && !details.internal) {
+                    // 从 IP 和子网掩码计算广播地址
+                    const ipParts = details.address.split('.');
+                    const maskParts = details.netmask.split('.');
+                    const broadcastParts = ipParts.map((part, i) =>
+                        (parseInt(part) | (~parseInt(maskParts[i]) & 255)) & 255
+                    );
+                    broadcastAddresses.push(broadcastParts.join('.'));
+                }
+            });
+        });
+
+        // 发送广播
+        const message = JSON.stringify({
+            type: 'presence',
+            deviceId: this.deviceId,
+            deviceName: this.deviceName,
+            services: ['file-transfer', 'peer-discovery'],
+            ports: {
+                'heartbeat': this.port,
+                'peer-discovery': 8765
+            }
+        });
+
+        broadcastAddresses.forEach(address => {
+            this.udpServer?.send(message, this.port, address);
+        });
+
+        console.log(`发送UDP广播到: ${broadcastAddresses.join(', ')}`);
     }
 }
 

@@ -514,41 +514,30 @@ app.on('will-quit', () => {
 
 // 配置Windows防火墙的辅助函数
 async function configureWindowsFirewall() {
+    // 添加 UDP 心跳端口规则
+    addFirewallRule('LanFileHeartbeat', 'UDP', heartbeatService.getPort());
+
+    // 添加 TCP PeerDiscovery 规则
+    addFirewallRule('LanFilePeerDiscovery', 'TCP', 8765);
+
+    // 添加 MDNS 规则
+    addFirewallRule('LanFileMDNS', 'UDP', 5353);
+}
+
+function addFirewallRule(name, protocol, port) {
     const { spawn } = require('child_process');
-    const appPath = app.getPath('exe');
-    const ruleName = 'LanFile';
+    const addRule = spawn('netsh', [
+        'advfirewall', 'firewall', 'add', 'rule',
+        `name=${name}`,
+        'dir=in',
+        'action=allow',
+        'program=any',
+        `protocol=${protocol}`,
+        `localport=${port}`
+    ]);
 
-    // 检查规则是否已存在
-    const checkRule = spawn('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${ruleName}`]);
-
-    checkRule.on('close', (code: number) => {
-        if (code !== 0) {
-            // 添加规则
-            const addRule = spawn('netsh', [
-                'advfirewall', 'firewall', 'add', 'rule',
-                `name=${ruleName}`,
-                'dir=in',
-                'action=allow',
-                'program=any',
-                'protocol=UDP',
-                'localport=32199'
-            ]);
-
-            addRule.on('error', (err: Error) => {
-                console.error('添加防火墙规则失败:', err);
-            });
-
-            // 添加 PeerDiscoveryService 端口
-            const addPeerDiscoveryRule = spawn('netsh', [
-                'advfirewall', 'firewall', 'add', 'rule',
-                `name=LanFilePeerDiscovery`,
-                'dir=in',
-                'action=allow',
-                'program=any',
-                'protocol=TCP',
-                'localport=8765'
-            ]);
-        }
+    addRule.on('close', (code) => {
+        console.log(`添加防火墙规则 ${name} ${protocol}:${port} ${code === 0 ? '成功' : '失败'}`);
     });
 }
 
