@@ -30,24 +30,24 @@ export const usePeerJS = () => {
 
                 // 获取设备信息，但生成更唯一的 ID
                 const deviceInfo = await window.electron.invoke('device:getInfo');
-
-                // 添加随机后缀确保唯一性，同时保持 ID 的可识别性
                 const randomSuffix = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
                 const peerId = `lanfile-${deviceInfo.id.substring(0, 8)}-${randomSuffix}`;
 
                 console.log("生成的唯一 PeerJS ID:", peerId);
                 setDeviceId(peerId);
 
-                // 创建 Peer 实例，采用纯 P2P 模式
+                // 创建 Peer 实例
                 const newPeer = new Peer(peerId, {
                     config: {
                         iceServers: [] // 局域网中不需要 STUN/TURN 服务器
                     }
                 });
 
-                // 设置事件监听
-                newPeer.on('open', (id) => {
+                // 当PeerJS连接成功后，启动发现服务
+                newPeer.on('open', async (id) => {
                     console.log(`PeerJS已连接，ID: ${id}`);
+                    // 启动ID发现服务
+                    await window.electron.invoke('peer:startDiscovery', id);
                     setIsReady(true);
                     setStatus('idle');
                 });
@@ -148,16 +148,14 @@ export const usePeerJS = () => {
         try {
             console.log(`尝试连接到 ${peerIp}`);
 
-            // 检查设备是否在线
-            const isOnline = await window.electron.invoke('device:ping', peerIp);
-            if (!isOnline.success) {
-                throw new Error(`设备 ${peerIp} 不在线`);
+            // 从目标设备获取实际的PeerJS ID
+            const peerResult = await window.electron.invoke('peer:getRemotePeerId', peerIp);
+            if (!peerResult.success || !peerResult.peerId) {
+                throw new Error(`无法获取设备 ${peerIp} 的PeerJS ID: ${peerResult.error || '未知错误'}`);
             }
 
-            // 生成目标设备的对等ID - 基于IP地址
-            // 这里直接使用IP地址作为标识符的一部分，避免依赖未注册的方法
-            const remotePeerId = `peer-${peerIp.replace(/\./g, '-')}`;
-            console.log(`尝试连接到对等ID: ${remotePeerId}`);
+            const remotePeerId = peerResult.peerId;
+            console.log(`获取到远程设备的PeerJS ID: ${remotePeerId}`);
 
             // 创建到远程Peer的连接
             const conn = peer.connect(remotePeerId, {

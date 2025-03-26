@@ -14,6 +14,7 @@ import { logService } from './services/LogService';
 import { setupSignalingHandlers } from './signaling';
 import { webSocketSignalingService } from './services/WebSocketSignalingService';
 import { registerNetworkHandlers } from './services/NetworkService';
+import { peerDiscoveryService } from './services/PeerDiscoveryService';
 
 // 在应用顶部添加
 app.commandLine.appendSwitch('lang', 'zh-CN');
@@ -571,6 +572,8 @@ app.on('will-quit', () => {
     if (webSocketSignalingService && webSocketSignalingService.isRunning) {
         webSocketSignalingService.stop();
     }
+
+    peerDiscoveryService.stop();
 });
 
 // 配置Windows防火墙的辅助函数
