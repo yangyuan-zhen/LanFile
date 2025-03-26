@@ -154,13 +154,10 @@ export const usePeerJS = () => {
                 throw new Error(`设备 ${peerIp} 不在线`);
             }
 
-            // 查询设备的PeerJS ID
-            const deviceInfo = await window.electron.invoke('device:getRemoteInfo', peerIp);
-            if (!deviceInfo || !deviceInfo.id) {
-                throw new Error(`无法获取设备 ${peerIp} 的信息`);
-            }
-
-            const remotePeerId = `lanfile-${deviceInfo.id}`;
+            // 生成目标设备的对等ID - 基于IP地址
+            // 这里直接使用IP地址作为标识符的一部分，避免依赖未注册的方法
+            const remotePeerId = `peer-${peerIp.replace(/\./g, '-')}`;
+            console.log(`尝试连接到对等ID: ${remotePeerId}`);
 
             // 创建到远程Peer的连接
             const conn = peer.connect(remotePeerId, {
