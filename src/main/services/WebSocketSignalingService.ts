@@ -3,6 +3,7 @@ import { WebSocketServer } from 'ws';
 import { EventEmitter } from 'events';
 import { ipcMain } from 'electron';
 import { logService } from './LogService';
+import net from 'net';
 
 interface SignalingMessage {
     type: 'offer' | 'answer' | 'ice-candidate' | 'register' | 'disconnect' | 'ping' | 'pong';
@@ -586,4 +587,37 @@ export class WebSocketSignalingService extends EventEmitter {
 }
 
 // 创建单例实例
-export const webSocketSignalingService = new WebSocketSignalingService(); 
+export const webSocketSignalingService = new WebSocketSignalingService();
+
+// 在主进程中添加
+ipcMain.handle('signaling:sendDirectMessage', async (_, targetIp, message) => {
+    try {
+        console.log(`尝试直接发送消息到IP: ${targetIp}`);
+
+        // 创建TCP客户端直接连接目标IP
+        const client = new net.Socket();
+
+        return new Promise((resolve) => {
+            client.connect(8092, targetIp, () => { // 使用信令服务默认端口
+                console.log(`已连接到 ${targetIp}:8092`);
+                client.write(JSON.stringify(message));
+                client.end();
+                resolve(true);
+            });
+
+            client.on('error', (err) => {
+                console.error(`连接失败: ${err.message}`);
+                resolve(false);
+            });
+
+            // 5秒超时
+            setTimeout(() => {
+                client.destroy();
+                resolve(false);
+            }, 5000);
+        });
+    } catch (error) {
+        console.error('直接发送消息失败:', error);
+        return false;
+    }
+}); 

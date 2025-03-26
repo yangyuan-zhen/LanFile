@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useWebRTC } from "../../../hooks/useWebRTC";
+import { usePeerJS } from "../../../hooks/usePeerJS";
 import { Button } from "../../common/Button/Button";
 
 interface Device {
@@ -21,7 +21,7 @@ export const TransferConfirmDialog: React.FC<TransferConfirmDialogProps> = ({
 }) => {
   const [isSelectingFile, setIsSelectingFile] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { connectToPeer, sendFile } = useWebRTC();
+  const { connectToPeer, sendFile } = usePeerJS();
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 

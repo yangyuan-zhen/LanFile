@@ -297,3 +297,35 @@ Hooks 为组件提供数据和方法：
 - **测试覆盖**：添加单元测试和集成测试
 
 以上优化方向将进一步提高 LanFile_PC 应用的稳定性、性能和用户体验。
+
+# Hooks 说明
+
+## usePeerJS
+
+此 hook 使用 PeerJS 库提供 WebRTC 文件传输功能，替代了之前自定义的 WebRTC 实现。
+
+### 主要特性
+
+- 简化的 P2P 连接建立
+- 文件发送和接收
+- 传输进度跟踪
+- 错误处理
+
+### 使用方法
+
+```typescript
+import { usePeerJS } from "../hooks/usePeerJS";
+
+// 在组件中
+const { isReady, connectToPeer, sendFile, transfers } = usePeerJS();
+
+// 连接到设备
+await connectToPeer(deviceIp);
+
+// 发送文件
+await sendFile(deviceIp, fileObject);
+```
+
+### 配置说明
+
+当前配置为纯局域网 P2P 模式，无需中央服务器。如需更改，可修改`usePeerJS.ts`中的 Peer 实例创建部分。

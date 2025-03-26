@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { useWebRTC } from "../hooks/useWebRTC";
+import { usePeerJS } from "../hooks/usePeerJS";
 import { Button } from "../components/common/Button/Button";
 import { Progress } from "../components/common/Progress/Progress";
 
@@ -13,7 +13,7 @@ export interface FileTransferProps {
 
 export const FileTransfer: React.FC<FileTransferProps> = ({ targetDevice }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isReady, connectToPeer, sendFile, transfers } = useWebRTC();
+  const { isReady, connectToPeer, sendFile, transfers } = usePeerJS();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
