@@ -437,70 +437,128 @@ export const useWebRTC = () => {
     };
 
     // 连接到对等点
-    const connectToPeer = useCallback(async (peerId: string) => {
+    const connectToPeer = useCallback(async (peerIp: string) => {
         if (isConnecting.current) {
             console.log("已有连接请求进行中，请稍后再试");
             return false;
         }
 
         isConnecting.current = true;
-        console.log(`尝试连接到设备: ${peerId}`);
+        console.log(`尝试连接到局域网设备: ${peerIp}`);
+        setStatus('connecting');
 
         try {
-            // 检查信令服务是否已连接
-            if (!signalingService.isConnected) {
-                await signalingService.connect();
-                if (!signalingService.isConnected) {
-                    throw new Error('信令服务连接失败');
-                }
-            }
-
-            // 使用纯IP地址尝试直接连接
-            console.log(`直接连接IP: ${peerId}`);
-            const result = await window.electron.invoke('signaling:connectToDevice', peerId, peerId);
-            console.log("连接到设备结果:", result);
-
-            // 创建标准WebRTC连接
+            // 针对局域网环境的简化RTCPeerConnection配置
             const peerConnection = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
-                ]
+                // 局域网场景下，可以使用最小化的ICE配置
+                iceServers: [], // 同一局域网内不需要STUN/TURN服务器
+                iceTransportPolicy: 'all',
+                iceCandidatePoolSize: 0,
             });
 
+            // 设置连接超时
+            const connectionTimeoutId = setTimeout(() => {
+                if (peerConnection.iceConnectionState !== 'connected' &&
+                    peerConnection.iceConnectionState !== 'completed') {
+                    console.error("与设备建立连接超时");
+                    peerConnection.close();
+                    isConnecting.current = false;
+                    setError("连接超时，请确认目标设备在线并运行应用");
+                    setStatus('error');
+                }
+            }, 10000); // 10秒超时
+
             // 创建数据通道
-            const dataChannel = peerConnection.createDataChannel('fileTransfer');
-            setupDataChannel(dataChannel, peerId);
+            console.log("创建数据通道");
+            const dataChannel = peerConnection.createDataChannel('fileTransfer', {
+                ordered: true // 确保局域网传输的可靠性
+            });
+
+            // 使用Promise跟踪数据通道打开状态
+            const channelOpenPromise = new Promise<boolean>((resolve) => {
+                dataChannel.onopen = () => {
+                    console.log(`数据通道已打开: ${peerIp}`);
+                    clearTimeout(connectionTimeoutId);
+                    setDataChannels(prev => ({ ...prev, [peerIp]: dataChannel }));
+                    resolve(true);
+                };
+
+                dataChannel.onclose = () => {
+                    console.log(`数据通道已关闭: ${peerIp}`);
+                    setDataChannels(prev => {
+                        const newChannels = { ...prev };
+                        delete newChannels[peerIp];
+                        return newChannels;
+                    });
+                };
+            });
+
+            // 设置数据通道事件
+            setupDataChannel(dataChannel, peerIp);
 
             // 保存连接
             setPeers(prev => ({
                 ...prev,
-                [peerId]: { peerId, connection: peerConnection, dataChannel }
+                [peerIp]: { peerId: peerIp, connection: peerConnection, dataChannel }
             }));
 
-            // 创建并发送提议
+            // 简化的信令交换过程，适用于局域网
+            console.log("创建并发送提议");
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
 
-            // 发送ICE候选
+            // 使用直接IP通信而非复杂的信令服务
+            window.electron.invoke('signaling:sendMessage', peerIp, {
+                type: 'offer',
+                data: peerConnection.localDescription,
+                from: deviceInfo.id
+            });
+
+            // 等待连接建立或超时
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    window.electron.invoke('signaling:sendMessage', peerId, {
+                    window.electron.invoke('signaling:sendMessage', peerIp, {
                         type: 'ice-candidate',
-                        candidate: event.candidate,
+                        data: event.candidate,
                         from: deviceInfo.id
                     });
                 }
             };
 
+            // 监听ICE连接状态
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log(`ICE连接状态 (${peerIp}): ${peerConnection.iceConnectionState}`);
+
+                if (peerConnection.iceConnectionState === 'connected' ||
+                    peerConnection.iceConnectionState === 'completed') {
+                    setConnectionState('connected');
+                    setConnectionError(null);
+                    setStatus('connected');
+                } else if (peerConnection.iceConnectionState === 'failed' ||
+                    peerConnection.iceConnectionState === 'disconnected') {
+                    setConnectionError('局域网连接失败，请检查对方设备是否在线');
+                    setConnectionState('failed');
+                    setStatus('error');
+                }
+            };
+
             isConnecting.current = false;
-            return true;
+
+            // 等待数据通道打开，最多10秒
+            const channelOpened = await Promise.race([
+                channelOpenPromise,
+                new Promise<boolean>(resolve => setTimeout(() => resolve(false), 10000))
+            ]);
+
+            return channelOpened;
         } catch (error) {
-            console.error("连接到对等设备失败:", error);
+            console.error("连接到局域网设备失败:", error);
             isConnecting.current = false;
+            setError(`连接失败: ${error instanceof Error ? error.message : String(error)}`);
+            setStatus('error');
             return false;
         }
-    }, [deviceInfo.id, signalingService, setupDataChannel]);
+    }, [deviceInfo.id, setupDataChannel]);
 
     // 发送文件
     const sendFile = useCallback(async (peerId: string, file: File) => {
