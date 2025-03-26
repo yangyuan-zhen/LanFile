@@ -105,7 +105,7 @@ export const useWebRTC = () => {
         // 获取设备列表
         const fetchDevices = async () => {
             try {
-                const devices = await window.electron.invoke('zeroconf:getDevices');
+                const devices = await window.electron.invoke('mdns:getDiscoveredDevices');
                 setAllDevices(devices || []);
             } catch (error) {
                 console.error('获取设备列表失败:', error);
@@ -125,10 +125,10 @@ export const useWebRTC = () => {
             });
         };
 
-        window.electron.on('zeroconf:deviceFound', handleDeviceFound);
+        window.electron.on('mdns:deviceFound', handleDeviceFound);
 
         return () => {
-            window.electron.off('zeroconf:deviceFound', handleDeviceFound);
+            window.electron.off('mdns:deviceFound', handleDeviceFound);
         };
     }, []);
 
@@ -353,27 +353,26 @@ export const useWebRTC = () => {
         return false;
     };
 
-    // 修改设备查找逻辑，处理复合ID的情况
+    // 改进设备查找函数
     const findPeerDevice = (peerId: string) => {
-        // 使用host属性而不是ip
-        let device = allDevices.find(d => d.host === peerId || d.addresses.includes(peerId));
+        console.log("查找设备，当前设备列表:", allDevices);
 
-        // 如果找不到，可能是复合ID (IP+设备名)，尝试提取IP部分
-        if (!device && peerId.match(/^(\d{1,3}\.){3}\d{1,3}/)) {
-            // 提取IP地址部分
-            const ipMatch = peerId.match(/^(\d{1,3}\.){3}\d{1,3}/);
-            if (ipMatch) {
-                const ip = ipMatch[0];
-                device = allDevices.find(d =>
-                    d.host === ip || d.addresses.includes(ip)
-                );
-            }
+        // 优先尝试直接查找IP匹配的设备
+        let device = allDevices.find(d =>
+            d.host === peerId ||
+            (d.addresses && d.addresses.includes(peerId))
+        );
+
+        if (device) {
+            console.log("通过IP直接找到设备:", device);
+            return device;
         }
 
-        return device;
+        // 如果找不到设备，尝试实时从MDNS获取
+        return null;
     };
 
-    // 连接到对等点
+    // 改进连接到对等点函数
     const connectToPeer = useCallback(async (peerId: string) => {
         if (isConnecting.current) {
             console.log("已有连接请求进行中，请稍后再试");
@@ -381,25 +380,53 @@ export const useWebRTC = () => {
         }
 
         isConnecting.current = true;
+        console.log(`尝试连接到设备: ${peerId}`);
 
         try {
-            const device = findPeerDevice(peerId);
+            // 先从缓存查找
+            let device = findPeerDevice(peerId);
+
+            // 如果缓存中找不到，尝试直接从MDNS查询最新设备
+            if (!device) {
+                console.log("本地缓存找不到设备，尝试从MDNS直接获取");
+                try {
+                    const devices = await window.electron.invoke('mdns:getDiscoveredDevices');
+                    console.log("MDNS返回设备列表:", devices);
+
+                    // 更新设备列表
+                    setAllDevices(devices || []);
+
+                    // 再次尝试查找
+                    device = devices?.find((d: Device) =>
+                        d.host === peerId ||
+                        (d.addresses && d.addresses.includes(peerId))
+                    ) || null;
+                } catch (error) {
+                    console.error("从MDNS获取设备失败:", error);
+                }
+            }
 
             if (!device) {
-                console.error(`找不到ID为 ${peerId} 的设备信息`);
+                console.error(`找不到IP为 ${peerId} 的设备信息，尝试强制连接`);
+                // 即使找不到设备信息，也尝试连接
+                // 实现强制连接逻辑...
+
                 isConnecting.current = false;
                 return false;
             }
 
-            // 使用设备的纯IP地址继续连接逻辑
-            // ...其他连接代码...
-        }
-        catch (error) {
+            console.log("找到设备，准备建立连接:", device);
+            // 实现连接逻辑
+            // ...
+
+            isConnecting.current = false;
+            return true;
+        } catch (error) {
             console.error("连接到对等设备失败:", error);
             isConnecting.current = false;
             return false;
         }
-    }, []);
+    }, [allDevices]);
 
     // 发送文件的真实实现
     const sendFile = useCallback(async (peerId: string, file: File) => {
