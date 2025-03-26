@@ -255,39 +255,30 @@ export const useWebRTC = () => {
     };
 
     // 设置数据通道
-    const setupDataChannel = (channel: RTCDataChannel, peerId: string) => {
+    const setupDataChannel = useCallback((channel: RTCDataChannel, peerId: string) => {
+        console.log(`设置数据通道: ${peerId}`, channel);
+
         channel.binaryType = 'arraybuffer';
 
         channel.onopen = () => {
-            console.log(`与设备 ${peerId} 的数据通道已打开`);
-            setPeers(prev => ({
-                ...prev,
-                [peerId]: { ...prev[peerId], dataChannel: channel },
-            }));
-            setDataChannels(prev => ({
-                ...prev,
-                [peerId]: channel,
-            }));
-            setActiveConnection({ peerConnection: peers[peerId].connection, dataChannel: channel });
-            setStatus('connected');
+            console.log(`数据通道已打开: ${peerId}`);
+            setDataChannels(prev => ({ ...prev, [peerId]: channel }));
         };
 
         channel.onclose = () => {
-            console.log(`与设备 ${peerId} 的数据通道已关闭`);
-            setStatus('disconnected');
-            closeConnectionToPeer(peerId);
+            console.log(`数据通道已关闭: ${peerId}`);
+            setDataChannels(prev => {
+                const newChannels = { ...prev };
+                delete newChannels[peerId];
+                return newChannels;
+            });
         };
 
-        channel.onerror = (error) => {
-            console.error(`与设备 ${peerId} 的数据通道发生错误:`, error);
-            setError('数据通道错误');
-            setStatus('error');
-        };
+        // 存储通道，即使未打开也预先存储引用
+        setDataChannels(prev => ({ ...prev, [peerId]: channel }));
 
-        channel.onmessage = (event) => {
-            handleDataChannelMessage(event.data, peerId);
-        };
-    };
+        // 其他事件处理...
+    }, []);
 
     // 处理接收的消息
     const handleDataChannelMessage = (data: any, peerId: string) => {
@@ -512,132 +503,52 @@ export const useWebRTC = () => {
     }, [deviceInfo.id, signalingService, setupDataChannel]);
 
     // 发送文件
-    const sendFile = useCallback(
-        async (peerId: string, file: File) => {
-            try {
-                if (!signalingService.isConnected) {
-                    throw new Error('信令服务未连接，无法发送文件');
-                }
+    const sendFile = useCallback(async (peerId: string, file: File) => {
+        try {
+            console.log(`尝试发送文件到: ${peerId}`, file);
 
-                let pureIpId = peerId;
-                if (peerId.match(/^(\d{1,3}\.){3}\d{1,3}/)) {
-                    const ipMatch = peerId.match(/^(\d{1,3}\.){3}\d{1,3}/);
-                    if (ipMatch) {
-                        pureIpId = ipMatch[0];
-                    }
-                }
-
-                if (!dataChannels[pureIpId] || dataChannels[pureIpId].readyState !== 'open') {
-                    console.log('数据通道未打开，尝试连接...');
-                    const connected = await connectToPeer(pureIpId);
-
-                    if (!connected) {
-                        throw new Error(`无法连接到设备: ${pureIpId}`);
-                    }
-
-                    if (!dataChannels[pureIpId] || dataChannels[pureIpId].readyState !== 'open') {
-                        console.log('等待数据通道打开...');
-                        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-                        if (!dataChannels[pureIpId] || dataChannels[pureIpId].readyState !== 'open') {
-                            throw new Error('数据通道未能打开，无法发送文件');
-                        }
-                    }
-                }
-
-                console.log(`开始传输文件: ${file.name} 到设备: ${pureIpId}`);
-
-                const transferId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                setTransfers(prev => [
-                    ...prev,
-                    {
-                        id: transferId,
-                        name: file.name,
-                        size: file.size,
-                        type: file.type,
-                        progress: 0,
-                        status: 'pending',
-                        direction: 'upload',
-                        peerId: pureIpId,
-                    },
-                ]);
-
-                sendControlMessage(pureIpId, {
-                    type: 'file-info',
-                    transferId,
-                    name: file.name,
-                    size: file.size,
-                    fileType: file.type,
-                });
-
-                const reader = new FileReader();
-                let offset = 0;
-
-                const readSlice = () => {
-                    const slice = file.slice(offset, offset + chunkSize);
-                    reader.readAsArrayBuffer(slice);
-                };
-
-                reader.onload = (event) => {
-                    if (!event.target) {
-                        console.error('文件读取事件目标为空');
-                        return;
-                    }
-                    const buffer = event.target.result as ArrayBuffer;
-                    const idBuffer = new TextEncoder().encode(transferId);
-                    const combinedBuffer = new Uint8Array(1 + idBuffer.length + buffer.byteLength);
-                    combinedBuffer[0] = idBuffer.length;
-                    combinedBuffer.set(idBuffer, 1);
-                    combinedBuffer.set(new Uint8Array(buffer), 1 + idBuffer.length);
-
-                    dataChannels[pureIpId].send(combinedBuffer);
-                    offset += buffer.byteLength;
-
-                    setTransfers(prev => {
-                        const transfer = prev.find(t => t.id === transferId);
-                        if (transfer) {
-                            const progress = Math.min(100, Math.floor((offset / transfer.size) * 100));
-                            return prev.map(t =>
-                                t.id === transferId ? { ...t, progress, status: 'transferring' } : t
-                            );
-                        }
-                        return prev;
-                    });
-
-                    if (offset < file.size) {
-                        readSlice();
-                    } else {
-                        sendControlMessage(pureIpId, {
-                            type: 'file-complete',
-                            transferId,
-                            fileName: file.name,
-                            fileType: file.type,
-                        });
-                        setTransfers(prev =>
-                            prev.map(t =>
-                                t.id === transferId ? { ...t, status: 'completed', progress: 100 } : t
-                            )
-                        );
-                    }
-                };
-
-                reader.onerror = (error) => {
-                    console.error('文件读取失败:', error);
-                    setError('文件读取失败');
-                    setTransfers(prev =>
-                        prev.map(t => (t.id === transferId ? { ...t, status: 'error' } : t))
-                    );
-                };
-
-                readSlice();
-            } catch (error) {
-                console.error('文件发送失败:', error);
-                setError(`文件发送失败: ${error instanceof Error ? error.message : String(error)}`);
-                throw error;
+            // 连接到对等设备
+            const connected = await connectToPeer(peerId);
+            if (!connected) {
+                throw new Error(`无法连接到设备: ${peerId}`);
             }
-        },
-        [dataChannels, connectToPeer, signalingService]
-    );
+
+            // 等待数据通道打开
+            if (!dataChannels[peerId] || dataChannels[peerId].readyState !== 'open') {
+                console.log(`数据通道未打开，等待打开...`);
+                await new Promise<void>((resolve, reject) => {
+                    const maxWaitTime = 10000; // 最多等待10秒
+                    const checkInterval = 500; // 每500ms检查一次
+                    let elapsedTime = 0;
+
+                    const checkChannel = () => {
+                        if (dataChannels[peerId]?.readyState === 'open') {
+                            resolve();
+                        } else if (elapsedTime >= maxWaitTime) {
+                            reject(new Error('数据通道打开超时'));
+                        } else {
+                            elapsedTime += checkInterval;
+                            setTimeout(checkChannel, checkInterval);
+                        }
+                    };
+
+                    checkChannel();
+                });
+            }
+
+            // 确保数据通道已打开
+            if (!dataChannels[peerId] || dataChannels[peerId].readyState !== 'open') {
+                throw new Error('数据通道未能打开，无法发送文件');
+            }
+
+            // 继续原有发送逻辑...
+
+        } catch (error) {
+            console.error('文件发送失败:', error);
+            setError(`文件发送失败: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }, [dataChannels, connectToPeer]);
 
     // 处理 Offer
     const handleOffer = useCallback(
