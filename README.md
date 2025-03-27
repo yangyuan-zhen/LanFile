@@ -6,20 +6,37 @@
 
 - 📡 智能设备发现 - 自动检测并连接局域网内的设备
 - 📂 文件传输 - 支持拖拽上传和快速下载
+- 📊 实时状态监控 - 显示传输进度、速度和状态
+- 🔔 通知系统 - 传输完成自动通知
 - 🚀 高效传输 - 采用点对点传输技术，速度更快
-- 💻 全平台支持 - 完整支持 Windows、macOS 和 Linux
-- 🔐 安全可靠 - 端到端加密确保数据安全
-- 🎨 精美界面 - 现代化 UI 设计，支持深色模式
+- 💻 全平台支持 - 完整支持 Windows、计划支持 macOS 和 Linux
+- 🎨 精美界面 - 现代化 UI 设计，支持多种主题
+
+## 已实现功能
+
+- ✅ 局域网自动设备发现
+- ✅ 文件拖拽上传与下载
+- ✅ 实时传输进度和速度显示
+- ✅ 传输完成通知系统
+- ✅ 文件传输分块大小设置
+- ✅ 多文件队列传输
+- ✅ 传输历史与状态管理
+
+## 🚀 计划中的功能
+
+- 📱 移动设备支持
+- 🔐 加密传输
+- 🔄 断点续传
+- 📊 传输统计和分析
 
 ## 🛠️ 技术栈
 
 - **框架**: Electron + React
 - **语言**: TypeScript
+- **UI 组件**: Chakra UI
 - **样式**: TailwindCSS
-- **测试**: Jest
-- **计划中**:
-  - WebRTC 支持
-  - WebTorrent 集成
+- **状态管理**: React Context API
+- **通信**: PeerJS
 
 ## 🚀 快速开始
 
@@ -46,33 +63,25 @@
    ```
    npm run dev
    ```
-5. 运行测试
-   ```
-   npm test
-   ```
-6. 运行测试（监视模式）
-   ```
-   npm run test:watch
-   ```
-7. 生成测试覆盖率报告
-   ```
-   npm run test:coverage
-   ```
-8. 构建应用
+5. 构建应用
    ```
    npm run build
    ```
 
-项目目录结构
+## 项目目录结构
 
 ```
 LanFile_PC/
 ├── src/
-│ ├── main/ # Electron 主进程
-│ ├── renderer/ # React 渲染进程
-│ └── shared/ # 共享代码
-├── tests/ # 测试文件
-└── dist/ # 构建输出目录
+│   ├── main/         # Electron 主进程
+│   ├── renderer/     # React 渲染进程
+│   │   ├── components/  # UI组件
+│   │   ├── contexts/    # React上下文
+│   │   ├── hooks/       # 自定义钩子
+│   │   └── pages/       # 页面组件
+│   └── preload/      # 预加载脚本
+├── build/           # 构建配置
+└── dist/            # 构建输出目录
 ```
 
 ## 开发指南
@@ -88,20 +97,7 @@ LanFile_PC/
 
 - 使用函数式组件和 React Hooks
 - 为所有变量和函数定义适当的 TypeScript 类型
-- 使用 TailwindCSS 实现响应式设计
-
-### 测试要求
-
-- 为所有新组件和工具函数编写单元测试
-- 保持最少 80% 的代码覆盖率
-- 使用 Jest 和 React Testing Library 进行测试
-
-## 构建与打包
-
-构建应用
-npm run build
-打包应用（即将支持）
-npm run package
+- 使用 TailwindCSS 和 Chakra UI 实现响应式设计
 
 ## 贡献指南
 
