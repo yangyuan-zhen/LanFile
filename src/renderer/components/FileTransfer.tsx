@@ -1,30 +1,40 @@
 import React, { useRef } from "react";
 import { usePeerJS } from "../hooks/usePeerJS";
 import { Button } from "../components/common/Button/Button";
-import { Progress } from "../components/common/Progress/Progress";
 
 export interface FileTransferProps {
-  targetDevice: {
-    id: string;
-    name: string;
-    ip: string;
-  };
+  targetDevice:
+    | {
+        id: string;
+        name: string;
+        ip: string;
+      }
+    | string;
 }
 
-export const FileTransfer: React.FC<FileTransferProps> = ({ targetDevice }) => {
+// 重命名组件以避免与CurrentTransfers冲突
+export const FileTransferButton: React.FC<FileTransferProps> = ({
+  targetDevice,
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isReady, connectToPeer, sendFile, transfers } = usePeerJS();
+  const { isReady, connectToPeer, sendFile } = usePeerJS();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
     try {
+      // 如果是字符串，转换为对象
+      const deviceObj =
+        typeof targetDevice === "string"
+          ? { id: targetDevice, name: targetDevice, ip: targetDevice }
+          : targetDevice;
+
       // 确保连接已建立
-      await connectToPeer(targetDevice.ip);
+      await connectToPeer(deviceObj.ip);
 
       // 发送每个选择的文件
       for (let i = 0; i < e.target.files.length; i++) {
-        await sendFile(targetDevice.ip, e.target.files[i]);
+        await sendFile(deviceObj.ip, e.target.files[i]);
       }
 
       // 清除选择的文件
@@ -38,9 +48,6 @@ export const FileTransfer: React.FC<FileTransferProps> = ({ targetDevice }) => {
       alert(`文件传输失败: ${errorMessage}`);
     }
   };
-
-  // 获取与当前设备相关的传输
-  const deviceTransfers = transfers.filter((t) => t.peerId === targetDevice.ip);
 
   return (
     <div className="p-4 space-y-4">
@@ -63,35 +70,9 @@ export const FileTransfer: React.FC<FileTransferProps> = ({ targetDevice }) => {
           {isReady ? "准备就绪" : "初始化中..."}
         </span>
       </div>
-
-      {deviceTransfers.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <h3 className="font-medium">文件传输</h3>
-          {deviceTransfers.map((transfer) => (
-            <div key={transfer.id} className="p-3 bg-gray-50 rounded-md">
-              <div className="flex justify-between">
-                <span className="font-medium">{transfer.name}</span>
-                <span className="text-sm text-gray-500">
-                  {(transfer.size / 1024 / 1024).toFixed(2)} MB
-                  {" · "}
-                  {transfer.direction === "upload" ? "发送" : "接收"}
-                </span>
-              </div>
-              <Progress value={transfer.progress} max={100} className="mt-2" />
-              <div className="flex justify-between mt-1 text-sm">
-                <span>
-                  {transfer.status === "pending" && "准备中..."}
-                  {transfer.status === "transferring" &&
-                    `${transfer.progress}%`}
-                  {transfer.status === "completed" && "已完成"}
-                  {transfer.status === "error" && "传输失败"}
-                </span>
-                <span>{transfer.type}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
+
+// 更新导出名称
+export default FileTransferButton;

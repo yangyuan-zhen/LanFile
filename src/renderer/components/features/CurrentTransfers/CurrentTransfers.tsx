@@ -1,45 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { useGlobalPeerJS } from "../../../contexts/PeerJSContext";
 import {
-  Progress,
-  Card,
   Text,
   Flex,
   Box,
   Icon,
   IconButton,
   Tooltip,
-  Button,
   Badge,
-  Collapse,
-  Divider,
 } from "@chakra-ui/react";
-import {
-  FaUpload,
-  FaDownload,
-  FaCheck,
-  FaTimes,
-  FaExclamationTriangle,
-  FaInbox,
-  FaFolder,
-  FaFile,
-  FaChevronUp,
-  FaChevronDown,
-  FaTrash,
-} from "react-icons/fa";
+import { FaCheck, FaInbox, FaChevronUp, FaChevronDown } from "react-icons/fa";
 import type { FileTransfer } from "../../../hooks/usePeerJS";
 import TransferItem from "./TransferItem";
 
 export const CurrentTransfers: React.FC = () => {
   const peerContext = useGlobalPeerJS();
-  const { transfers } = peerContext;
+  const { transfers } = peerContext || { transfers: [] };
   const [isExpanded, setIsExpanded] = useState(true);
   const [showCompleted, setShowCompleted] = useState(true);
-
-  // 添加调试日志
-  useEffect(() => {
-    console.log("[CurrentTransfers] 传输状态更新:", transfers);
-  }, [transfers]);
 
   // 过滤和排序传输
   const filteredTransfers = transfers
@@ -79,6 +57,17 @@ export const CurrentTransfers: React.FC = () => {
     return (bytesPerSecond / (1024 * 1024)).toFixed(1) + " MB/s";
   };
 
+  // 添加转换剩余时间的函数
+  const formatTimeRemaining = (seconds?: number): string => {
+    if (!seconds) return "";
+    if (seconds < 60) return `${Math.ceil(seconds)}秒`;
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.ceil(seconds % 60);
+
+    return `${minutes}分${remainingSeconds}秒`;
+  };
+
   // 获取状态文本
   const getStatusText = (status: FileTransfer["status"]): string => {
     switch (status) {
@@ -113,86 +102,85 @@ export const CurrentTransfers: React.FC = () => {
       width="350px"
       zIndex={9999}
       borderRadius="md"
-      overflow="visible"
+      overflow="hidden"
       boxShadow="0 0 20px rgba(0,0,0,0.3)"
       bg="white"
     >
-      <Card p={0} bg="white" borderRadius="md">
-        {/* 标题栏 - 更明显的样式 */}
-        <Flex
-          justify="space-between"
-          align="center"
-          p={3}
-          bg="gray.50"
-          borderBottom="1px solid"
-          borderColor="gray.200"
-        >
-          <Flex align="center">
-            <Text fontWeight="bold">文件传输</Text>
-            {activeCount > 0 && (
-              <Badge ml={2} colorScheme="blue" borderRadius="full">
-                {activeCount} 进行中
-              </Badge>
-            )}
-          </Flex>
-
-          <Flex>
-            {completedCount > 0 && (
-              <Tooltip label={showCompleted ? "隐藏已完成" : "显示已完成"}>
-                <IconButton
-                  aria-label={showCompleted ? "隐藏已完成" : "显示已完成"}
-                  icon={<FaCheck />}
-                  size="sm"
-                  variant="ghost"
-                  colorScheme={showCompleted ? "green" : "gray"}
-                  onClick={() => setShowCompleted(!showCompleted)}
-                  mr={1}
-                />
-              </Tooltip>
-            )}
-            <Tooltip label={isExpanded ? "收起" : "展开"}>
-              <IconButton
-                aria-label={isExpanded ? "收起" : "展开"}
-                icon={isExpanded ? <FaChevronDown /> : <FaChevronUp />}
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsExpanded(!isExpanded)}
-              />
-            </Tooltip>
-          </Flex>
+      {/* 标题栏 */}
+      <Flex
+        justify="space-between"
+        align="center"
+        p={3}
+        bg="gray.50"
+        borderBottom={isExpanded ? "1px solid" : "none"}
+        borderColor="gray.200"
+      >
+        <Flex align="center">
+          <Text fontWeight="bold">文件传输</Text>
+          {activeCount > 0 && (
+            <Badge ml={2} colorScheme="blue" borderRadius="full">
+              {activeCount} 进行中
+            </Badge>
+          )}
         </Flex>
 
-        {/* 内容区 */}
-        <Collapse in={isExpanded} animateOpacity>
-          <Box p={3} maxHeight="400px" overflowY="auto">
-            {!transfers || filteredTransfers.length === 0 ? (
-              <Flex
-                direction="column"
-                align="center"
-                justify="center"
-                py={6}
-                color="gray.500"
-              >
-                <Icon as={FaInbox} boxSize={8} mb={3} />
-                <Text>暂无传输任务</Text>
-              </Flex>
-            ) : (
-              filteredTransfers.map((transfer) => (
-                <Box key={transfer.id} mb={3}>
-                  <TransferItem
-                    transfer={transfer}
-                    formatSize={formatSize}
-                    formatSpeed={formatSpeed}
-                    getStatusText={getStatusText}
-                    openFileLocation={openFileLocation}
-                    openFile={openFile}
-                  />
-                </Box>
-              ))
-            )}
-          </Box>
-        </Collapse>
-      </Card>
+        <Flex>
+          {completedCount > 0 && (
+            <Tooltip label={showCompleted ? "隐藏已完成" : "显示已完成"}>
+              <IconButton
+                aria-label={showCompleted ? "隐藏已完成" : "显示已完成"}
+                icon={<FaCheck />}
+                size="sm"
+                variant="ghost"
+                colorScheme={showCompleted ? "green" : "gray"}
+                onClick={() => setShowCompleted((prev) => !prev)}
+                mr={1}
+              />
+            </Tooltip>
+          )}
+          <Tooltip label={isExpanded ? "收起" : "展开"}>
+            <IconButton
+              aria-label={isExpanded ? "收起" : "展开"}
+              icon={isExpanded ? <FaChevronDown /> : <FaChevronUp />}
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsExpanded((prev) => !prev)}
+            />
+          </Tooltip>
+        </Flex>
+      </Flex>
+
+      {/* 内容区 - 使用简单的条件渲染替代Collapse组件 */}
+      {isExpanded && (
+        <Box p={3} maxHeight="400px" overflowY="auto">
+          {!transfers || filteredTransfers.length === 0 ? (
+            <Flex
+              direction="column"
+              align="center"
+              justify="center"
+              py={6}
+              color="gray.500"
+            >
+              <Icon as={FaInbox} boxSize={8} mb={3} />
+              <Text>暂无传输任务</Text>
+            </Flex>
+          ) : (
+            filteredTransfers.map((transfer) => (
+              <Box key={transfer.id} mb={3}>
+                <TransferItem
+                  transfer={transfer}
+                  formatSize={formatSize}
+                  formatSpeed={formatSpeed}
+                  formatTimeRemaining={formatTimeRemaining}
+                  getStatusText={getStatusText}
+                  openFileLocation={openFileLocation}
+                  openFile={openFile}
+                />
+              </Box>
+            ))
+          )}
+        </Box>
+      )}
     </Box>
   );
 };

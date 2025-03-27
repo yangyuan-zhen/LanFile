@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ChevronLeft, Image, FileVideo, FileText, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { FileTransferButton } from "../../components/FileTransfer";
 
 interface FileItem {
   id: string;
@@ -11,7 +12,15 @@ interface FileItem {
 
 export const SendPage: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedDevice, setSelectedDevice] = useState("Unknown Device");
+  const [selectedDevice, setSelectedDevice] = useState<{
+    id: string;
+    name: string;
+    ip: string;
+  }>({
+    id: "unknown",
+    name: "未知设备",
+    ip: "127.0.0.1",
+  });
   const [activeTab, setActiveTab] = useState<
     "all" | "images" | "videos" | "documents"
   >("all");
@@ -75,7 +84,7 @@ export const SendPage: React.FC = () => {
             Change
           </button>
         </div>
-        <div className="mt-1 text-base font-medium">{selectedDevice}</div>
+        <div className="mt-1 text-base font-medium">{selectedDevice.name}</div>
       </div>
 
       {/* Tabs */}
@@ -124,6 +133,8 @@ export const SendPage: React.FC = () => {
           <span className="font-medium">Add Files</span>
         </button>
       </div>
+
+      <FileTransferButton targetDevice={selectedDevice.name} />
     </div>
   );
 };

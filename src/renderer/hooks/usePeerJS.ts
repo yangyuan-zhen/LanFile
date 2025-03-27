@@ -11,8 +11,9 @@ export interface FileTransfer {
     status: 'pending' | 'transferring' | 'completed' | 'error';
     direction: 'upload' | 'download';
     peerId: string;
-    savedPath?: string;
     speed?: number;
+    timeRemaining?: number;
+    savedPath?: string;
 }
 
 const debug = (message: string, ...args: any[]) => {
@@ -33,8 +34,13 @@ export const usePeerJS = () => {
     const fileChunks = useRef<Record<string, Uint8Array[]>>({});
     const fileInfo = useRef<Record<string, any>>({});
 
-    // 添加速度计算
-    const transferTimes = useRef<Record<string, { lastTime: number; lastBytes: number }>>({});
+    // 修改 transferTimes 的类型定义
+    const transferTimes = useRef<Record<string, {
+        lastTime: number;
+        lastBytes: number;
+        startTime: number;
+        totalBytes: number;
+    }>>({});
 
     const { chunkSize } = useSettings();
 
@@ -178,7 +184,7 @@ export const usePeerJS = () => {
                 const progress = Math.min(100, Math.floor((receivedSize / fileInfo.current[transferId].size) * 100));
 
                 // 更新传输进度
-                updateTransferProgress(transferId, receivedSize);
+                updateTransferProgress(transferId, receivedSize, fileInfo.current[transferId].size);
             }
             else if (data.type === 'file-complete') {
                 const transferId = data.transferId;
@@ -380,12 +386,8 @@ export const usePeerJS = () => {
                     });
                 }
 
-                // 生成传输ID
-                const transferId = `transfer-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-
                 // 创建传输记录
-                const transfer: FileTransfer = {
-                    id: transferId,
+                const transferId = addFileTransfer({
                     name: file.name,
                     size: file.size,
                     type: file.type,
@@ -393,24 +395,49 @@ export const usePeerJS = () => {
                     status: 'pending',
                     direction: 'upload',
                     peerId: conn.peer
+                });
+
+                // 分块发送逻辑
+                let offset = 0;
+                let chunkIndex = 0;
+                const totalChunks = Math.ceil(file.size / chunkSize);
+
+                // 使用与接收端相同的进度跟踪结构
+                transferTimes.current[transferId] = {
+                    lastTime: Date.now(),
+                    lastBytes: 0,
+                    startTime: Date.now(),
+                    totalBytes: 0
                 };
 
-                setTransfers(prev => [...prev, transfer]);
+                // 发送文件的每个分块
+                while (offset < file.size) {
+                    const chunk = await readFileChunk(file, offset, chunkSize);
 
-                // 发送文件信息并等待确认
-                const fileInfoReceived = await sendFileInfo(conn, file, transferId);
+                    // 构建消息
+                    conn.send({
+                        type: 'file-chunk',
+                        transferId,
+                        chunk,
+                        index: chunkIndex,
+                        total: totalChunks
+                    });
 
-                if (!fileInfoReceived) {
-                    throw new Error('文件信息发送失败，对方未确认接收');
+                    // 更新已发送的字节数
+                    offset += chunk.byteLength;
+                    chunkIndex++;
+
+                    // 更新发送进度
+                    updateUploadProgress(transferId, offset, file.size);
+
+                    // 简单的流量控制 - 可选
+                    await new Promise(resolve => setTimeout(resolve, 10));
                 }
 
-                // 开始文件传输
-                await sendFileChunks(conn, file, transferId);
-
-                resolve(transferId);
+                return transferId;
             } catch (error) {
-                console.error("发送文件准备阶段失败:", error);
-                reject(error);
+                console.error('发送文件失败:', error);
+                throw error;
             }
         });
     }, [connections, connectToPeer]);
@@ -493,7 +520,7 @@ export const usePeerJS = () => {
                 offset += bytesRead;
 
                 // 使用 updateTransferProgress 替代直接的 setTransfers
-                updateTransferProgress(transferId, offset);
+                updateTransferProgress(transferId, offset, file.size);
 
                 if (offset < file.size) {
                     readSlice(offset);
@@ -553,56 +580,22 @@ export const usePeerJS = () => {
     }
 
     // 修改更新传输进度的函数，添加速度计算
-    const updateTransferProgress = (transferId: string, bytesReceived: number) => {
-        const now = Date.now();
-
-        // 获取文件总大小并计算进度
-        const fileSize = fileInfo.current[transferId]?.size || 0;
+    const updateTransferProgress = (transferId: string, bytesReceived: number, fileSize: number) => {
         const progress = Math.min(100, Math.floor((bytesReceived / fileSize) * 100));
 
-        console.log(`更新传输进度: ${transferId}, 进度: ${progress}%, ${bytesReceived}/${fileSize} 字节`);
-        console.log(`文件传输进度更新: ${transferId}, 进度: ${progress}%`);
+        console.log(`传输进度更新: ${transferId}, ${progress}%, ${bytesReceived}/${fileSize} 字节`);
 
-        // 计算传输速度
-        if (!transferTimes.current[transferId]) {
-            transferTimes.current[transferId] = { lastTime: now, lastBytes: 0 };
-        }
-
-        const { lastTime, lastBytes } = transferTimes.current[transferId];
-        const timeDiff = now - lastTime; // 毫秒
-        let speed = undefined;
-
-        // 至少100ms计算一次速度，避免频繁计算
-        if (timeDiff > 100) {
-            const bytesDiff = bytesReceived - lastBytes;
-            speed = bytesDiff / (timeDiff / 1000); // 字节/秒
-
-            // 更新时间和字节数
-            transferTimes.current[transferId] = { lastTime: now, lastBytes: bytesReceived };
-        }
-
-        // 使用函数式更新确保状态正确更新
-        setTransfers((prevTransfers) => {
-            console.log("更新前的传输数组:", prevTransfers);
-            // 检查传输ID是否存在
-            const transferExists = prevTransfers.some(t => t.id === transferId);
-            let updatedTransfers;
-
-            if (transferExists) {
-                // 更新现有传输
-                updatedTransfers = prevTransfers.map(t =>
-                    t.id === transferId
-                        ? { ...t, progress, status: 'transferring' as const, speed }
-                        : t
-                );
-            } else {
-                // 如果传输不存在，可能需要创建一个
-                console.warn(`找不到ID为${transferId}的传输，无法更新进度`);
-                updatedTransfers = prevTransfers;
-            }
-
-            console.log("更新后的传输数组:", updatedTransfers);
-            return updatedTransfers;
+        setTransfers(prev => {
+            return prev.map(t => {
+                if (t.id === transferId) {
+                    return {
+                        ...t,
+                        progress,
+                        status: progress >= 100 ? 'completed' : 'transferring'
+                    };
+                }
+                return t;
+            });
         });
     };
 
@@ -661,6 +654,96 @@ export const usePeerJS = () => {
         });
 
         return id;
+    };
+
+    // 修改接收文件数据的函数以确保进度准确性
+    const handleFileChunk = (peerId: string, data: any) => {
+        if (data.type === 'file-chunk') {
+            const { transferId, chunk, index, total } = data;
+
+            // 存储接收到的数据块
+            if (!fileChunks.current[transferId]) {
+                fileChunks.current[transferId] = [];
+            }
+            fileChunks.current[transferId][index] = new Uint8Array(chunk);
+
+            // 获取文件信息
+            const fileSize = fileInfo.current[transferId]?.size || 0;
+
+            // 计算已接收字节数 - 更精确的计算方式
+            let bytesReceived = 0;
+            fileChunks.current[transferId].forEach(chunk => {
+                if (chunk) bytesReceived += chunk.byteLength;
+            });
+
+            // 更新接收进度
+            updateTransferProgress(transferId, bytesReceived, fileSize);
+
+            // 如果是最后一个块并且所有块都已接收，完成传输
+            if (index === total - 1 && fileChunks.current[transferId].filter(Boolean).length === total) {
+                completeTransfer(transferId);
+            }
+        }
+    };
+
+    // 添加发送进度更新函数
+    const updateUploadProgress = (transferId: string, bytesSent: number, fileSize: number) => {
+        const progress = Math.min(100, Math.floor((bytesSent / fileSize) * 100));
+        const now = Date.now();
+
+        // 获取时间统计数据
+        const timeStat = transferTimes.current[transferId];
+        if (!timeStat) return;
+
+        timeStat.totalBytes = bytesSent;
+
+        // 每200ms更新一次UI，避免频繁更新
+        if (now - timeStat.lastTime > 200) {
+            const bytesDiff = bytesSent - timeStat.lastBytes;
+            const timeDiff = (now - timeStat.lastTime) / 1000; // 转为秒
+            const speed = timeDiff > 0 ? bytesDiff / timeDiff : 0; // 字节/秒
+
+            // 更新统计数据
+            timeStat.lastTime = now;
+            timeStat.lastBytes = bytesSent;
+
+            // 计算剩余时间
+            const bytesRemaining = fileSize - bytesSent;
+            const timeRemaining = speed > 0 ? bytesRemaining / speed : 0;
+
+            // 更新传输状态
+            setTransfers(prev => prev.map(t => {
+                if (t.id === transferId) {
+                    return {
+                        ...t,
+                        progress,
+                        status: progress >= 100 ? 'completed' : 'transferring',
+                        speed,
+                        timeRemaining
+                    };
+                }
+                return t;
+            }));
+        }
+    };
+
+    // 文件读取函数 - 添加在 updateUploadProgress 函数之后
+    const readFileChunk = (file: File, offset: number, length: number): Promise<ArrayBuffer> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            const blob = file.slice(offset, offset + length);
+
+            reader.onload = (e) => {
+                if (e.target?.result instanceof ArrayBuffer) {
+                    resolve(e.target.result);
+                } else {
+                    reject(new Error('读取文件失败: 无效的ArrayBuffer'));
+                }
+            };
+
+            reader.onerror = () => reject(new Error('读取文件块时出错'));
+            reader.readAsArrayBuffer(blob);
+        });
     };
 
     // 确保返回所有需要的属性和方法
