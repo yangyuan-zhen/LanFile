@@ -12,6 +12,11 @@ export const PeerJSProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const peerJSState = usePeerJS();
 
+  // 添加调试日志，监控状态变化
+  React.useEffect(() => {
+    console.log("PeerJS状态更新:", peerJSState.transfers);
+  }, [peerJSState.transfers]);
+
   return (
     <PeerJSContext.Provider value={peerJSState}>
       {children}

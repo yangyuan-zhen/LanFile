@@ -1,5 +1,5 @@
 import React from "react";
-import { usePeerJS } from "../../../hooks/usePeerJS";
+import { useGlobalPeerJS } from "../../../contexts/PeerJSContext";
 import {
   Progress,
   Card,
@@ -23,7 +23,7 @@ import {
 } from "react-icons/fa";
 
 export const CurrentTransfers: React.FC = () => {
-  const { transfers } = usePeerJS();
+  const { transfers } = useGlobalPeerJS();
 
   // 添加调试日志
   console.log("CurrentTransfers 渲染:", transfers);
@@ -47,24 +47,21 @@ export const CurrentTransfers: React.FC = () => {
     window.electron.invoke("file:openFile", path);
   };
 
-  // 临时调试用
+  // 恢复正常样式
   return (
     <Box
       position="fixed"
-      bottom="50px"
-      right="50px"
-      width="400px"
-      zIndex={9999}
-      bg="red.100" // 明显的背景色
-      p={4}
-      border="2px solid red"
+      bottom="20px"
+      right="20px"
+      width="350px"
+      zIndex={1000}
+      borderRadius="md"
+      overflow="hidden"
+      boxShadow="lg"
     >
-      <Text fontSize="lg" fontWeight="bold">
-        文件传输 ({transfers?.length || 0})
-      </Text>
-      <Card p={4} boxShadow="lg" bg="white" borderRadius="md">
+      <Card p={4} bg="white" borderRadius="md">
         <Text fontWeight="bold" mb={3}>
-          文件传输
+          文件传输 {transfers?.length > 0 && `(${transfers.length})`}
         </Text>
 
         {!transfers || transfers.length === 0 ? (
