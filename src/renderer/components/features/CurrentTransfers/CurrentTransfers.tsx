@@ -9,6 +9,7 @@ import {
   Icon,
   IconButton,
   Tooltip,
+  Button,
 } from "@chakra-ui/react";
 import {
   FaUpload,
@@ -17,6 +18,8 @@ import {
   FaTimes,
   FaExclamationTriangle,
   FaInbox,
+  FaFolder,
+  FaFile,
 } from "react-icons/fa";
 
 export const CurrentTransfers: React.FC = () => {
@@ -29,6 +32,16 @@ export const CurrentTransfers: React.FC = () => {
     if (bytes < 1024 * 1024 * 1024)
       return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+  };
+
+  // 打开文件位置
+  const openFileLocation = (path: string) => {
+    window.electron.invoke("file:openFolder", path);
+  };
+
+  // 打开文件
+  const openFile = (path: string) => {
+    window.electron.invoke("file:openFile", path);
   };
 
   // 始终显示传输面板，即使没有传输任务
@@ -124,6 +137,33 @@ export const CurrentTransfers: React.FC = () => {
                   {transfer.direction === "upload" ? "上传中" : "下载中"}
                 </Text>
               </Flex>
+
+              {/* 为完成的下载添加文件操作按钮 */}
+              {transfer.status === "completed" &&
+                transfer.direction === "download" &&
+                transfer.savedPath && (
+                  <Flex mt={2} justify="flex-end">
+                    <Tooltip label="在文件夹中显示">
+                      <IconButton
+                        aria-label="在文件夹中显示"
+                        icon={<FaFolder />}
+                        size="sm"
+                        mr={2}
+                        onClick={() =>
+                          openFileLocation(transfer.savedPath as string)
+                        }
+                      />
+                    </Tooltip>
+                    <Tooltip label="打开文件">
+                      <IconButton
+                        aria-label="打开文件"
+                        icon={<FaFile />}
+                        size="sm"
+                        onClick={() => openFile(transfer.savedPath as string)}
+                      />
+                    </Tooltip>
+                  </Flex>
+                )}
             </Box>
           ))
         )}

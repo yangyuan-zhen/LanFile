@@ -20,5 +20,13 @@ contextBridge.exposeInMainWorld('electron', {
             });
         }
         // 其他现有的 invoke 调用...
+
+        // 添加打开文件和文件夹的API
+        if (channel === 'file:openFolder' && typeof args === 'string') {
+            return await ipcRenderer.invoke(channel, args);
+        }
+        if (channel === 'file:openFile' && typeof args === 'string') {
+            return await ipcRenderer.invoke(channel, args);
+        }
     }
 }); 

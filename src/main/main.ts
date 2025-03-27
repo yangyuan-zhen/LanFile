@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, shell } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import store from './store'; // 修改为默认导入
@@ -34,5 +34,30 @@ ipcMain.handle('file:saveToDownloads', async (event, args) => {
     } catch (error) {
         console.error('保存文件失败:', error);
         throw error;
+    }
+});
+
+// 打开文件所在文件夹
+ipcMain.handle('file:openFolder', async (event, filePath) => {
+    try {
+        // 在文件管理器中显示文件
+        const dirPath = path.dirname(filePath);
+        shell.showItemInFolder(filePath);
+        return { success: true };
+    } catch (error) {
+        console.error('打开文件夹失败:', error);
+        return { success: false, error: String(error) };
+    }
+});
+
+// 打开文件
+ipcMain.handle('file:openFile', async (event, filePath) => {
+    try {
+        // 打开文件
+        shell.openPath(filePath);
+        return { success: true };
+    } catch (error) {
+        console.error('打开文件失败:', error);
+        return { success: false, error: String(error) };
     }
 }); 
