@@ -11,6 +11,7 @@ interface FileTransfer {
     direction: 'upload' | 'download';
     peerId: string;
     savedPath?: string;
+    speed?: number;
 }
 
 export const usePeerJS = () => {
@@ -26,6 +27,9 @@ export const usePeerJS = () => {
     // 提升到全局，而不是每个连接单独维护
     const fileChunks = useRef<Record<string, Uint8Array[]>>({});
     const fileInfo = useRef<Record<string, any>>({});
+
+    // 添加速度计算
+    const transferTimes = useRef<Record<string, { lastTime: number; lastBytes: number }>>({});
 
     // 初始化PeerJS
     useEffect(() => {
@@ -165,12 +169,7 @@ export const usePeerJS = () => {
                 const progress = Math.min(100, Math.floor((receivedSize / fileInfo.current[transferId].size) * 100));
 
                 // 更新传输进度
-                setTransfers(prev => {
-                    const updated = prev.map(t => t.id === transferId ?
-                        { ...t, progress, status: 'transferring' as const } : t);
-                    console.log("传输状态更新:", updated);
-                    return updated;
-                });
+                updateTransferProgress(transferId, receivedSize);
             }
             else if (data.type === 'file-complete') {
                 const transferId = data.transferId;
@@ -473,12 +472,17 @@ export const usePeerJS = () => {
                 });
 
                 // 更新进度
-                offset += chunkSize;
-                const progress = Math.min(100, Math.floor((offset / file.size) * 100));
+                let bytesRead = 0;
+                if (e.target?.result instanceof ArrayBuffer) {
+                    bytesRead = e.target.result.byteLength;
+                } else {
+                    bytesRead = chunkSize; // 使用默认值
+                }
 
-                setTransfers(prev =>
-                    prev.map(t => t.id === transferId ? { ...t, progress } : t)
-                );
+                offset += bytesRead;
+
+                // 使用 updateTransferProgress 替代直接的 setTransfers
+                updateTransferProgress(transferId, offset);
 
                 if (offset < file.size) {
                     readSlice(offset);
@@ -533,6 +537,48 @@ export const usePeerJS = () => {
         connections.set(targetPeerId, conn);
         return conn;
     }
+
+    // 在更新传输进度的地方
+    const updateTransferProgress = (transferId: string, bytesReceived: number) => {
+        const now = Date.now();
+
+        // 获取文件总大小并计算进度 - 添加这两行
+        const fileSize = fileInfo.current[transferId]?.size || 0;
+        const progress = Math.min(100, Math.floor((bytesReceived / fileSize) * 100));
+
+        // 获取上次更新时间和字节数
+        if (!transferTimes.current[transferId]) {
+            transferTimes.current[transferId] = { lastTime: now, lastBytes: 0 };
+        }
+
+        const { lastTime, lastBytes } = transferTimes.current[transferId];
+        const timeDiff = now - lastTime; // 毫秒
+
+        // 至少100ms计算一次速度，避免频繁计算
+        if (timeDiff > 100) {
+            const bytesDiff = bytesReceived - lastBytes;
+            const speed = bytesDiff / (timeDiff / 1000); // 字节/秒
+
+            // 更新时间和字节数
+            transferTimes.current[transferId] = { lastTime: now, lastBytes: bytesReceived };
+
+            // 更新传输状态
+            setTransfers(prev => {
+                const updated = prev.map(t => t.id === transferId ?
+                    { ...t, progress, status: 'transferring' as const, speed } : t);
+                console.log("传输状态更新:", updated);
+                return updated;
+            });
+        } else {
+            // 不计算速度，只更新进度
+            setTransfers(prev => {
+                const updated = prev.map(t => t.id === transferId ?
+                    { ...t, progress, status: 'transferring' as const } : t);
+                console.log("传输状态更新:", updated);
+                return updated;
+            });
+        }
+    };
 
     // 确保返回所有需要的属性和方法
     return {
