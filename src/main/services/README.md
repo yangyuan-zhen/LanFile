@@ -130,23 +130,23 @@ async function checkTcpConnection(ip: string, port: number): Promise<boolean> {
 ```typescript
 // 建立 WebSocket 服务器
 const server = new WebSocketServer({
-    port,
-    perMessageDeflate: {
-        // 压缩配置...
+  port,
+  perMessageDeflate: {
+    zlibDeflateOptions: {
+      chunkSize: 1024,
+      memLevel: 7,
+      level: 3,
     },
-    maxPayload: 50 * 1024 * 1024
+    zlibInflateOptions: {
+      chunkSize: 10 * 1024,
+    },
+    clientNoContextTakeover: true,
+    serverNoContextTakeover: true,
+    serverMaxWindowBits: 10,
+    concurrencyLimit: 10,
+    threshold: 1024,
+  },
 });
-
-// 消息转发
-public sendToDevice(deviceId: string, message: SignalingMessage): boolean {
-    if (!this.connections.has(deviceId)) {
-        return false;
-    }
-
-    const connection = this.connections.get(deviceId);
-    connection?.send(JSON.stringify(message));
-    return true;
-}
 ```
 
 ### 3.4 文件操作与传输
@@ -204,69 +204,96 @@ private writeLog(level: string, args: any[]) {
 }
 ```
 
-## 4. 技术实现
+## 4. 设备发现与连接架构
 
-### 4.1 事件驱动架构
+LanFile_PC 实现了强大的设备发现和连接架构，采用多层策略确保在各种网络环境下的可靠通信。
 
-服务模块广泛采用 Node.js 的 `EventEmitter` 模式，实现松耦合的组件通信：
+### 4.1 核心服务组件
 
-```typescript
-export class MDNSService {
-  private eventListeners: { [key: string]: Function[] } = {};
+| 服务名称                 | 职责           | 端口 | 协议 |
+| ------------------------ | -------------- | ---- | ---- |
+| **MDNSService**          | 设备发现       | 5353 | UDP  |
+| **HeartbeatService**     | 设备在线状态   | 8080 | TCP  |
+| **PeerDiscoveryService** | PeerJS ID 交换 | 8765 | TCP  |
 
-  public on(event: string, callback: Function): void {
-    if (!this.eventListeners[event]) {
-      this.eventListeners[event] = [];
-    }
-    this.eventListeners[event].push(callback);
-  }
+### 4.2 工作原理
 
-  private emit(event: string, ...args: any[]): void {
-    if (!this.eventListeners[event]) return;
-    this.eventListeners[event].forEach((callback) => callback(...args));
-  }
-}
+#### 设备发现流程
+
+```
+用户打开应用
+  ↓
+启动 MDNSService (mDNS/Bonjour)
+  ↓
+发布本机服务 (包含心跳端口信息)
+  ↓
+监听网络中的其他设备广播
+  ↓
+发现设备后记录其 IP 地址和服务信息
 ```
 
-### 4.2 单例模式
+#### 设备在线检测
 
-大多数服务使用单例模式，确保全局只有一个服务实例：
-
-```typescript
-// HeartbeatService.ts
-export const heartbeatService = new HeartbeatService();
-export default heartbeatService;
-
-// WebSocketSignalingService.ts
-export const webSocketSignalingService = new WebSocketSignalingService();
-
-// ZeroconfService.ts
-export const zeroconfService = ZeroconfService.getInstance();
+```
+发现设备后
+  ↓
+通过多端口 TCP 连接测试检查设备在线状态
+  | → 心跳服务端口 (8080)
+  | → PeerDiscovery端口 (8765)
+  ↓
+任一连接成功即认为设备在线
 ```
 
-### 4.3 自动端口管理
+#### 文件传输准备
 
-服务模块实现了智能端口管理，自动处理端口冲突：
-
-```typescript
-// 在 HeartbeatService 中
-this.server.on("error", (error: any) => {
-  if (error.code === "EADDRINUSE") {
-    console.log(`端口 ${this.port} 已被占用，尝试使用 ${this.port + 1}`);
-    this.port++;
-    this.setupServer(); // 尝试使用下一个端口
-  }
-});
-
-// 在 WebSocketSignalingService 中
-if (error.code === "EADDRINUSE") {
-  logService.log(`端口 ${port} 已被占用，尝试端口 ${port + 1}`);
-  // 递增端口并重试
-  tryStartServer(port + 1, maxRetries, retryCount + 1);
-}
+```
+检测到在线设备
+  ↓
+通过 PeerDiscoveryService 获取对方的 PeerJS ID
+  ↓
+使用 PeerJS 建立 WebRTC 连接
+  ↓
+通过建立的数据通道传输文件
 ```
 
-### 4.4 错误处理与重试机制
+### 4.3 防火墙配置
+
+LanFile_PC 在 Windows 平台上自动配置防火墙规则，允许以下端口的入站流量：
+
+- UDP 5353: mDNS 服务用于设备发现
+- TCP 8080: 心跳服务用于设备状态检测
+- TCP 8765: PeerDiscovery 服务用于 PeerJS ID 交换
+
+### 4.4 故障排除
+
+如果无法发现设备或设备显示为离线，请尝试以下步骤：
+
+1. **检查网络连接**: 确保两台设备在同一局域网中
+2. **检查防火墙设置**: 验证必要端口是否开放
+   ```
+   netsh advfirewall firewall show rule name=all | findstr "LanFile"
+   ```
+3. **检查服务状态**: 在应用控制台日志中确认各服务是否正常启动
+4. **手动进行连接测试**: 使用以下命令测试连接
+   ```
+   telnet [设备IP] 8080
+   telnet [设备IP] 8765
+   ```
+
+### 4.5 服务间交互
+
+- **MDNSService → HeartbeatService**: 广播包含心跳服务端口的设备信息
+- **NetworkService → HeartbeatService + PeerDiscoveryService**: 使用两个服务的端口进行设备检测
+- **PeerDiscoveryService → PeerJS**: 支持基于 IP 的 WebRTC 连接建立
+
+### 4.6 设计优势
+
+1. **多层检测**: 通过多种机制和端口增强设备发现可靠性
+2. **自动配置**: 防火墙规则自动配置减少手动设置需求
+3. **优雅降级**: 当一种检测方法失败时尝试其他方法
+4. **透明化**: 详细日志记录便于调试和故障排除
+
+## 5. 错误处理与重试机制
 
 服务实现了健壮的错误处理和自动重连机制：
 
@@ -295,9 +322,9 @@ private shouldAttemptReconnect(deviceId: string): boolean {
 }
 ```
 
-## 5. 交互关系
+## 6. 交互关系
 
-### 5.1 服务间交互
+### 6.1 服务间交互
 
 服务模块之间存在多种依赖和交互关系：
 
@@ -306,7 +333,7 @@ private shouldAttemptReconnect(deviceId: string): boolean {
 - **`NetworkService` → `WebSocketSignalingService`**：网络服务检测设备连接状态，为信令服务提供支持
 - **`DirectIPService` ↔ `WebSocketSignalingService`**：信令服务可用于协商建立直接 TCP 连接
 
-### 5.2 与渲染进程的交互
+### 6.2 与渲染进程的交互
 
 服务通过 Electron 的 IPC 机制与渲染进程交互：
 
@@ -330,7 +357,7 @@ export const registerNetworkHandlers = () => {
 };
 ```
 
-### 5.3 与外部系统的交互
+### 6.3 与外部系统的交互
 
 服务与外部系统和网络资源交互：
 
@@ -338,50 +365,50 @@ export const registerNetworkHandlers = () => {
 - **系统资源**：文件系统（日志文件）、网络接口
 - **第三方库**：Bonjour、WebSocket、Node.js 核心模块
 
-## 6. 优化方向
+## 7. 优化方向
 
-### 6.1 性能优化
+### 7.1 性能优化
 
 - **消息处理效率**：优化 WebSocket 消息处理，减少 JSON 解析/序列化开销
 - **连接池管理**：实现更高效的连接池机制，减少连接建立开销
 - **资源使用优化**：优化内存使用，避免大文件传输时的内存溢出问题
 
-### 6.2 可靠性提升
+### 7.2 可靠性提升
 
 - **连接恢复机制**：增强断线重连机制，支持会话恢复
 - **传输验证**：添加文件传输完整性验证
 - **NAT 穿透**：改进 P2P 连接的 NAT 穿透能力，特别是在复杂网络环境中
 
-### 6.3 安全性增强
+### 7.3 安全性增强
 
 - **传输加密**：实现端到端加密传输，保护数据安全
 - **设备认证**：添加设备互相认证机制，防止未授权设备连接
 - **安全日志**：增强日志系统的安全性，敏感信息脱敏处理
 
-### 6.4 功能扩展
+### 7.4 功能扩展
 
 - **多通道传输**：支持多通道并行传输，提高传输速度
 - **断点续传**：实现大文件断点续传功能
 - **带宽控制**：添加传输速度限制功能，避免影响其他网络应用
 - **传输队列**：实现优先级传输队列，支持重要文件优先传输
 
-### 6.5 测试和监控
+### 7.5 测试和监控
 
 - **服务健康监控**：添加服务状态监控和统计功能
 - **自动化测试**：增加自动化测试覆盖，提高代码质量
 - **性能分析**：实现性能指标收集和分析，辅助优化决策
 
-## 7. 设备标识规范
+## 8. 设备标识规范
 
 为确保设备识别的一致性和可靠性，LanFile_PC 采用以下设备标识规范：
 
-### 7.1 设备 ID 格式
+### 8.1 设备 ID 格式
 
 - **主要标识符**: 设备 IP 地址（格式: `x.x.x.x`）
 - **辅助标识符**: 设备名称（用于显示，不用于内部识别）
 - **复合显示**: 在 UI 中可显示为"设备名称 (IP 地址)"
 
-### 7.2 标识符使用规范
+### 8.2 标识符使用规范
 
 - **连接建立**: 仅使用 IP 地址作为连接标识符
 - **设备查询**: 优先使用 IP 地址进行设备查询

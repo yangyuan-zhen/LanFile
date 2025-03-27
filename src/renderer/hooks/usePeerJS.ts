@@ -45,7 +45,11 @@ export const usePeerJS = () => {
                 // 创建 Peer 实例
                 const newPeer = new Peer(peerId, {
                     config: {
-                        iceServers: [] // 局域网中不需要 STUN/TURN 服务器
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' }
+                        ]
                     }
                 });
 
@@ -208,64 +212,95 @@ export const usePeerJS = () => {
 
     // 发送文件方法
     const sendFile = useCallback(async (peerIp: string, file: File) => {
-        try {
-            // 获取或建立连接
-            let conn = null;
+        console.log(`尝试向 ${peerIp} 发送文件: ${file.name}`);
 
-            // 查找现有连接
-            for (const [id, connection] of Object.entries(connections)) {
-                if (id.includes(peerIp)) {
-                    conn = connection;
-                    break;
-                }
-            }
+        if (!peer || !peer.open) {
+            await connectToPeer(peerIp);
+        }
 
-            // 如果没有连接，尝试建立连接
-            if (!conn) {
-                const connected = await connectToPeer(peerIp);
-                if (!connected) {
-                    throw new Error(`无法连接到设备 ${peerIp}`);
-                }
+        return new Promise<string>(async (resolve, reject) => {
+            try {
+                // 获取或等待建立连接
+                let conn = connections.get(peerIp);
 
-                // 重新获取连接
-                for (const [id, connection] of Object.entries(connections)) {
-                    if (id.includes(peerIp)) {
-                        conn = connection;
-                        break;
+                if (!conn) {
+                    console.log("连接不存在，正在重新连接...");
+                    conn = await connectToPeer(peerIp);
+
+                    // 等待连接打开
+                    if (!conn.open) {
+                        console.log("等待连接打开...");
+                        await new Promise<void>((openResolve, openReject) => {
+                            // 设置打开超时
+                            const timeout = setTimeout(() => {
+                                openReject(new Error("连接打开超时"));
+                            }, 10000);
+
+                            conn.on('open', () => {
+                                clearTimeout(timeout);
+                                openResolve();
+                            });
+
+                            conn.on('error', (err: any) => {
+                                clearTimeout(timeout);
+                                openReject(err);
+                            });
+                        });
                     }
                 }
+
+                // 确保连接已打开且数据通道可用
+                if (!conn.open || !conn.dataChannel) {
+                    console.log("连接未打开或数据通道不可用，等待重试...");
+                    // 等待数据通道准备就绪
+                    await new Promise<void>((resolveChannel, rejectChannel) => {
+                        const channelTimeout = setTimeout(() => {
+                            rejectChannel(new Error("数据通道准备超时"));
+                        }, 5000);
+
+                        // 定期检查数据通道状态
+                        const checkChannel = setInterval(() => {
+                            if (conn.dataChannel && conn.dataChannel.readyState === 'open') {
+                                clearInterval(checkChannel);
+                                clearTimeout(channelTimeout);
+                                resolveChannel();
+                            }
+                        }, 500);
+
+                        conn.on('error', (err: any) => {
+                            clearInterval(checkChannel);
+                            clearTimeout(channelTimeout);
+                            rejectChannel(err);
+                        });
+                    });
+                }
+
+                // 生成传输ID
+                const transferId = `transfer-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+
+                // 创建传输记录
+                const transfer: FileTransfer = {
+                    id: transferId,
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    progress: 0,
+                    status: 'pending',
+                    direction: 'upload',
+                    peerId: conn.peer
+                };
+
+                setTransfers(prev => [...prev, transfer]);
+
+                // 开始文件传输
+                await sendFileChunks(conn, file, transferId);
+
+                resolve(transferId);
+            } catch (error) {
+                console.error("发送文件准备阶段失败:", error);
+                reject(error);
             }
-
-            if (!conn) {
-                throw new Error('连接已建立但无法获取数据通道');
-            }
-
-            // 生成传输ID
-            const transferId = `transfer-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
-
-            // 创建传输记录
-            const transfer: FileTransfer = {
-                id: transferId,
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                progress: 0,
-                status: 'pending',
-                direction: 'upload',
-                peerId: conn.peer
-            };
-
-            setTransfers(prev => [...prev, transfer]);
-
-            // 开始文件传输
-            await sendFileChunks(conn, file, transferId);
-
-            return transferId;
-        } catch (error) {
-            console.error('发送文件失败:', error);
-            setError(`发送文件失败: ${error instanceof Error ? error.message : String(error)}`);
-            throw error;
-        }
+        });
     }, [connections, connectToPeer]);
 
     // 辅助函数：发送文件块
@@ -320,6 +355,31 @@ export const usePeerJS = () => {
             readSlice(0);
         });
     };
+
+    // 添加连接状态调试
+    function createConnection(targetPeerId: string) {
+        console.log(`创建到 ${targetPeerId} 的新连接`);
+        if (!peer) {
+            throw new Error('Peer 实例未初始化');
+        }
+
+        const conn = peer.connect(targetPeerId, {
+            reliable: true,
+            serialization: 'binary'
+        });
+
+        conn.on('open', () => {
+            console.log(`连接到 ${targetPeerId} 已打开，数据通道状态:`,
+                conn.dataChannel ? conn.dataChannel.readyState : '不存在');
+        });
+
+        conn.on('error', (err) => {
+            console.error(`连接到 ${targetPeerId} 发生错误:`, err);
+        });
+
+        connections.set(targetPeerId, conn);
+        return conn;
+    }
 
     // 确保返回所有需要的属性和方法
     return {
