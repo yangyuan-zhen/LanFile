@@ -153,7 +153,7 @@ export const usePeerJS = () => {
     const connectToPeer = useCallback(async (peerIp: string) => {
         if (isConnecting.current || !peer || !isReady) {
             console.log('连接尚未就绪或已有连接请求进行中');
-            return false;
+            return null;
         }
 
         isConnecting.current = true;
@@ -177,14 +177,14 @@ export const usePeerJS = () => {
                 serialization: 'binary'
             });
 
-            return new Promise<boolean>((resolve) => {
+            return new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     console.log('连接超时');
                     conn.close();
                     isConnecting.current = false;
                     setStatus('error');
                     setError(`连接到 ${peerIp} 超时`);
-                    resolve(false);
+                    reject(new Error('连接超时'));
                 }, 10000);
 
                 conn.on('open', () => {
@@ -195,7 +195,7 @@ export const usePeerJS = () => {
                     setConnections(newConnections);
                     isConnecting.current = false;
                     setStatus('connected');
-                    resolve(true);
+                    resolve(conn);
                 });
 
                 conn.on('error', (err) => {
@@ -204,7 +204,7 @@ export const usePeerJS = () => {
                     isConnecting.current = false;
                     setStatus('error');
                     setError(`连接失败: ${err.message}`);
-                    resolve(false);
+                    reject(err);
                 });
             });
         } catch (error) {
@@ -212,9 +212,9 @@ export const usePeerJS = () => {
             isConnecting.current = false;
             setStatus('error');
             setError(`连接失败: ${error instanceof Error ? error.message : String(error)}`);
-            return false;
+            throw error;
         }
-    }, [peer, isReady]);
+    }, [peer, isReady, connections]);
 
     // 发送文件方法
     const sendFile = useCallback(async (peerIp: string, file: File) => {
@@ -231,27 +231,12 @@ export const usePeerJS = () => {
 
                 if (!conn) {
                     console.log("连接不存在，正在重新连接...");
-                    conn = await connectToPeer(peerIp);
-
-                    // 等待连接打开
-                    if (!conn.open) {
-                        console.log("等待连接打开...");
-                        await new Promise<void>((openResolve, openReject) => {
-                            // 设置打开超时
-                            const timeout = setTimeout(() => {
-                                openReject(new Error("连接打开超时"));
-                            }, 10000);
-
-                            conn.on('open', () => {
-                                clearTimeout(timeout);
-                                openResolve();
-                            });
-
-                            conn.on('error', (err: any) => {
-                                clearTimeout(timeout);
-                                openReject(err);
-                            });
-                        });
+                    try {
+                        conn = await connectToPeer(peerIp);
+                        if (!conn) throw new Error("连接失败");
+                    } catch (error) {
+                        reject(error);
+                        return;
                     }
                 }
 
