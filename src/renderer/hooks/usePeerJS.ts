@@ -665,7 +665,7 @@ export const usePeerJS = () => {
         }
     };
 
-    // 修改 completeTransfer 函数中的文件保存逻辑
+    // 完善 completeTransfer 函数实现
     const completeTransfer = async (transferId: string) => {
         try {
             const chunks = fileChunks.current[transferId];
