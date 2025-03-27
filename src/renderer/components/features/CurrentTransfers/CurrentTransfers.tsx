@@ -150,7 +150,6 @@ export const CurrentTransfers: React.FC = () => {
         </Flex>
       </Flex>
 
-      {/* 内容区 - 使用简单的条件渲染替代Collapse组件 */}
       {isExpanded && (
         <Box p={3} maxHeight="400px" overflowY="auto">
           {!transfers || filteredTransfers.length === 0 ? (
