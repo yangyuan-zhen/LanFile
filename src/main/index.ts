@@ -524,7 +524,7 @@ async function configureWindowsFirewall() {
     addFirewallRule('LanFileMDNS', 'UDP', 5353);
 }
 
-function addFirewallRule(name, protocol, port) {
+function addFirewallRule(name: string, protocol: string, port: number) {
     const { spawn } = require('child_process');
     const addRule = spawn('netsh', [
         'advfirewall', 'firewall', 'add', 'rule',
@@ -536,7 +536,7 @@ function addFirewallRule(name, protocol, port) {
         `localport=${port}`
     ]);
 
-    addRule.on('close', (code) => {
+    addRule.on('close', (code: number | null) => {
         console.log(`添加防火墙规则 ${name} ${protocol}:${port} ${code === 0 ? '成功' : '失败'}`);
     });
 }
