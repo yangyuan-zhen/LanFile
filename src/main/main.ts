@@ -96,4 +96,14 @@ app.whenReady().then(() => {
 app.on('will-quit', () => {
     heartbeatService.stop();
     mdnsService.destroy();
-}); 
+});
+
+// 在 app ready 事件处理程序中添加以下代码
+app.on('ready', async () => {
+    // ... 现有代码
+
+    // 启动 PeerJS 服务器
+    startPeerServer();
+
+    // ... 其他现有代码
+});
