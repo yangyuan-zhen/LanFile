@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Peer from 'peerjs';
 import { useSettings } from './useSettings';
 
-interface FileTransfer {
+export interface FileTransfer {
     id: string;
     name: string;
     size: number;
@@ -218,6 +218,9 @@ export const usePeerJS = () => {
                         prev.map(t => t.id === transferId ?
                             { ...t, progress: 100, status: 'completed' as const, savedPath } : t)
                     );
+
+                    // 触发文件清理事件
+                    window.dispatchEvent(new CustomEvent('file-transfer-complete'));
                 }).catch((error: any) => {
                     console.error('文件保存失败:', error);
                     setTransfers(prev =>
@@ -502,6 +505,9 @@ export const usePeerJS = () => {
                         prev.map(t => t.id === transferId ?
                             { ...t, progress: 100, status: 'completed' as const } : t)
                     );
+
+                    // 触发文件清理事件
+                    window.dispatchEvent(new CustomEvent('file-transfer-complete'));
                     resolve();
                 }
             };

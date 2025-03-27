@@ -26,6 +26,9 @@ interface NotificationContextType {
   markAllAsRead: () => void;
   markAsRead: (id: string) => void;
   clearAll: () => void;
+  removeNotification: (id: string) => void;
+  deleteNotification?: (id: string) => void;
+  dismissNotification?: (id: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -123,6 +126,13 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     setNotifications([]);
   };
 
+  // 添加 removeNotification 实现
+  const removeNotification = (id: string) => {
+    setNotifications((prev) =>
+      prev.filter((notification) => notification.id !== id)
+    );
+  };
+
   return (
     <NotificationContext.Provider
       value={{
@@ -132,6 +142,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         markAllAsRead,
         markAsRead,
         clearAll,
+        removeNotification,
       }}
     >
       {children}

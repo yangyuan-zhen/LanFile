@@ -5,8 +5,8 @@ import { Bell } from "lucide-react";
 
 const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { notifications, unreadCount, markAllAsRead, markAsRead, clearAll } =
-    useNotifications();
+  const { notifications, removeNotification } = useNotifications();
+  const [hasUnread, setHasUnread] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // 点击外部关闭下拉
@@ -24,6 +24,20 @@ const NotificationDropdown: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    // 检查是否有未读通知
+    if (notifications.some((n) => !n.read)) {
+      setHasUnread(true);
+    }
+  }, [notifications]);
+
+  const toggleDropdown = () => {
+    setIsOpen(!isOpen);
+    if (isOpen) {
+      setHasUnread(false);
+    }
+  };
+
   // 格式化时间
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -33,81 +47,71 @@ const NotificationDropdown: React.FC = () => {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        className="relative p-2 text-gray-400 hover:text-gray-600"
-        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-2 text-gray-600 hover:text-gray-800"
+        onClick={toggleDropdown}
       >
-        <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex justify-center items-center min-w-[16px] h-4 px-1 bg-red-500 rounded-full text-white text-xs">
-            {unreadCount}
-          </span>
+        <Bell className="w-6 h-6" />
+        {hasUnread && (
+          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg z-10">
-          <div className="p-3 border-b border-gray-100">
-            <div className="flex justify-between items-center">
-              <h3 className="font-medium">通知</h3>
-              <div className="flex space-x-2">
-                {unreadCount > 0 && (
-                  <button
-                    onClick={markAllAsRead}
-                    className="text-xs text-blue-500 hover:text-blue-700"
-                  >
-                    全部标为已读
-                  </button>
-                )}
-                {notifications.length > 0 && (
-                  <button
-                    onClick={clearAll}
-                    className="text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    清空
-                  </button>
-                )}
-              </div>
-            </div>
+        <div className="absolute right-0 z-50 mt-2 w-80 bg-white rounded-md shadow-lg">
+          <div className="flex justify-between items-center p-2 border-b">
+            <h3 className="font-medium">通知</h3>
+            {notifications.length > 0 && (
+              <button
+                className="text-xs text-gray-500 hover:text-gray-700"
+                onClick={() =>
+                  notifications.forEach((n) => removeNotification(n.id))
+                }
+              >
+                清除全部
+              </button>
+            )}
           </div>
-
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="py-8 px-4 text-center text-gray-500">
-                暂无通知
-              </div>
+          <div className="overflow-y-auto max-h-80">
+            {notifications.length > 0 ? (
+              notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-3 border-b hover:bg-gray-50 ${
+                    !notification.read ? "bg-blue-50" : ""
+                  }`}
+                >
+                  <div className="flex justify-between">
+                    <p className="font-medium">{notification.title}</p>
+                    <button
+                      className="text-gray-400 hover:text-gray-600"
+                      onClick={() => removeNotification(notification.id)}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {notification.message}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {formatTime(notification.timestamp)}
+                  </p>
+                </div>
+              ))
             ) : (
-              <ul>
-                {notifications.map((notification) => (
-                  <li
-                    key={notification.id}
-                    className={`p-3 border-b border-gray-100 ${
-                      !notification.read ? "bg-blue-50" : ""
-                    }`}
-                  >
-                    <div className="flex justify-between">
-                      <div>
-                        <h4 className="font-medium text-sm">
-                          {notification.title}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {notification.message}
-                        </p>
-                        <span className="text-xs text-gray-400">
-                          {formatTime(notification.timestamp)}
-                        </span>
-                      </div>
-                      {!notification.read && (
-                        <button
-                          onClick={() => markAsRead(notification.id)}
-                          className="text-blue-500 hover:text-blue-700"
-                        >
-                          <FaCheck size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <div className="p-4 text-center text-gray-500">暂无通知</div>
             )}
           </div>
         </div>

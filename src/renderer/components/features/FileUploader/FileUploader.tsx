@@ -44,6 +44,23 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
       }
     }, [transfers, clearAfterUpload, selectedFiles]);
 
+    // 在组件内部添加事件监听器
+    useEffect(() => {
+      const handleTransferComplete = () => {
+        // 清除已选择的文件
+        setSelectedFiles([]);
+      };
+
+      window.addEventListener("file-transfer-complete", handleTransferComplete);
+
+      return () => {
+        window.removeEventListener(
+          "file-transfer-complete",
+          handleTransferComplete
+        );
+      };
+    }, []);
+
     // 处理文件上传
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;

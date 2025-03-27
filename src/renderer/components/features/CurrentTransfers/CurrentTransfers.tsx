@@ -27,6 +27,7 @@ import {
   FaChevronDown,
   FaTrash,
 } from "react-icons/fa";
+import type { FileTransfer } from "../../../hooks/usePeerJS";
 
 export const CurrentTransfers: React.FC = () => {
   const { transfers } = useGlobalPeerJS();
@@ -84,6 +85,65 @@ export const CurrentTransfers: React.FC = () => {
   // 打开文件
   const openFile = (path: string) => {
     window.electron.invoke("file:openFile", path);
+  };
+
+  // 在渲染传输项的部分添加进度条
+  const renderTransferItem = (transfer: FileTransfer) => (
+    <div className="flex items-center p-2 border-b">
+      <div className="flex-1">
+        <p className="font-medium">{transfer.name}</p>
+        <p className="text-sm text-gray-500">
+          {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
+          {transfer.peerId}
+        </p>
+
+        {/* 添加进度条 */}
+        <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+          <div
+            className={`h-2.5 rounded-full ${
+              transfer.status === "error"
+                ? "bg-red-500"
+                : transfer.status === "completed"
+                ? "bg-green-500"
+                : "bg-blue-500"
+            }`}
+            style={{ width: `${transfer.progress}%` }}
+          ></div>
+        </div>
+
+        {/* 添加状态和速度信息 */}
+        <div className="flex justify-between mt-1 text-xs">
+          <span>{getStatusText(transfer.status)}</span>
+          <span>
+            {formatSize(transfer.size * (transfer.progress / 100))}/
+            {formatSize(transfer.size)}
+          </span>
+          {transfer.speed && <span>{formatSpeed(transfer.speed)}</span>}
+        </div>
+      </div>
+    </div>
+  );
+
+  // 添加辅助函数
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "等待中";
+      case "transferring":
+        return "传输中";
+      case "completed":
+        return "已完成";
+      case "error":
+        return "错误";
+      default:
+        return status;
+    }
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   return (
