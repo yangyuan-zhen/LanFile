@@ -1,8 +1,10 @@
-import React, { useState, forwardRef } from "react";
+import React, { useState, forwardRef, useEffect } from "react";
 import { FolderUp, X } from "lucide-react";
+import { useGlobalPeerJS } from "../../../contexts/PeerJSContext";
 
 interface FileUploaderProps {
   onFileSelect?: (files: FileList) => void;
+  clearAfterUpload?: boolean;
 }
 
 interface PreviewFile {
@@ -12,9 +14,35 @@ interface PreviewFile {
 }
 
 const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
-  ({ onFileSelect }, ref) => {
+  ({ onFileSelect, clearAfterUpload = true }, ref) => {
     // 添加状态来跟踪已选择的文件
     const [selectedFiles, setSelectedFiles] = useState<PreviewFile[]>([]);
+    const { transfers } = useGlobalPeerJS();
+
+    // 清除所有选中的文件
+    const clearAllFiles = () => {
+      // 释放预览URL
+      selectedFiles.forEach((file) => {
+        if (file.preview) {
+          URL.revokeObjectURL(file.preview);
+        }
+      });
+
+      setSelectedFiles([]);
+    };
+
+    // 监听传输状态变化
+    useEffect(() => {
+      // 检查是否有传输完成
+      const hasCompletedUploads = transfers.some(
+        (t) => t.direction === "upload" && t.status === "completed"
+      );
+
+      // 如果有上传完成且启用了自动清除
+      if (hasCompletedUploads && clearAfterUpload && selectedFiles.length > 0) {
+        clearAllFiles();
+      }
+    }, [transfers, clearAfterUpload, selectedFiles]);
 
     // 处理文件上传
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,17 +115,6 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
       });
     };
 
-    // 清理组件卸载时的预览URL
-    React.useEffect(() => {
-      return () => {
-        selectedFiles.forEach((file) => {
-          if (file.preview) {
-            URL.revokeObjectURL(file.preview);
-          }
-        });
-      };
-    }, []);
-
     // 获取文件图标
     const getFileTypeIcon = (fileName: string) => {
       const extension = fileName.split(".").pop()?.toLowerCase();
@@ -130,6 +147,21 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
             </div>
           );
       }
+    };
+
+    // 添加清除所有按钮
+    const renderClearAllButton = () => {
+      if (selectedFiles.length > 0) {
+        return (
+          <button
+            onClick={clearAllFiles}
+            className="px-3 py-1 mt-2 text-xs text-gray-600 rounded-md border border-gray-200 hover:bg-gray-100"
+          >
+            清除全部
+          </button>
+        );
+      }
+      return null;
     };
 
     return (
@@ -173,7 +205,10 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
               className="overflow-y-auto p-4 h-full rounded-lg border border-gray-200"
               style={{ maxHeight: "300px" }}
             >
-              <h4 className="mb-3 font-medium text-gray-700">已选择的文件</h4>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-gray-700">已选择的文件</h4>
+                {renderClearAllButton()}
+              </div>
 
               {selectedFiles.length === 0 ? (
                 <div className="flex justify-center items-center h-32 text-gray-400">

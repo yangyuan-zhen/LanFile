@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Peer from 'peerjs';
+import { useSettings } from './useSettings';
 
 interface FileTransfer {
     id: string;
@@ -30,6 +31,8 @@ export const usePeerJS = () => {
 
     // 添加速度计算
     const transferTimes = useRef<Record<string, { lastTime: number; lastBytes: number }>>({});
+
+    const { chunkSize } = useSettings();
 
     // 初始化PeerJS
     useEffect(() => {
@@ -450,7 +453,6 @@ export const usePeerJS = () => {
 
     // 辅助函数：发送文件块
     const sendFileChunks = async (conn: any, file: File, transferId: string) => {
-        const chunkSize = 16384; // 16KB
         const fileReader = new FileReader();
         let offset = 0;
 
@@ -476,7 +478,7 @@ export const usePeerJS = () => {
                 if (e.target?.result instanceof ArrayBuffer) {
                     bytesRead = e.target.result.byteLength;
                 } else {
-                    bytesRead = chunkSize; // 使用默认值
+                    bytesRead = chunkSize; // 使用设置中的分块大小
                 }
 
                 offset += bytesRead;

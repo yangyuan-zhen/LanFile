@@ -28,5 +28,13 @@ contextBridge.exposeInMainWorld('electron', {
         if (channel === 'file:openFile' && typeof args === 'string') {
             return await ipcRenderer.invoke(channel, args);
         }
+
+        // 添加设置API
+        if (channel === 'settings:get') {
+            return await ipcRenderer.invoke(channel);
+        }
+        if (channel === 'settings:set' && typeof args === 'object') {
+            return await ipcRenderer.invoke(channel, args);
+        }
     }
 }); 

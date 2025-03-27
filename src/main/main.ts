@@ -60,4 +60,18 @@ ipcMain.handle('file:openFile', async (event, filePath) => {
         console.error('打开文件失败:', error);
         return { success: false, error: String(error) };
     }
+});
+
+// 注册设置处理程序
+ipcMain.handle('settings:get', async () => {
+    return store.get('settings') || {};
+});
+
+ipcMain.handle('settings:set', async (event, settings) => {
+    const currentSettings = store.get('settings') || {};
+    store.set('settings', {
+        ...currentSettings,
+        ...settings
+    });
+    return true;
 }); 
