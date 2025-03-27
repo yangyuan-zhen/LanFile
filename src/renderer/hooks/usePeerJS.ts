@@ -55,18 +55,16 @@ export const usePeerJS = () => {
                 setDeviceId(peerId);
 
                 // 创建 Peer 实例
-                const newPeer = new Peer(peerId, {
-                    config: {
-                        iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' },
-                            { urls: 'stun:stun2.l.google.com:19302' }
-                        ]
-                    }
+                const peer = new Peer(deviceId, {
+                    host: 'localhost',  // 改为使用本地主机
+                    port: 9000,         // 使用自定义端口
+                    path: '/myapp',
+                    secure: false,      // 局域网不需要安全连接
+                    debug: 2            // 增加调试级别
                 });
 
                 // 当PeerJS连接成功后，启动发现服务
-                newPeer.on('open', async (id) => {
+                peer.on('open', async (id) => {
                     console.log(`PeerJS已连接，ID: ${id}`);
                     // 启动ID发现服务
                     await window.electron.invoke('peer:startDiscovery', id);
@@ -74,17 +72,17 @@ export const usePeerJS = () => {
                     setStatus('idle');
                 });
 
-                newPeer.on('connection', (conn) => {
+                peer.on('connection', (conn) => {
                     handleIncomingConnection(conn);
                 });
 
-                newPeer.on('error', (err) => {
+                peer.on('error', (err) => {
                     console.error('PeerJS错误:', err);
                     setError(`PeerJS错误: ${err.message}`);
                     setStatus('error');
                 });
 
-                setPeer(newPeer);
+                setPeer(peer);
             } catch (error) {
                 console.error('PeerJS初始化失败:', error);
                 setError(`初始化失败: ${error instanceof Error ? error.message : String(error)}`);

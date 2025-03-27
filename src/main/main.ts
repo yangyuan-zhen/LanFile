@@ -2,6 +2,9 @@ import { app, ipcMain, shell } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import store from './store'; // 修改为默认导入
+import { startPeerServer } from './peerServer';
+import { heartbeatService } from './services/HeartbeatService';
+import mdnsService from './services/MDNSService';
 
 // 在文件顶部添加
 interface Settings {
@@ -74,4 +77,23 @@ ipcMain.handle('settings:set', async (event, settings) => {
         ...settings
     });
     return true;
+});
+
+// 在 app.whenReady() 中添加
+app.whenReady().then(() => {
+    // 现有代码...
+
+    // 启动网络服务
+    heartbeatService.start().catch(err => console.error('心跳服务启动失败:', err));
+    mdnsService.publishService();
+    mdnsService.startDiscovery();
+
+    // 启动PeerJS服务器
+    startPeerServer();
+});
+
+// 在应用退出时清理
+app.on('will-quit', () => {
+    heartbeatService.stop();
+    mdnsService.destroy();
 }); 

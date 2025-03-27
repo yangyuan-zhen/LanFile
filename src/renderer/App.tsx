@@ -5,6 +5,7 @@ import { CurrentTransfers } from "./components/features/CurrentTransfers/Current
 import { BrowserRouter as Router } from "react-router-dom";
 import { PeerJSProvider } from "./contexts/PeerJSContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { FirewallAlert } from "./components/common/FirewallAlert/FirewallAlert";
 
 const App: React.FC = () => {
   return (
@@ -18,6 +19,7 @@ const App: React.FC = () => {
           </Router>
 
           <CurrentTransfers />
+          <FirewallAlert />
         </>
       </NotificationProvider>
     </PeerJSProvider>
