@@ -547,7 +547,7 @@ export const usePeerJS = () => {
         return conn;
     }
 
-    // 在更新传输进度的地方
+    // 修改更新传输进度的函数，添加速度计算
     const updateTransferProgress = (transferId: string, bytesReceived: number) => {
         const now = Date.now();
 
@@ -555,13 +555,31 @@ export const usePeerJS = () => {
         const fileSize = fileInfo.current[transferId]?.size || 0;
         const progress = Math.min(100, Math.floor((bytesReceived / fileSize) * 100));
 
-        console.log(`更新传输进度: ${transferId}, 进度: ${progress}%, ${bytesReceived}/${fileSize} 字节`); // 添加日志
+        console.log(`更新传输进度: ${transferId}, 进度: ${progress}%, ${bytesReceived}/${fileSize} 字节`);
         console.log(`文件传输进度更新: ${transferId}, 进度: ${progress}%`);
+
+        // 计算传输速度
+        if (!transferTimes.current[transferId]) {
+            transferTimes.current[transferId] = { lastTime: now, lastBytes: 0 };
+        }
+
+        const { lastTime, lastBytes } = transferTimes.current[transferId];
+        const timeDiff = now - lastTime; // 毫秒
+        let speed = undefined;
+
+        // 至少100ms计算一次速度，避免频繁计算
+        if (timeDiff > 100) {
+            const bytesDiff = bytesReceived - lastBytes;
+            speed = bytesDiff / (timeDiff / 1000); // 字节/秒
+
+            // 更新时间和字节数
+            transferTimes.current[transferId] = { lastTime: now, lastBytes: bytesReceived };
+        }
 
         // 更新传输状态
         setTransfers(prev => {
             const updated = prev.map(t => t.id === transferId ?
-                { ...t, progress, status: 'transferring' as const } : t);
+                { ...t, progress, status: 'transferring' as const, speed } : t);
             return updated;
         });
     };

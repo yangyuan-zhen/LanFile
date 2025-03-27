@@ -87,67 +87,92 @@ export const CurrentTransfers: React.FC = () => {
     window.electron.invoke("file:openFile", path);
   };
 
-  // 在渲染传输项的部分，更改为使用 Chakra UI 的 Progress 组件
+  // 修改渲染传输项的部分，使用更明显的进度条样式
   const renderTransferItem = (transfer: FileTransfer) => (
-    <div className="flex flex-col p-3 border-b">
-      <div className="flex justify-between items-center mb-1">
-        <p className="font-medium">{transfer.name}</p>
-        <Badge
+    <div className="p-4 mb-4 rounded-lg border border-gray-200">
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center">
+          <Icon
+            as={transfer.direction === "upload" ? FaUpload : FaDownload}
+            color={transfer.direction === "upload" ? "green.500" : "blue.500"}
+            mr={3}
+          />
+          <div>
+            <Text fontWeight="medium">{transfer.name}</Text>
+            <Text fontSize="sm" color="gray.500">
+              {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
+              {transfer.peerId}
+            </Text>
+          </div>
+        </div>
+        <div className="text-right">
+          {transfer.speed && (
+            <Text
+              fontSize="sm"
+              fontWeight="semibold"
+              color={transfer.direction === "upload" ? "green.500" : "blue.500"}
+            >
+              {formatSpeed(transfer.speed)}
+            </Text>
+          )}
+          <Text fontSize="xs" color="gray.500">
+            {transfer.status === "transferring"
+              ? "传输中"
+              : getStatusText(transfer.status)}
+          </Text>
+        </div>
+      </div>
+
+      <div className="relative pt-1">
+        <div className="flex justify-between items-center mb-2">
+          <span
+            className="inline-block text-xs font-semibold"
+            color={
+              transfer.status === "error"
+                ? "red.500"
+                : transfer.status === "completed"
+                ? "green.500"
+                : "blue.500"
+            }
+          >
+            {transfer.progress}%
+          </span>
+          <span className="inline-block text-xs font-semibold text-gray-600">
+            {formatSize(transfer.size * (transfer.progress / 100))}/
+            {formatSize(transfer.size)}
+          </span>
+        </div>
+
+        <Progress
+          mt={1}
+          size="sm"
+          value={transfer.progress}
           colorScheme={
             transfer.status === "error"
               ? "red"
               : transfer.status === "completed"
               ? "green"
-              : transfer.status === "transferring"
-              ? "blue"
-              : "gray"
+              : "blue"
           }
-        >
-          {getStatusText(transfer.status)}
-        </Badge>
-      </div>
-
-      <p className="text-sm text-gray-500">
-        {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
-        {transfer.peerId}
-      </p>
-
-      {/* 使用 Chakra UI 的 Progress 组件 */}
-      <Progress
-        mt={2}
-        size="sm"
-        value={transfer.progress}
-        colorScheme={
-          transfer.status === "error"
-            ? "red"
-            : transfer.status === "completed"
-            ? "green"
-            : "blue"
-        }
-        borderRadius="full"
-      />
-
-      <div className="flex justify-between mt-1 text-xs">
-        <span>
-          {formatSize(transfer.size * (transfer.progress / 100))}/
-          {formatSize(transfer.size)}
-        </span>
-        {transfer.speed && <span>{formatSpeed(transfer.speed)}</span>}
+          borderRadius="full"
+          hasStripe={transfer.status === "transferring"}
+          isAnimated={transfer.status === "transferring"}
+        />
       </div>
 
       {/* 如果传输完成且有保存路径，添加操作按钮 */}
       {transfer.status === "completed" && transfer.savedPath && (
-        <div className="flex mt-2 space-x-2">
+        <div className="flex mt-3 space-x-2">
           <Button
             size="xs"
-            leftIcon={<FaFolder />}
+            leftIcon={<Icon as={FaFolder} />}
             onClick={() => openFileLocation(transfer.savedPath!)}
           >
             打开文件夹
           </Button>
           <Button
             size="xs"
-            leftIcon={<FaFile />}
+            leftIcon={<Icon as={FaFile} />}
             onClick={() => openFile(transfer.savedPath!)}
           >
             打开文件
@@ -188,27 +213,24 @@ export const CurrentTransfers: React.FC = () => {
       zIndex={1000}
       borderRadius="md"
       overflow="hidden"
-      boxShadow="lg"
+      boxShadow="xl"
+      bg="white"
     >
       <Card p={0} bg="white" borderRadius="md">
-        {/* 标题栏 */}
+        {/* 标题栏 - 更明显的样式 */}
         <Flex
           justify="space-between"
           align="center"
           p={3}
-          borderBottom={transfers.length > 0 ? "1px solid" : "none"}
+          bg="gray.50"
+          borderBottom="1px solid"
           borderColor="gray.200"
         >
           <Flex align="center">
             <Text fontWeight="bold">文件传输</Text>
-            {transfers.length > 0 && (
-              <Badge ml={2} colorScheme="blue" borderRadius="full">
-                {transfers.length}
-              </Badge>
-            )}
             {activeCount > 0 && (
-              <Badge ml={1} colorScheme="green" borderRadius="full">
-                {activeCount} 活动
+              <Badge ml={2} colorScheme="blue" borderRadius="full">
+                {activeCount} 进行中
               </Badge>
             )}
           </Flex>
@@ -242,9 +264,9 @@ export const CurrentTransfers: React.FC = () => {
         {/* 内容区 */}
         <Collapse in={isExpanded} animateOpacity>
           <Box
-            p={3}
-            maxHeight={transfers.length > 4 ? "400px" : "auto"}
-            overflowY={transfers.length > 4 ? "auto" : "visible"}
+            p={transfers.length > 0 ? 2 : 0}
+            maxHeight="400px"
+            overflowY="auto"
           >
             {!transfers || filteredTransfers.length === 0 ? (
               <Flex
@@ -258,7 +280,11 @@ export const CurrentTransfers: React.FC = () => {
                 <Text>暂无传输任务</Text>
               </Flex>
             ) : (
-              filteredTransfers.map((transfer) => renderTransferItem(transfer))
+              filteredTransfers.map((transfer) => (
+                <React.Fragment key={transfer.id}>
+                  {renderTransferItem(transfer)}
+                </React.Fragment>
+              ))
             )}
           </Box>
         </Collapse>
