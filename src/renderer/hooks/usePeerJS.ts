@@ -144,7 +144,13 @@ export const usePeerJS = () => {
                     peerId: conn.peer
                 });
 
-                // 继续处理...
+                // 重要！恢复发送确认代码 - 必须保留这部分
+                try {
+                    debug(`发送文件信息确认: ${data.transferId}`);
+                    conn.send({ type: 'file-info-received', transferId: data.transferId });
+                } catch (error) {
+                    console.error('发送确认失败:', error);
+                }
             }
             else if (data.type === 'file-chunk') {
                 const transferId = data.transferId;
