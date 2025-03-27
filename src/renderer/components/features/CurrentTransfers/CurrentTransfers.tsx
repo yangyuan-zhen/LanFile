@@ -47,15 +47,21 @@ export const CurrentTransfers: React.FC = () => {
     window.electron.invoke("file:openFile", path);
   };
 
-  // 始终显示传输面板，即使没有传输任务
+  // 临时调试用
   return (
     <Box
       position="fixed"
-      bottom="20px"
-      right="20px"
-      width="350px"
-      zIndex={1000}
+      bottom="50px"
+      right="50px"
+      width="400px"
+      zIndex={9999}
+      bg="red.100" // 明显的背景色
+      p={4}
+      border="2px solid red"
     >
+      <Text fontSize="lg" fontWeight="bold">
+        文件传输 ({transfers?.length || 0})
+      </Text>
       <Card p={4} boxShadow="lg" bg="white" borderRadius="md">
         <Text fontWeight="bold" mb={3}>
           文件传输
