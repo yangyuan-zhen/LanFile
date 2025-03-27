@@ -576,11 +576,28 @@ export const usePeerJS = () => {
             transferTimes.current[transferId] = { lastTime: now, lastBytes: bytesReceived };
         }
 
-        // 更新传输状态
-        setTransfers(prev => {
-            const updated = prev.map(t => t.id === transferId ?
-                { ...t, progress, status: 'transferring' as const, speed } : t);
-            return updated;
+        // 使用函数式更新确保状态正确更新
+        setTransfers((prevTransfers) => {
+            console.log("更新前的传输数组:", prevTransfers);
+            // 检查传输ID是否存在
+            const transferExists = prevTransfers.some(t => t.id === transferId);
+            let updatedTransfers;
+
+            if (transferExists) {
+                // 更新现有传输
+                updatedTransfers = prevTransfers.map(t =>
+                    t.id === transferId
+                        ? { ...t, progress, status: 'transferring' as const, speed }
+                        : t
+                );
+            } else {
+                // 如果传输不存在，可能需要创建一个
+                console.warn(`找不到ID为${transferId}的传输，无法更新进度`);
+                updatedTransfers = prevTransfers;
+            }
+
+            console.log("更新后的传输数组:", updatedTransfers);
+            return updatedTransfers;
         });
     };
 
@@ -623,6 +640,26 @@ export const usePeerJS = () => {
 
         console.log(`触发通知事件：file-transfer-complete，ID: ${transferId}`);
     }
+
+    // 添加新传输时的函数
+    const addTransfer = (transfer: Omit<FileTransfer, 'id'>) => {
+        const id = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
+        const newTransfer: FileTransfer = {
+            id,
+            ...transfer,
+        };
+
+        console.log("添加新传输:", newTransfer);
+
+        // 使用函数式更新确保状态正确更新
+        setTransfers(prev => {
+            const updated = [...prev, newTransfer];
+            console.log("添加后的传输列表:", updated);
+            return updated;
+        });
+
+        return id;
+    };
 
     // 确保返回所有需要的属性和方法
     return {

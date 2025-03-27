@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from "react";
+import React, { createContext, useContext, ReactNode, useEffect } from "react";
 import { usePeerJS } from "../hooks/usePeerJS";
 
 // 创建上下文
@@ -10,17 +10,15 @@ export const PeerJSContext = createContext<
 export const PeerJSProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const peerJSState = usePeerJS();
+  const peer = usePeerJS();
 
-  // 添加调试日志，监控状态变化
-  React.useEffect(() => {
-    console.log("PeerJS状态更新:", peerJSState.transfers);
-  }, [peerJSState.transfers]);
+  // 添加调试日志
+  useEffect(() => {
+    console.log("PeerJSContext 传输状态更新:", peer.transfers);
+  }, [peer.transfers]);
 
   return (
-    <PeerJSContext.Provider value={peerJSState}>
-      {children}
-    </PeerJSContext.Provider>
+    <PeerJSContext.Provider value={peer}>{children}</PeerJSContext.Provider>
   );
 };
 
