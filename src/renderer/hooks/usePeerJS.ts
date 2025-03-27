@@ -622,7 +622,7 @@ export const usePeerJS = () => {
         }
     };
 
-    // 在文件中找到文件传输完成时的代码，添加以下事件触发
+    // 完善 completeTransfer 函数实现
     const completeTransfer = async (transferId: string) => {
         try {
             const chunks = fileChunks.current[transferId];
@@ -652,7 +652,37 @@ export const usePeerJS = () => {
                 offset += chunk.byteLength;
             }
 
-            // 剩下的处理逻辑...
+            // 获取文件信息
+            const info = fileInfo.current[transferId];
+            if (!info) {
+                throw new Error("找不到文件信息");
+            }
+
+            // 保存文件数据
+            try {
+                const savedPath = await window.electron.file.saveDownload({
+                    fileName: info.name,
+                    fileData: Array.from(fileData)
+                });
+
+                // 更新传输状态为已完成
+                setTransfers(prev =>
+                    prev.map(t =>
+                        t.id === transferId
+                            ? { ...t, progress: 100, status: 'completed', savedPath }
+                            : t
+                    )
+                );
+
+                // 触发事件通知文件传输完成
+                window.dispatchEvent(new CustomEvent('file-transfer-complete'));
+                console.log(`触发通知事件：file-transfer-complete，ID: ${transferId}`);
+
+            } catch (saveError) {
+                console.error("保存文件失败:", saveError);
+                throw saveError;
+            }
+
         } catch (error) {
             console.error("完成传输时出错:", error);
             // 更新为错误状态
