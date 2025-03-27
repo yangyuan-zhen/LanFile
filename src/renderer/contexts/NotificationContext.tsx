@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   ReactNode,
+  useRef,
 } from "react";
 import { useGlobalPeerJS } from "./PeerJSContext";
 
@@ -37,22 +38,24 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const { transfers } = useGlobalPeerJS();
 
+  // 使用 ref 跟踪已通知的传输
+  const notifiedTransfers = useRef<Set<string>>(new Set());
+  const notifiedErrors = useRef<Set<string>>(new Set());
+
   // 计算未读数量
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // 监听传输完成事件
+  // 监听传输完成事件 - 移除 notifications 依赖
   useEffect(() => {
     const completedTransfers = transfers.filter(
       (t) => t.status === "completed"
     );
 
     completedTransfers.forEach((transfer) => {
-      // 检查是否已经为此传输创建了通知
-      const transferNotificationExists = notifications.some((n) =>
-        n.id.includes(transfer.id)
-      );
+      // 使用 ref 而不是检查通知数组
+      if (!notifiedTransfers.current.has(transfer.id)) {
+        notifiedTransfers.current.add(transfer.id);
 
-      if (!transferNotificationExists) {
         addNotification({
           title: "文件传输完成",
           message: `${transfer.name} 已${
@@ -67,11 +70,11 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     const errorTransfers = transfers.filter((t) => t.status === "error");
 
     errorTransfers.forEach((transfer) => {
-      const transferErrorNotificationExists = notifications.some((n) =>
-        n.id.includes(`error-${transfer.id}`)
-      );
+      const errorId = `error-${transfer.id}`;
 
-      if (!transferErrorNotificationExists) {
+      if (!notifiedErrors.current.has(errorId)) {
+        notifiedErrors.current.add(errorId);
+
         addNotification({
           title: "文件传输失败",
           message: `${transfer.name} ${
@@ -81,7 +84,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         });
       }
     });
-  }, [transfers, notifications]);
+  }, [transfers]); // 移除 notifications 依赖项
 
   // 添加通知
   const addNotification = (
