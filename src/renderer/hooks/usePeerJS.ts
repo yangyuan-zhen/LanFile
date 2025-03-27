@@ -160,31 +160,67 @@ export const usePeerJS = () => {
             }
             else if (data.type === 'file-chunk') {
                 const transferId = data.transferId;
-                // 更详细的日志
-                console.log(`收到文件块 ${transferId}, 块大小:`, data.data.byteLength);
 
-                // 检查引用中是否存在
-                if (!fileInfo.current[transferId]) {
-                    console.error('收到未知传输ID的文件块:', transferId);
-                    // 请求重新发送文件信息
-                    conn.send({ type: 'request-file-info', transferId });
+                // 添加数据有效性检查
+                if (!data.data) {
+                    console.error('收到无效的文件块数据:', { transferId });
                     return;
                 }
 
-                // 存储到全局引用
-                const chunk = new Uint8Array(data.data);
-                fileChunks.current[transferId].push(chunk);
+                try {
+                    // 确保 fileChunks 中有这个传输的数组
+                    if (!fileChunks.current[transferId]) {
+                        fileChunks.current[transferId] = [];
+                    }
 
-                // 计算已接收的总大小
-                const receivedSize = fileChunks.current[transferId].reduce(
-                    (total, chunk) => total + chunk.byteLength, 0
-                );
+                    // 检查并记录块大小
+                    const chunkSize = data.data instanceof ArrayBuffer
+                        ? data.data.byteLength
+                        : (data.chunk?.byteLength || 0);  // 兼容旧格式
 
-                // 计算进度并更新
-                const progress = Math.min(100, Math.floor((receivedSize / fileInfo.current[transferId].size) * 100));
+                    console.log(`收到文件块 ${transferId}, 块大小:`, chunkSize);
 
-                // 更新传输进度
-                updateTransferProgress(transferId, receivedSize, fileInfo.current[transferId].size);
+                    // 存储到全局引用
+                    const chunk = new Uint8Array(
+                        data.data instanceof ArrayBuffer ? data.data : data.chunk
+                    );
+
+                    // 检查块是否有效
+                    if (chunk.byteLength === 0) {
+                        console.error('收到空的文件块');
+                        return;
+                    }
+
+                    fileChunks.current[transferId].push(chunk);
+
+                    // 计算已接收的总大小
+                    const receivedSize = fileChunks.current[transferId].reduce(
+                        (total, chunk) => total + (chunk?.byteLength || 0), 0
+                    );
+
+                    // 确保文件信息存在
+                    if (!fileInfo.current[transferId]) {
+                        console.error('找不到文件信息:', transferId);
+                        // 请求重新发送文件信息
+                        conn.send({ type: 'request-file-info', transferId });
+                        return;
+                    }
+
+                    // 计算进度并更新
+                    const progress = Math.min(100, Math.floor((receivedSize / fileInfo.current[transferId].size) * 100));
+
+                    // 更新传输进度
+                    updateTransferProgress(transferId, receivedSize, fileInfo.current[transferId].size);
+
+                } catch (error) {
+                    console.error('处理文件块时出错:', error);
+                    // 通知发送方重试
+                    conn.send({
+                        type: 'chunk-error',
+                        transferId,
+                        error: error instanceof Error ? error.message : '未知错误'
+                    });
+                }
             }
             else if (data.type === 'file-complete') {
                 const transferId = data.transferId;
