@@ -98,16 +98,32 @@ export const CurrentTransfers: React.FC = () => {
                 {transfer.peerId}
               </Text>
 
-              {(transfer.status === "pending" ||
-                transfer.status === "transferring") && (
-                <Progress
-                  size="sm"
-                  value={transfer.progress}
-                  colorScheme="blue"
-                  mt={1}
-                  borderRadius="full"
-                />
-              )}
+              <Progress
+                size="sm"
+                value={transfer.progress}
+                colorScheme={
+                  transfer.status === "error"
+                    ? "red"
+                    : transfer.status === "completed"
+                    ? "green"
+                    : "blue"
+                }
+                mt={1}
+                borderRadius="full"
+              />
+
+              <Flex justify="space-between" mt={1}>
+                <Text fontSize="xs" color="gray.500">
+                  {transfer.status === "completed"
+                    ? "已完成"
+                    : transfer.status === "error"
+                    ? "传输失败"
+                    : `${transfer.progress}%`}
+                </Text>
+                <Text fontSize="xs" color="gray.500">
+                  {transfer.direction === "upload" ? "上传中" : "下载中"}
+                </Text>
+              </Flex>
             </Box>
           ))
         )}

@@ -89,13 +89,10 @@ export const HomePage = () => {
       </div>
       <NetworkService
         networkInfo={networkInfo}
-        getSelectedFiles={getSelectedFiles} // 传递获取文件方法
+        getSelectedFiles={getSelectedFiles}
       />
-      <CurrentTransfers transfers={transfers} />
-      <FileUploader
-        ref={fileUploaderRef} // 添加 ref
-        onFileSelect={handleFileSelect}
-      />
+      <CurrentTransfers />
+      <FileUploader ref={fileUploaderRef} onFileSelect={handleFileSelect} />
       <FileList files={files} />
     </div>
   );

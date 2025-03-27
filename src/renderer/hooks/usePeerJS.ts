@@ -170,6 +170,8 @@ export const usePeerJS = () => {
             }
             else if (data.type === 'file-complete') {
                 const transferId = data.transferId;
+                console.log(`收到文件完成消息: ${transferId}`);
+
                 // 检查引用中是否存在
                 if (!fileInfo.current[transferId] || !fileChunks.current[transferId]) {
                     console.error('收到未知传输ID的完成消息:', transferId);
@@ -180,6 +182,8 @@ export const usePeerJS = () => {
                 const totalLength = fileChunks.current[transferId].reduce(
                     (total, chunk) => total + chunk.byteLength, 0
                 );
+
+                console.log(`准备合并文件: ${transferId}, 总大小: ${totalLength} 字节`);
 
                 const completeFile = new Uint8Array(totalLength);
                 let offset = 0;
@@ -193,10 +197,16 @@ export const usePeerJS = () => {
                 const blob = new Blob([completeFile], { type: fileInfo.current[transferId].type });
                 const url = URL.createObjectURL(blob);
 
+                console.log(`准备保存文件: ${fileInfo.current[transferId].name}`);
+
                 // 使用 electron 的 API 保存文件
                 window.electron.invoke('file:saveDownload', {
                     fileName: fileInfo.current[transferId].name,
                     fileData: url
+                }).then((result: any) => {
+                    console.log('文件保存结果:', result);
+                }).catch((error: any) => {
+                    console.error('文件保存失败:', error);
                 });
 
                 // 更新传输状态为完成
@@ -465,7 +475,14 @@ export const usePeerJS = () => {
                 if (offset < file.size) {
                     readSlice(offset);
                 } else {
-                    // 文件发送完成
+                    // 文件发送完成，发送完成消息
+                    console.log(`文件传输完成，发送完成消息: ${transferId}`);
+                    conn.send({
+                        type: 'file-complete',
+                        transferId
+                    });
+
+                    // 更新UI状态
                     setTransfers(prev =>
                         prev.map(t => t.id === transferId ?
                             { ...t, progress: 100, status: 'completed' } : t)

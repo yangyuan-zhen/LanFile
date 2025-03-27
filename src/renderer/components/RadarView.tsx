@@ -1,9 +1,9 @@
-import { useWebRTC } from "@/hooks/useWebRTC";
-import { Device } from "@/services/ZeroconfService";
+import { usePeerJS } from "../hooks/usePeerJS";
+import { Device } from "../types/device";
 
 const RadarView = () => {
   // 获取WebRTC相关功能
-  const { connectToPeer } = useWebRTC();
+  const { connectToPeer } = usePeerJS();
 
   const handleTransferConfirm = async (
     deviceIp: string,
