@@ -56,11 +56,14 @@ export const usePeerJS = () => {
 
                 // 创建 Peer 实例
                 const peer = new Peer(deviceId, {
-                    host: 'localhost',  // 改为使用本地主机
-                    port: 9000,         // 使用自定义端口
-                    path: '/myapp',
-                    secure: false,      // 局域网不需要安全连接
-                    debug: 2            // 增加调试级别
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' }
+                        ]
+                    },
+                    debug: 2
                 });
 
                 // 当PeerJS连接成功后，启动发现服务
