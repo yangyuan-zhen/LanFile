@@ -126,15 +126,14 @@ export const usePeerJS = () => {
         });
 
         conn.on('data', async (data: any) => {
-            // 对于文件信息，立即发送确认
             if (data.type === 'file-info') {
-                console.log('收到文件信息:', data.transferId);
+                debug("收到文件信息:", data);
 
                 // 存储到全局引用中
                 fileInfo.current[data.transferId] = data;
                 fileChunks.current[data.transferId] = [];
 
-                // 创建新的传输记录
+                // 创建新的传输记录 - 只使用 addFileTransfer 添加一次
                 const transferId = addFileTransfer({
                     name: data.name,
                     size: data.size,
@@ -145,24 +144,7 @@ export const usePeerJS = () => {
                     peerId: conn.peer
                 });
 
-                setTransfers(prev => [...prev, {
-                    id: transferId,
-                    name: data.name,
-                    size: data.size,
-                    type: data.fileType,
-                    progress: 0,
-                    status: 'pending',
-                    direction: 'download',
-                    peerId: conn.peer
-                }]);
-
-                // 确认文件信息接收 - 确保这一步不会被跳过
-                try {
-                    console.log(`发送文件信息确认: ${data.transferId}`);
-                    conn.send({ type: 'file-info-received', transferId: data.transferId });
-                } catch (error) {
-                    console.error('发送确认失败:', error);
-                }
+                // 继续处理...
             }
             else if (data.type === 'file-chunk') {
                 const transferId = data.transferId;
