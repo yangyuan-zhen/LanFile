@@ -49,6 +49,21 @@ export const usePeerJS = () => {
         debug("Transfers state updated:", transfers);
     }, [transfers]);
 
+    // 将 addFileTransfer 函数移到这里，在它被使用之前
+    const addFileTransfer = (fileInfo: Omit<FileTransfer, 'id'>) => {
+        const id = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
+        const newTransfer: FileTransfer = { id, ...fileInfo };
+
+        debug("Adding new transfer:", newTransfer);
+        setTransfers(prev => {
+            const newTransfers = [...prev, newTransfer];
+            debug("Transfers after adding:", newTransfers);
+            return newTransfers;
+        });
+
+        return id;
+    };
+
     // 初始化PeerJS
     useEffect(() => {
         const initPeer = async () => {
@@ -134,13 +149,14 @@ export const usePeerJS = () => {
         conn.on('data', async (data: any) => {
             if (data.type === 'file-info') {
                 debug("收到文件信息:", data);
+                const { transferId } = data;
 
-                // 存储到全局引用中
-                fileInfo.current[data.transferId] = data;
-                fileChunks.current[data.transferId] = [];
+                // 存储文件信息
+                fileInfo.current[transferId] = data;
+                fileChunks.current[transferId] = [];
 
-                // 创建新的传输记录 - 只使用 addFileTransfer 添加一次
-                const transferId = addFileTransfer({
+                // 创建传输记录
+                addFileTransfer({
                     name: data.name,
                     size: data.size,
                     type: data.fileType,
@@ -150,10 +166,13 @@ export const usePeerJS = () => {
                     peerId: conn.peer
                 });
 
-                // 重要！恢复发送确认代码 - 必须保留这部分
+                // 发送确认
                 try {
-                    debug(`发送文件信息确认: ${data.transferId}`);
-                    conn.send({ type: 'file-info-received', transferId: data.transferId });
+                    debug(`发送文件信息确认: ${transferId}`);
+                    conn.send({
+                        type: 'file-info-received',
+                        transferId
+                    });
                 } catch (error) {
                     console.error('发送确认失败:', error);
                 }
@@ -377,52 +396,12 @@ export const usePeerJS = () => {
 
     // 发送文件方法
     const sendFile = useCallback(async (peerIp: string, file: File) => {
-        console.log(`尝试向 ${peerIp} 发送文件: ${file.name}`);
-
-        if (!peer || !peer.open) {
-            await connectToPeer(peerIp);
-        }
-
         return new Promise<string>(async (resolve, reject) => {
             try {
-                // 获取或等待建立连接
                 let conn = connections.get(peerIp);
-
                 if (!conn) {
-                    console.log("连接不存在，正在重新连接...");
-                    try {
-                        conn = await connectToPeer(peerIp);
-                        if (!conn) throw new Error("连接失败");
-                    } catch (error) {
-                        reject(error);
-                        return;
-                    }
-                }
-
-                // 确保连接已打开且数据通道可用
-                if (!conn.open || !conn.dataChannel) {
-                    console.log("连接未打开或数据通道不可用，等待重试...");
-                    // 等待数据通道准备就绪
-                    await new Promise<void>((resolveChannel, rejectChannel) => {
-                        const channelTimeout = setTimeout(() => {
-                            rejectChannel(new Error("数据通道准备超时"));
-                        }, 5000);
-
-                        // 定期检查数据通道状态
-                        const checkChannel = setInterval(() => {
-                            if (conn.dataChannel && conn.dataChannel.readyState === 'open') {
-                                clearInterval(checkChannel);
-                                clearTimeout(channelTimeout);
-                                resolveChannel();
-                            }
-                        }, 500);
-
-                        conn.on('error', (err: any) => {
-                            clearInterval(checkChannel);
-                            clearTimeout(channelTimeout);
-                            rejectChannel(err);
-                        });
-                    });
+                    conn = await connectToPeer(peerIp);
+                    if (!conn) throw new Error("连接失败");
                 }
 
                 // 创建传输记录
@@ -436,12 +415,41 @@ export const usePeerJS = () => {
                     peerId: conn.peer
                 });
 
-                // 分块发送逻辑
-                let offset = 0;
-                let chunkIndex = 0;
-                const totalChunks = Math.ceil(file.size / chunkSize);
+                // 先发送文件信息并等待确认
+                const fileInfoData = {
+                    type: 'file-info',
+                    transferId,
+                    name: file.name,
+                    size: file.size,
+                    fileType: file.type
+                };
 
-                // 使用与接收端相同的进度跟踪结构
+                // 存储到发送方的 fileInfo
+                fileInfo.current[transferId] = fileInfoData;
+
+                // 发送文件信息并等待确认
+                const confirmed = await new Promise<boolean>((resolveConfirm) => {
+                    const timeout = setTimeout(() => {
+                        resolveConfirm(false);
+                    }, 5000);
+
+                    const handleConfirm = (data: any) => {
+                        if (data.type === 'file-info-received' && data.transferId === transferId) {
+                            clearTimeout(timeout);
+                            conn.off('data', handleConfirm);
+                            resolveConfirm(true);
+                        }
+                    };
+
+                    conn.on('data', handleConfirm);
+                    conn.send(fileInfoData);
+                });
+
+                if (!confirmed) {
+                    throw new Error("文件信息确认超时");
+                }
+
+                // 初始化传输时间统计
                 transferTimes.current[transferId] = {
                     lastTime: Date.now(),
                     lastBytes: 0,
@@ -449,34 +457,33 @@ export const usePeerJS = () => {
                     totalBytes: 0
                 };
 
-                // 发送文件的每个分块
+                // 开始分块发送
+                let offset = 0;
+                let chunkIndex = 0;
+                const totalChunks = Math.ceil(file.size / chunkSize);
+
                 while (offset < file.size) {
                     const chunk = await readFileChunk(file, offset, chunkSize);
-
-                    // 修改：统一使用 data 字段名
                     conn.send({
                         type: 'file-chunk',
                         transferId,
-                        data: chunk,  // 改用 data 而不是 chunk
+                        data: chunk,
                         index: chunkIndex,
                         total: totalChunks
                     });
 
-                    // 更新已发送的字节数
                     offset += chunk.byteLength;
                     chunkIndex++;
-
-                    // 更新发送进度
                     updateUploadProgress(transferId, offset, file.size);
                 }
 
-                return transferId;
+                resolve(transferId);
             } catch (error) {
                 console.error('发送文件失败:', error);
-                throw error;
+                reject(error);
             }
         });
-    }, [connections, connectToPeer]);
+    }, [connections, connectToPeer, addFileTransfer]);
 
     // 新增函数：发送文件信息并等待确认
     const sendFileInfo = (conn: any, file: File, transferId: string): Promise<boolean> => {
@@ -730,23 +737,6 @@ export const usePeerJS = () => {
                 )
             );
         }
-    };
-
-    // 修改添加传输的函数
-    const addFileTransfer = (fileInfo: Omit<FileTransfer, 'id'>) => {
-        const id = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
-        const newTransfer: FileTransfer = { id, ...fileInfo };
-
-        debug("Adding new transfer:", newTransfer);
-
-        // 使用函数式更新确保最新状态
-        setTransfers(prev => {
-            const newTransfers = [...prev, newTransfer];
-            debug("Transfers after adding:", newTransfers);
-            return newTransfers;
-        });
-
-        return id;
     };
 
     // 修改接收文件数据的函数以确保进度准确性
