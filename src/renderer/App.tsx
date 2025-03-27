@@ -1,26 +1,21 @@
 import React from "react";
-import MainLayout from "./components/layout/MainLayout/MainLayout";
-import { HomePage } from "./pages/Home/Home";
-import { CurrentTransfers } from "./components/features/CurrentTransfers/CurrentTransfers";
-import { BrowserRouter as Router } from "react-router-dom";
-import { PeerJSProvider } from "./contexts/PeerJSContext";
+import { RouterProvider } from "react-router-dom";
+import { router } from "./routes";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { PeerJSProvider } from "./contexts/PeerJSContext";
+import { CurrentTransfers } from "./components/features/CurrentTransfers/CurrentTransfers";
 import { FirewallAlert } from "./components/common/FirewallAlert/FirewallAlert";
+import MainLayout from "./components/layout/MainLayout/MainLayout";
 
 const App: React.FC = () => {
   return (
     <PeerJSProvider>
       <NotificationProvider>
-        <>
-          <Router>
-            <MainLayout>
-              <HomePage />
-            </MainLayout>
-          </Router>
-
-          <CurrentTransfers />
-          <FirewallAlert />
-        </>
+        <MainLayout>
+          <RouterProvider router={router} />
+        </MainLayout>
+        <CurrentTransfers />
+        <FirewallAlert />
       </NotificationProvider>
     </PeerJSProvider>
   );

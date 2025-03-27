@@ -217,20 +217,20 @@ export const CurrentTransfers: React.FC = () => {
             {completedCount > 0 && (
               <Tooltip label={showCompleted ? "隐藏已完成" : "显示已完成"}>
                 <IconButton
-                  aria-label="切换显示已完成"
+                  aria-label="Toggle completed"
                   icon={<FaCheck />}
                   size="sm"
                   variant="ghost"
                   colorScheme={showCompleted ? "green" : "gray"}
-                  mr={1}
                   onClick={() => setShowCompleted(!showCompleted)}
+                  mr={1}
                 />
               </Tooltip>
             )}
             {transfers.length > 0 && (
               <IconButton
-                aria-label={isExpanded ? "折叠" : "展开"}
-                icon={isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                aria-label="Collapse"
+                icon={isExpanded ? <FaChevronDown /> : <FaChevronUp />}
                 size="sm"
                 variant="ghost"
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -258,119 +258,7 @@ export const CurrentTransfers: React.FC = () => {
                 <Text>暂无传输任务</Text>
               </Flex>
             ) : (
-              filteredTransfers.map((transfer, index) => (
-                <Box
-                  key={transfer.id}
-                  mb={index < filteredTransfers.length - 1 ? 3 : 0}
-                  p={3}
-                  borderWidth="1px"
-                  borderRadius="md"
-                  bg={transfer.status === "transferring" ? "blue.50" : "white"}
-                >
-                  <Flex justify="space-between" align="center" mb={2}>
-                    <Flex align="center" maxWidth="240px">
-                      <Icon
-                        as={
-                          transfer.direction === "upload"
-                            ? FaUpload
-                            : FaDownload
-                        }
-                        mr={2}
-                        color={
-                          transfer.direction === "upload"
-                            ? "blue.500"
-                            : "green.500"
-                        }
-                      />
-                      <Text fontWeight="medium" isTruncated>
-                        {transfer.name}
-                      </Text>
-                    </Flex>
-                    <Flex>
-                      {transfer.status === "completed" && (
-                        <Icon as={FaCheck} color="green.500" />
-                      )}
-                      {transfer.status === "error" && (
-                        <Tooltip label="传输失败">
-                          <Icon as={FaExclamationTriangle} color="red.500" />
-                        </Tooltip>
-                      )}
-                    </Flex>
-                  </Flex>
-
-                  <Text fontSize="sm" color="gray.600" mb={1}>
-                    {formatFileSize(transfer.size)}
-                    {transfer.direction === "upload" ? " → " : " ← "}
-                    {transfer.peerId}
-                  </Text>
-
-                  <Progress
-                    size="sm"
-                    value={transfer.progress}
-                    colorScheme={
-                      transfer.status === "error"
-                        ? "red"
-                        : transfer.status === "completed"
-                        ? "green"
-                        : "blue"
-                    }
-                    mt={1}
-                    borderRadius="full"
-                  />
-
-                  <Flex justify="space-between" mt={1}>
-                    <Text fontSize="xs" color="gray.500">
-                      {transfer.status === "completed"
-                        ? "已完成"
-                        : transfer.status === "error"
-                        ? "传输失败"
-                        : `${transfer.progress}%`}
-                    </Text>
-                    {transfer.status === "transferring" && (
-                      <Flex>
-                        {transfer.speed && (
-                          <Text fontSize="xs" color="blue.500" mr={2}>
-                            {formatSpeed(transfer.speed)}
-                          </Text>
-                        )}
-                        <Text fontSize="xs" color="gray.500">
-                          {transfer.direction === "upload"
-                            ? "上传中"
-                            : "下载中"}
-                        </Text>
-                      </Flex>
-                    )}
-                  </Flex>
-
-                  {transfer.status === "completed" &&
-                    transfer.direction === "download" &&
-                    transfer.savedPath && (
-                      <Flex mt={2} justify="flex-end">
-                        <Tooltip label="在文件夹中显示">
-                          <IconButton
-                            aria-label="在文件夹中显示"
-                            icon={<FaFolder />}
-                            size="sm"
-                            mr={2}
-                            onClick={() =>
-                              openFileLocation(transfer.savedPath as string)
-                            }
-                          />
-                        </Tooltip>
-                        <Tooltip label="打开文件">
-                          <IconButton
-                            aria-label="打开文件"
-                            icon={<FaFile />}
-                            size="sm"
-                            onClick={() =>
-                              openFile(transfer.savedPath as string)
-                            }
-                          />
-                        </Tooltip>
-                      </Flex>
-                    )}
-                </Box>
-              ))
+              filteredTransfers.map((transfer) => renderTransferItem(transfer))
             )}
           </Box>
         </Collapse>

@@ -551,42 +551,19 @@ export const usePeerJS = () => {
     const updateTransferProgress = (transferId: string, bytesReceived: number) => {
         const now = Date.now();
 
-        // 获取文件总大小并计算进度 - 添加这两行
+        // 获取文件总大小并计算进度
         const fileSize = fileInfo.current[transferId]?.size || 0;
         const progress = Math.min(100, Math.floor((bytesReceived / fileSize) * 100));
 
-        // 获取上次更新时间和字节数
-        if (!transferTimes.current[transferId]) {
-            transferTimes.current[transferId] = { lastTime: now, lastBytes: 0 };
-        }
+        console.log(`更新传输进度: ${transferId}, 进度: ${progress}%, ${bytesReceived}/${fileSize} 字节`); // 添加日志
+        console.log(`文件传输进度更新: ${transferId}, 进度: ${progress}%`);
 
-        const { lastTime, lastBytes } = transferTimes.current[transferId];
-        const timeDiff = now - lastTime; // 毫秒
-
-        // 至少100ms计算一次速度，避免频繁计算
-        if (timeDiff > 100) {
-            const bytesDiff = bytesReceived - lastBytes;
-            const speed = bytesDiff / (timeDiff / 1000); // 字节/秒
-
-            // 更新时间和字节数
-            transferTimes.current[transferId] = { lastTime: now, lastBytes: bytesReceived };
-
-            // 更新传输状态
-            setTransfers(prev => {
-                const updated = prev.map(t => t.id === transferId ?
-                    { ...t, progress, status: 'transferring' as const, speed } : t);
-                console.log("传输状态更新:", updated);
-                return updated;
-            });
-        } else {
-            // 不计算速度，只更新进度
-            setTransfers(prev => {
-                const updated = prev.map(t => t.id === transferId ?
-                    { ...t, progress, status: 'transferring' as const } : t);
-                console.log("传输状态更新:", updated);
-                return updated;
-            });
-        }
+        // 更新传输状态
+        setTransfers(prev => {
+            const updated = prev.map(t => t.id === transferId ?
+                { ...t, progress, status: 'transferring' as const } : t);
+            return updated;
+        });
     };
 
     // 在文件传输完成时触发通知事件
@@ -611,6 +588,23 @@ export const usePeerJS = () => {
             });
         }
     };
+
+    // 在文件中找到文件传输完成时的代码，添加以下事件触发
+    const completeTransfer = (transferId: string, savedPath?: string) => {
+        // 更新传输状态
+        setTransfers(prev =>
+            prev.map(t =>
+                t.id === transferId
+                    ? { ...t, progress: 100, status: 'completed' as const, savedPath }
+                    : t
+            )
+        );
+
+        // 触发事件通知文件传输完成
+        window.dispatchEvent(new CustomEvent('file-transfer-complete'));
+
+        console.log(`触发通知事件：file-transfer-complete，ID: ${transferId}`);
+    }
 
     // 确保返回所有需要的属性和方法
     return {

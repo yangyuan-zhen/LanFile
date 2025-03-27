@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNotifications } from "../../../contexts/NotificationContext";
-import { FaCheck, FaTrash } from "react-icons/fa";
-import { Bell } from "lucide-react";
+import { BellRing } from "lucide-react";
 
 const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -47,10 +46,10 @@ const NotificationDropdown: React.FC = () => {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        className="relative p-2 text-gray-600 hover:text-gray-800"
+        className="relative p-2 text-gray-400 hover:text-gray-600"
         onClick={toggleDropdown}
       >
-        <Bell className="w-6 h-6" />
+        <BellRing className="w-5 h-5" />
         {hasUnread && (
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
         )}
