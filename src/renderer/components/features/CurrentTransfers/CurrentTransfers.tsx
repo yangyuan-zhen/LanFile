@@ -195,9 +195,7 @@ export const CurrentTransfers: React.FC = () => {
                     </Flex>
                     <Flex>
                       {transfer.status === "completed" && (
-                        <Tooltip label="传输完成">
-                          <Icon as={FaCheck} color="green.500" />
-                        </Tooltip>
+                        <Icon as={FaCheck} color="green.500" />
                       )}
                       {transfer.status === "error" && (
                         <Tooltip label="传输失败">
