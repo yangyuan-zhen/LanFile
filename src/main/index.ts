@@ -15,6 +15,11 @@ import { peerDiscoveryService } from './services/PeerDiscoveryService';
 import fs from 'fs';
 import './ipc-handlers';  // 这里导入包含所有IPC处理程序的文件
 
+// 添加调试日志，确认文件正在加载
+console.log('===== main/index.ts 开始执行 =====');
+console.log('当前 __dirname:', __dirname);
+console.log('预计预加载脚本路径:', path.join(__dirname, '../preload/preload.js'));
+
 // 在应用顶部添加
 app.commandLine.appendSwitch('lang', 'zh-CN');
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
@@ -445,10 +450,11 @@ const createWindow = () => {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, '../preload/preload.js'),
+            preload: path.join(__dirname, '../preload/index.js'),
             sandbox: false
         }
     });
+    console.log(path.join(__dirname, '路径../preload/preload.js')); // 打印预加载脚本路径
 
     // 添加更多调试信息
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
