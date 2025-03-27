@@ -10,6 +10,7 @@ interface FileTransfer {
     status: 'pending' | 'transferring' | 'completed' | 'error';
     direction: 'upload' | 'download';
     peerId: string;
+    savedPath?: string;
 }
 
 export const usePeerJS = () => {
@@ -193,27 +194,28 @@ export const usePeerJS = () => {
                     offset += chunk.byteLength;
                 }
 
-                // 创建 Blob 并触发下载
+                // 创建 Blob
                 const blob = new Blob([completeFile], { type: fileInfo.current[transferId].type });
-                const url = URL.createObjectURL(blob);
 
-                console.log(`准备保存文件: ${fileInfo.current[transferId].name}`);
-
-                // 使用 electron 的 API 保存文件
-                window.electron.invoke('file:saveDownload', {
+                // 修改这里：直接保存到下载目录而不是弹出对话框
+                window.electron.invoke('file:saveToDownloads', {
                     fileName: fileInfo.current[transferId].name,
-                    fileData: url
-                }).then((result: any) => {
-                    console.log('文件保存结果:', result);
+                    fileData: blob
+                }).then((savedPath: string) => {
+                    console.log('文件已自动保存到:', savedPath);
+
+                    // 更新传输状态为完成
+                    setTransfers(prev =>
+                        prev.map(t => t.id === transferId ?
+                            { ...t, progress: 100, status: 'completed', savedPath } : t)
+                    );
                 }).catch((error: any) => {
                     console.error('文件保存失败:', error);
+                    setTransfers(prev =>
+                        prev.map(t => t.id === transferId ?
+                            { ...t, status: 'error' } : t)
+                    );
                 });
-
-                // 更新传输状态为完成
-                setTransfers(prev =>
-                    prev.map(t => t.id === transferId ?
-                        { ...t, progress: 100, status: 'completed' } : t)
-                );
 
                 // 清理全局引用中的数据
                 delete fileChunks.current[transferId];
