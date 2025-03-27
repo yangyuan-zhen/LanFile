@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import { ipcMain } from 'electron';
 import { networkInterfaces } from 'os';
+import { heartbeatService } from './HeartbeatService';
 
 export interface NetworkDevice {
     name: string;
@@ -193,11 +194,24 @@ export const registerNetworkHandlers = () => {
     });
 
     // 为保持兼容性，注册device:ping处理程序，但内部使用TCP检测
-    ipcMain.handle('device:ping', async (_event, ip, port) => {
+    ipcMain.handle('device:ping', async (_event, ip) => {
         try {
             console.log(`设备状态检查请求: ${ip}`);
-            const isOnline = await checkTcpConnection(ip, port || 8092);
-            return { success: isOnline };
+
+            // 尝试使用不同端口进行检测
+            // 1. 检查心跳服务端口
+            let isOnline = await checkTcpConnection(ip, heartbeatService.getPort());
+            if (isOnline) {
+                return { success: true };
+            }
+
+            // 2. 检查PeerDiscovery端口
+            isOnline = await checkTcpConnection(ip, 8765);
+            if (isOnline) {
+                return { success: true };
+            }
+
+            return { success: false };
         } catch (error) {
             console.error('设备状态检查失败:', error);
             return { success: false };

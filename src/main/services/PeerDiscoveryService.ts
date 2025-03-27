@@ -75,6 +75,11 @@ class PeerDiscoveryService {
             this.server = null;
         }
     }
+
+    // 添加公共获取端口的方法
+    public getPort(): number {
+        return this.port;
+    }
 }
 
 export const peerDiscoveryService = new PeerDiscoveryService(); 

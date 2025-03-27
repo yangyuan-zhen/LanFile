@@ -10,6 +10,7 @@ export class HeartbeatService extends EventEmitter {
         super();
         this.port = port;
         this.setupServer();
+        console.log(`HeartbeatService 初始化，默认端口: ${this.port}`);
     }
 
     private setupServer() {

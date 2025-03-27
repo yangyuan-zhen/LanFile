@@ -467,13 +467,22 @@ const createWindow = () => {
 // 应用初始化
 app.whenReady().then(async () => {
     try {
+        // 添加此行代码执行防火墙配置
+        if (process.platform === 'win32') {
+            await configureWindowsFirewall();
+        }
+
         // 设置IPC处理程序
         setupIpcHandlers();
 
-        // 添加以下代码确保心跳服务启动
+        // 启动心跳服务
         console.log("启动心跳服务...");
         await heartbeatService.start();
         console.log(`心跳服务状态: ${heartbeatService.isRunning ? '已启动' : '未启动'}, 端口: ${heartbeatService.getPort()}`);
+
+        // 添加这行代码启动PeerDiscoveryService
+        await peerDiscoveryService.start();
+        console.log(`PeerDiscovery服务已启动，端口: ${peerDiscoveryService.getPort()}`);
 
         // 创建窗口
         if (!mainWindow) {
