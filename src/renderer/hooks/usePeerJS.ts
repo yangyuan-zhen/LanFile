@@ -668,12 +668,13 @@ export const usePeerJS = () => {
     // 完善 completeTransfer 函数实现
     const completeTransfer = async (transferId: string) => {
         try {
+            console.log(`开始完成传输: ${transferId}`);
             const chunks = fileChunks.current[transferId];
             if (!chunks || chunks.length === 0) {
                 throw new Error("没有接收到文件块");
             }
 
-            // 过滤出有效的块并确保顺序正确
+            // 过滤出有效的块
             const validChunks = chunks.filter(chunk => chunk && chunk.byteLength);
 
             // 计算总大小
@@ -693,18 +694,17 @@ export const usePeerJS = () => {
                 throw new Error("找不到文件信息");
             }
 
-            try {
-                // 使用简化的调用方式，排除类型问题
-                console.log('准备保存文件:', info.name, fileData.length, '字节');
+            console.log(`准备保存文件: ${info.name}, 大小: ${totalSize} 字节`);
 
-                const result = await window.electron.invoke('file:saveToDownloads', {
+            try {
+                // 使用正确的 API 保存文件
+                const savedPath = await window.electron.invoke('file:saveToDownloads', {
                     fileName: info.name,
                     fileData: Array.from(fileData),
                     fileType: info.fileType || 'application/octet-stream'
                 });
 
-                console.log('文件保存结果:', result);
-                const savedPath = result;
+                console.log(`文件成功保存到: ${savedPath}`);
 
                 // 更新传输状态
                 setTransfers(prev =>
@@ -723,12 +723,10 @@ export const usePeerJS = () => {
                 // 清理内存
                 delete fileChunks.current[transferId];
                 delete fileInfo.current[transferId];
-
             } catch (saveError) {
                 console.error("保存文件失败:", saveError);
                 throw saveError;
             }
-
         } catch (error) {
             console.error("完成传输时出错:", error);
             setTransfers(prev =>

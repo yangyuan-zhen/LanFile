@@ -11,11 +11,11 @@ interface Settings {
 // 处理自动保存文件到下载目录
 ipcMain.handle('file:saveToDownloads', async (event, args) => {
     try {
-        const { fileName, fileData } = args;
+        const { fileName, fileData, fileType } = args;
+        console.log(`主进程: 准备保存文件 ${fileName}, 类型: ${fileType}`);
 
-        // 从设置中获取下载目录
-        const settings = (store.get('settings') || {}) as Settings;
-        const downloadPath = settings.downloadPath || app.getPath('downloads');
+        // 从设置中获取下载目录，或使用默认下载目录
+        const downloadPath = app.getPath('downloads');
 
         // 确保目录存在
         if (!fs.existsSync(downloadPath)) {
@@ -25,13 +25,14 @@ ipcMain.handle('file:saveToDownloads', async (event, args) => {
         // 构建完整文件路径
         const filePath = path.join(downloadPath, fileName);
 
-        // 写入文件 - 直接使用 ArrayBuffer
+        // 写入文件
         fs.writeFileSync(filePath, Buffer.from(fileData));
+        console.log(`主进程: 文件已保存到 ${filePath}`);
 
         // 返回保存的路径
         return filePath;
     } catch (error) {
-        console.error('保存文件失败:', error);
+        console.error('主进程: 保存文件失败:', error);
         throw error;
     }
 });
