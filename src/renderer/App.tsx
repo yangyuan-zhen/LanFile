@@ -14,6 +14,7 @@ const App: React.FC = () => {
         <MainLayout>
           <RouterProvider router={router} />
         </MainLayout>
+
         <CurrentTransfers />
         <FirewallAlert />
       </NotificationProvider>

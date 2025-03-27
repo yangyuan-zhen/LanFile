@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useGlobalPeerJS } from "../../../contexts/PeerJSContext";
 import {
   Progress,
@@ -204,16 +204,29 @@ export const CurrentTransfers: React.FC = () => {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
+  // 在组件开始添加更多调试
+  useEffect(() => {
+    console.log("CurrentTransfers 组件挂载");
+    console.log("当前传输任务:", transfers);
+
+    // 添加固定时间检查，防止数据未及时更新
+    const timer = setInterval(() => {
+      console.log("传输状态定时检查:", transfers);
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, [transfers]);
+
   return (
     <Box
       position="fixed"
       bottom="20px"
       right="20px"
       width="350px"
-      zIndex={1000}
+      zIndex={9999}
       borderRadius="md"
-      overflow="hidden"
-      boxShadow="xl"
+      overflow="visible"
+      boxShadow="0 0 20px rgba(0,0,0,0.3)"
       bg="white"
     >
       <Card p={0} bg="white" borderRadius="md">
