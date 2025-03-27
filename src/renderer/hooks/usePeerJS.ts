@@ -14,7 +14,7 @@ interface FileTransfer {
 
 export const usePeerJS = () => {
     const [peer, setPeer] = useState<Peer | null>(null);
-    const [connections, setConnections] = useState<Record<string, any>>({});
+    const [connections, setConnections] = useState<Map<string, any>>(new Map());
     const [isReady, setIsReady] = useState(false);
     const [transfers, setTransfers] = useState<FileTransfer[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -96,7 +96,11 @@ export const usePeerJS = () => {
 
         conn.on('open', () => {
             console.log(`与 ${conn.peer} 的连接已打开`);
-            setConnections(prev => ({ ...prev, [conn.peer]: conn }));
+            setConnections(prev => {
+                const newConnections = new Map(prev);
+                newConnections.set(conn.peer, conn);
+                return newConnections;
+            });
         });
 
         conn.on('data', (data: any) => {
@@ -134,8 +138,8 @@ export const usePeerJS = () => {
         conn.on('close', () => {
             console.log(`与 ${conn.peer} 的连接已关闭`);
             setConnections(prev => {
-                const newConnections = { ...prev };
-                delete newConnections[conn.peer];
+                const newConnections = new Map(prev);
+                newConnections.delete(conn.peer);
                 return newConnections;
             });
         });
@@ -186,7 +190,9 @@ export const usePeerJS = () => {
                 conn.on('open', () => {
                     console.log(`成功连接到 ${remotePeerId}`);
                     clearTimeout(timeout);
-                    setConnections(prev => ({ ...prev, [remotePeerId]: conn }));
+                    const newConnections = new Map(connections);
+                    newConnections.set(remotePeerId, conn);
+                    setConnections(newConnections);
                     isConnecting.current = false;
                     setStatus('connected');
                     resolve(true);
