@@ -2,7 +2,7 @@
   "name": "lanfile",
   "version": "1.0.0",
   "description": "LAN File Transfer Application",
-  "main": "./dist/main/index.js",
+  "main": "dist/main/index.js",
   "scripts": {
     "start": "electron .",
     "dev:compile": "tsc -p tsconfig.node.json",

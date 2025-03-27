@@ -13,6 +13,7 @@ import { logService } from './services/LogService';
 import { registerNetworkHandlers } from './services/NetworkService';
 import { peerDiscoveryService } from './services/PeerDiscoveryService';
 import fs from 'fs';
+import './ipc-handlers';  // 这里导入包含所有IPC处理程序的文件
 
 // 在应用顶部添加
 app.commandLine.appendSwitch('lang', 'zh-CN');
@@ -577,21 +578,5 @@ function addFirewallRule(name: string, protocol: string, port: number) {
 
     addRule.on('close', (code: number | null) => {
         console.log(`添加防火墙规则 ${name} ${protocol}:${port} ${code === 0 ? '成功' : '失败'}`);
-    });
-}
-
-// 检查UDP端口是否可用
-function checkUdpPortAvailability(port: number) {
-    const dgram = require('dgram');
-    const server = dgram.createSocket('udp4');
-
-    server.on('error', (err: Error) => {
-        console.error(`UDP端口 ${port} 不可用:`, err);
-        server.close();
-    });
-
-    server.bind(port, () => {
-        console.log(`UDP端口 ${port} 可用`);
-        server.close();
     });
 } 
