@@ -165,9 +165,12 @@ export const usePeerJS = () => {
                 const progress = Math.min(100, Math.floor((receivedSize / fileInfo.current[transferId].size) * 100));
 
                 // 更新传输进度
-                setTransfers(prev =>
-                    prev.map(t => t.id === transferId ? { ...t, progress, status: 'transferring' } : t)
-                );
+                setTransfers(prev => {
+                    const updated = prev.map(t => t.id === transferId ?
+                        { ...t, progress, status: 'transferring' as const } : t);
+                    console.log("传输状态更新:", updated);
+                    return updated;
+                });
             }
             else if (data.type === 'file-complete') {
                 const transferId = data.transferId;
@@ -453,7 +456,7 @@ export const usePeerJS = () => {
         let offset = 0;
 
         setTransfers(prev =>
-            prev.map(t => t.id === transferId ? { ...t, status: 'transferring' } : t)
+            prev.map(t => t.id === transferId ? { ...t, status: 'transferring' as const } : t)
         );
 
         return new Promise<void>((resolve, reject) => {
@@ -490,7 +493,7 @@ export const usePeerJS = () => {
                     // 更新UI状态
                     setTransfers(prev =>
                         prev.map(t => t.id === transferId ?
-                            { ...t, progress: 100, status: 'completed' } : t)
+                            { ...t, progress: 100, status: 'completed' as const } : t)
                     );
                     resolve();
                 }

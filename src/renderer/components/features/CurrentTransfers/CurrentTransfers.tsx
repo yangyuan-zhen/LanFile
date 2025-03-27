@@ -25,6 +25,9 @@ import {
 export const CurrentTransfers: React.FC = () => {
   const { transfers } = usePeerJS();
 
+  // 添加调试日志
+  console.log("CurrentTransfers 渲染:", transfers);
+
   // 辅助函数，格式化文件大小
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + " B";
