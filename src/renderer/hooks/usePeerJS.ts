@@ -15,6 +15,10 @@ export interface FileTransfer {
     speed?: number;
 }
 
+const debug = (message: string, ...args: any[]) => {
+    console.log(`[usePeerJS] ${message}`, ...args);
+};
+
 export const usePeerJS = () => {
     const [peer, setPeer] = useState<Peer | null>(null);
     const [connections, setConnections] = useState<Map<string, any>>(new Map());
@@ -33,6 +37,11 @@ export const usePeerJS = () => {
     const transferTimes = useRef<Record<string, { lastTime: number; lastBytes: number }>>({});
 
     const { chunkSize } = useSettings();
+
+    // 在 useEffect 中添加日志，监控 transfers 状态变化
+    useEffect(() => {
+        debug("Transfers state updated:", transfers);
+    }, [transfers]);
 
     // 初始化PeerJS
     useEffect(() => {
@@ -126,8 +135,7 @@ export const usePeerJS = () => {
                 fileChunks.current[data.transferId] = [];
 
                 // 创建新的传输记录
-                const transfer: FileTransfer = {
-                    id: data.transferId,
+                const transferId = addFileTransfer({
                     name: data.name,
                     size: data.size,
                     type: data.fileType,
@@ -135,9 +143,18 @@ export const usePeerJS = () => {
                     status: 'pending',
                     direction: 'download',
                     peerId: conn.peer
-                };
+                });
 
-                setTransfers(prev => [...prev, transfer]);
+                setTransfers(prev => [...prev, {
+                    id: transferId,
+                    name: data.name,
+                    size: data.size,
+                    type: data.fileType,
+                    progress: 0,
+                    status: 'pending',
+                    direction: 'download',
+                    peerId: conn.peer
+                }]);
 
                 // 确认文件信息接收 - 确保这一步不会被跳过
                 try {
@@ -641,21 +658,18 @@ export const usePeerJS = () => {
         console.log(`触发通知事件：file-transfer-complete，ID: ${transferId}`);
     }
 
-    // 添加新传输时的函数
-    const addTransfer = (transfer: Omit<FileTransfer, 'id'>) => {
+    // 修改添加传输的函数
+    const addFileTransfer = (fileInfo: Omit<FileTransfer, 'id'>) => {
         const id = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
-        const newTransfer: FileTransfer = {
-            id,
-            ...transfer,
-        };
+        const newTransfer: FileTransfer = { id, ...fileInfo };
 
-        console.log("添加新传输:", newTransfer);
+        debug("Adding new transfer:", newTransfer);
 
-        // 使用函数式更新确保状态正确更新
+        // 使用函数式更新确保最新状态
         setTransfers(prev => {
-            const updated = [...prev, newTransfer];
-            console.log("添加后的传输列表:", updated);
-            return updated;
+            const newTransfers = [...prev, newTransfer];
+            debug("Transfers after adding:", newTransfers);
+            return newTransfers;
         });
 
         return id;

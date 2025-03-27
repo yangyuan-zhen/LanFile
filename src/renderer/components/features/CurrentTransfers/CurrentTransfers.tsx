@@ -30,7 +30,8 @@ import {
 import type { FileTransfer } from "../../../hooks/usePeerJS";
 
 export const CurrentTransfers: React.FC = () => {
-  const { transfers } = useGlobalPeerJS();
+  const peerContext = useGlobalPeerJS();
+  const { transfers } = peerContext;
 
   // 每次渲染时打印收到的 transfers
   console.log(
@@ -55,6 +56,18 @@ export const CurrentTransfers: React.FC = () => {
     return () => clearInterval(timer);
   }, [transfers]); // 依赖数组包含 transfers
 
+  // 添加测试传输函数
+  const addTestTransfer = () => {
+    // 直接访问 context 对象并测试
+    if (window.electron) {
+      window.electron.invoke("debug:addTestTransfer");
+    } else {
+      // 模拟添加一个测试传输
+      console.log("添加测试传输 - 模拟数据");
+      // 这里需要实际修改 transfers 状态
+    }
+  };
+
   // --- 临时的简化渲染 ---
   return (
     <Box
@@ -73,6 +86,9 @@ export const CurrentTransfers: React.FC = () => {
       <Text fontWeight="bold" mb={2}>
         文件传输 (调试模式)
       </Text>
+      <Button colorScheme="blue" size="sm" onClick={addTestTransfer} mb={2}>
+        添加测试传输
+      </Button>
       <Text fontSize="sm" mb={1}>
         从 Context 获取到的 Transfers 数量: {transfers?.length ?? "N/A"}
       </Text>

@@ -1,5 +1,12 @@
-import React, { createContext, useContext, ReactNode, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  ReactNode,
+  useEffect,
+  useState,
+} from "react";
 import { usePeerJS } from "../hooks/usePeerJS";
+import type { FileTransfer } from "../hooks/usePeerJS";
 
 // 创建上下文
 export const PeerJSContext = createContext<
@@ -10,15 +17,25 @@ export const PeerJSContext = createContext<
 export const PeerJSProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const peer = usePeerJS();
+  const peerState = usePeerJS();
+  const [, forceUpdate] = useState({});
 
-  // 添加调试日志
+  // 添加调试日志和强制更新
   useEffect(() => {
-    console.log("PeerJSContext 传输状态更新:", peer.transfers);
-  }, [peer.transfers]);
+    console.log("[PeerJSContext] 传输状态更新:", peerState.transfers);
+
+    // 每当transfers变化时，强制组件树重新渲染
+    const timer = setTimeout(() => {
+      forceUpdate({});
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [peerState.transfers]);
 
   return (
-    <PeerJSContext.Provider value={peer}>{children}</PeerJSContext.Provider>
+    <PeerJSContext.Provider value={peerState}>
+      {children}
+    </PeerJSContext.Provider>
   );
 };
 
