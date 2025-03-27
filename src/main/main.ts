@@ -26,8 +26,8 @@ ipcMain.handle('file:saveToDownloads', async (event, args) => {
         // 构建完整文件路径
         const filePath = path.join(downloadPath, fileName);
 
-        // 写入文件
-        fs.writeFileSync(filePath, Buffer.from(await fileData.arrayBuffer()));
+        // 写入文件 - 直接使用 ArrayBuffer
+        fs.writeFileSync(filePath, Buffer.from(fileData));
 
         // 返回保存的路径
         return filePath;

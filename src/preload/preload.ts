@@ -13,7 +13,11 @@ contextBridge.exposeInMainWorld('electron', {
             'fileName' in args &&
             'fileData' in args
         ) {
-            return await ipcRenderer.invoke(channel, args);
+            // 确保 fileData 是一个 ArrayBuffer
+            return await ipcRenderer.invoke(channel, {
+                fileName: args.fileName,
+                fileData: args.fileData  // ArrayBuffer 是可序列化的
+            });
         }
         // 其他现有的 invoke 调用...
     }

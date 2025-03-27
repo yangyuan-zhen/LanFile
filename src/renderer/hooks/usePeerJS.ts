@@ -108,7 +108,7 @@ export const usePeerJS = () => {
             });
         });
 
-        conn.on('data', (data: any) => {
+        conn.on('data', async (data: any) => {
             // 对于文件信息，立即发送确认
             if (data.type === 'file-info') {
                 console.log('收到文件信息:', data.transferId);
@@ -197,10 +197,13 @@ export const usePeerJS = () => {
                 // 创建 Blob
                 const blob = new Blob([completeFile], { type: fileInfo.current[transferId].type });
 
-                // 修改这里：直接保存到下载目录而不是弹出对话框
+                // 将 Blob 转换为 ArrayBuffer 再传递
+                const arrayBuffer = await blob.arrayBuffer();
+
+                // 修改这里：使用 ArrayBuffer 而不是 Blob
                 window.electron.invoke('file:saveToDownloads', {
                     fileName: fileInfo.current[transferId].name,
-                    fileData: blob
+                    fileData: arrayBuffer  // 传递 ArrayBuffer 而不是 Blob
                 }).then((savedPath: string) => {
                     console.log('文件已自动保存到:', savedPath);
 
