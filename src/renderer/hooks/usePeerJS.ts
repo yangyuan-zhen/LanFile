@@ -22,6 +22,10 @@ export const usePeerJS = () => {
     const [deviceId, setDeviceId] = useState<string>('');
     const isConnecting = useRef<boolean>(false);
 
+    // 提升到全局，而不是每个连接单独维护
+    const fileChunks = useRef<Record<string, Uint8Array[]>>({});
+    const fileInfo = useRef<Record<string, any>>({});
+
     // 初始化PeerJS
     useEffect(() => {
         const initPeer = async () => {
@@ -94,10 +98,6 @@ export const usePeerJS = () => {
     const handleIncomingConnection = useCallback((conn: any) => {
         console.log(`收到来自 ${conn.peer} 的连接`);
 
-        // 用于存储传输中的文件数据
-        const fileChunks: Record<string, Uint8Array[]> = {};
-        const fileInfo: Record<string, any> = {};
-
         conn.on('open', () => {
             console.log(`与 ${conn.peer} 的连接已打开`);
             setConnections(prev => {
@@ -108,14 +108,15 @@ export const usePeerJS = () => {
         });
 
         conn.on('data', (data: any) => {
-            // 处理接收到的数据
-            if (data.type === 'file-info') {
-                // 处理文件信息
-                console.log('收到文件信息:', data);
+            // 添加更详细的日志
+            console.log(`收到来自 ${conn.peer} 的数据:`, data.type);
 
-                // 存储文件信息，准备接收文件
-                fileInfo[data.transferId] = data;
-                fileChunks[data.transferId] = [];
+            if (data.type === 'file-info') {
+                console.log('收到文件信息:', data.transferId);
+
+                // 存储到全局引用中
+                fileInfo.current[data.transferId] = data;
+                fileChunks.current[data.transferId] = [];
 
                 // 创建新的传输记录
                 const transfer: FileTransfer = {
@@ -135,24 +136,29 @@ export const usePeerJS = () => {
                 conn.send({ type: 'file-info-received', transferId: data.transferId });
             }
             else if (data.type === 'file-chunk') {
-                // 确保我们有此传输的文件信息
                 const transferId = data.transferId;
-                if (!fileInfo[transferId]) {
+                // 更详细的日志
+                console.log(`收到文件块 ${transferId}, 块大小:`, data.data.byteLength);
+
+                // 检查引用中是否存在
+                if (!fileInfo.current[transferId]) {
                     console.error('收到未知传输ID的文件块:', transferId);
+                    // 请求重新发送文件信息
+                    conn.send({ type: 'request-file-info', transferId });
                     return;
                 }
 
-                // 将文件块转换为 Uint8Array 并存储
+                // 存储到全局引用
                 const chunk = new Uint8Array(data.data);
-                fileChunks[transferId].push(chunk);
+                fileChunks.current[transferId].push(chunk);
 
                 // 计算已接收的总大小
-                const receivedSize = fileChunks[transferId].reduce(
+                const receivedSize = fileChunks.current[transferId].reduce(
                     (total, chunk) => total + chunk.byteLength, 0
                 );
 
                 // 计算进度并更新
-                const progress = Math.min(100, Math.floor((receivedSize / fileInfo[transferId].size) * 100));
+                const progress = Math.min(100, Math.floor((receivedSize / fileInfo.current[transferId].size) * 100));
 
                 // 更新传输进度
                 setTransfers(prev =>
@@ -161,31 +167,32 @@ export const usePeerJS = () => {
             }
             else if (data.type === 'file-complete') {
                 const transferId = data.transferId;
-                if (!fileInfo[transferId] || !fileChunks[transferId]) {
+                // 检查引用中是否存在
+                if (!fileInfo.current[transferId] || !fileChunks.current[transferId]) {
                     console.error('收到未知传输ID的完成消息:', transferId);
                     return;
                 }
 
-                // 合并所有块，创建完整文件
-                const totalLength = fileChunks[transferId].reduce(
+                // 使用全局引用
+                const totalLength = fileChunks.current[transferId].reduce(
                     (total, chunk) => total + chunk.byteLength, 0
                 );
 
                 const completeFile = new Uint8Array(totalLength);
                 let offset = 0;
 
-                for (const chunk of fileChunks[transferId]) {
+                for (const chunk of fileChunks.current[transferId]) {
                     completeFile.set(chunk, offset);
                     offset += chunk.byteLength;
                 }
 
                 // 创建 Blob 并触发下载
-                const blob = new Blob([completeFile], { type: fileInfo[transferId].type });
+                const blob = new Blob([completeFile], { type: fileInfo.current[transferId].type });
                 const url = URL.createObjectURL(blob);
 
                 // 使用 electron 的 API 保存文件
                 window.electron.invoke('file:saveDownload', {
-                    fileName: fileInfo[transferId].name,
+                    fileName: fileInfo.current[transferId].name,
                     fileData: url
                 });
 
@@ -195,9 +202,18 @@ export const usePeerJS = () => {
                         { ...t, progress: 100, status: 'completed' } : t)
                 );
 
-                // 清理缓存的数据
-                delete fileChunks[transferId];
-                delete fileInfo[transferId];
+                // 清理全局引用中的数据
+                delete fileChunks.current[transferId];
+                delete fileInfo.current[transferId];
+            }
+            // 添加请求文件信息的处理
+            else if (data.type === 'request-file-info') {
+                // 如果是发送方，重新发送文件信息
+                const transfer = transfers.find(t => t.id === data.transferId);
+                if (transfer && transfer.direction === 'upload') {
+                    // 重新发送文件信息
+                    conn.send(fileInfo.current[data.transferId]);
+                }
             }
         });
 
