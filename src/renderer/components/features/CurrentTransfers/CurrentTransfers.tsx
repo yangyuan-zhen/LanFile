@@ -28,6 +28,7 @@ import {
   FaTrash,
 } from "react-icons/fa";
 import type { FileTransfer } from "../../../hooks/usePeerJS";
+import TransferItem from "./TransferItem";
 
 export const CurrentTransfers: React.FC = () => {
   const peerContext = useGlobalPeerJS();
@@ -104,104 +105,6 @@ export const CurrentTransfers: React.FC = () => {
     window.electron.invoke("file:openFile", path);
   };
 
-  // 渲染传输项
-  const renderTransferItem = (transfer: FileTransfer) => (
-    <div
-      key={transfer.id}
-      className="p-4 mb-4 rounded-lg border border-gray-200"
-    >
-      <div className="flex justify-between items-center mb-2">
-        <div className="flex items-center">
-          <Icon
-            as={transfer.direction === "upload" ? FaUpload : FaDownload}
-            color={transfer.direction === "upload" ? "green.500" : "blue.500"}
-            mr={3}
-          />
-          <div>
-            <Text fontWeight="medium">{transfer.name}</Text>
-            <Text fontSize="sm" color="gray.500">
-              {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
-              {transfer.peerId}
-            </Text>
-          </div>
-        </div>
-        <div className="text-right">
-          {transfer.speed && (
-            <Text
-              fontSize="sm"
-              fontWeight="semibold"
-              color={transfer.direction === "upload" ? "green.500" : "blue.500"}
-            >
-              {formatSpeed(transfer.speed)}
-            </Text>
-          )}
-          <Text fontSize="xs" color="gray.500">
-            {transfer.status === "transferring"
-              ? "传输中"
-              : getStatusText(transfer.status)}
-          </Text>
-        </div>
-      </div>
-
-      <div className="relative pt-1">
-        <div className="flex justify-between items-center mb-2">
-          <span
-            className="inline-block text-xs font-semibold"
-            color={
-              transfer.status === "error"
-                ? "red.500"
-                : transfer.status === "completed"
-                ? "green.500"
-                : "blue.500"
-            }
-          >
-            {transfer.progress}%
-          </span>
-          <span className="inline-block text-xs font-semibold text-gray-600">
-            {formatSize(transfer.size * (transfer.progress / 100))}/
-            {formatSize(transfer.size)}
-          </span>
-        </div>
-
-        <Progress
-          mt={1}
-          size="sm"
-          value={transfer.progress}
-          colorScheme={
-            transfer.status === "error"
-              ? "red"
-              : transfer.status === "completed"
-              ? "green"
-              : "blue"
-          }
-          borderRadius="full"
-          hasStripe={transfer.status === "transferring"}
-          isAnimated={transfer.status === "transferring"}
-        />
-      </div>
-
-      {/* 如果传输完成且有保存路径，添加操作按钮 */}
-      {transfer.status === "completed" && transfer.savedPath && (
-        <div className="flex mt-3 space-x-2">
-          <Button
-            size="xs"
-            leftIcon={<Icon as={FaFolder} />}
-            onClick={() => openFileLocation(transfer.savedPath!)}
-          >
-            打开文件夹
-          </Button>
-          <Button
-            size="xs"
-            leftIcon={<Icon as={FaFile} />}
-            onClick={() => openFile(transfer.savedPath!)}
-          >
-            打开文件
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <Box
       position="fixed"
@@ -261,24 +164,31 @@ export const CurrentTransfers: React.FC = () => {
 
         {/* 内容区 */}
         <Collapse in={isExpanded} animateOpacity>
-          <Box
-            p={transfers.length > 0 ? 2 : 0}
-            maxHeight="400px"
-            overflowY="auto"
-          >
+          <Box p={3} maxHeight="400px" overflowY="auto">
             {!transfers || filteredTransfers.length === 0 ? (
               <Flex
                 direction="column"
                 align="center"
                 justify="center"
-                py={4}
+                py={6}
                 color="gray.500"
               >
-                <Icon as={FaInbox} boxSize={8} mb={2} />
+                <Icon as={FaInbox} boxSize={8} mb={3} />
                 <Text>暂无传输任务</Text>
               </Flex>
             ) : (
-              filteredTransfers.map((transfer) => renderTransferItem(transfer))
+              filteredTransfers.map((transfer) => (
+                <Box key={transfer.id} mb={3}>
+                  <TransferItem
+                    transfer={transfer}
+                    formatSize={formatSize}
+                    formatSpeed={formatSpeed}
+                    getStatusText={getStatusText}
+                    openFileLocation={openFileLocation}
+                    openFile={openFile}
+                  />
+                </Box>
+              ))
             )}
           </Box>
         </Collapse>
