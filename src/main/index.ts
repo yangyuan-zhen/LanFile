@@ -12,6 +12,7 @@ import dgram from 'dgram';
 import { logService } from './services/LogService';
 import { registerNetworkHandlers } from './services/NetworkService';
 import { peerDiscoveryService } from './services/PeerDiscoveryService';
+import fs from 'fs';
 
 // 在应用顶部添加
 app.commandLine.appendSwitch('lang', 'zh-CN');
@@ -402,6 +403,35 @@ function setupIpcHandlers() {
 
     // 注册网络处理程序
     registerNetworkHandlers();
+
+    // 处理文件下载保存
+    ipcMain.handle('file:saveDownload', async (_, data) => {
+        try {
+            const { fileName, fileData } = data;
+
+            // 打开保存对话框
+            const { canceled, filePath } = await dialog.showSaveDialog({
+                title: '保存文件',
+                defaultPath: fileName,
+                buttonLabel: '保存'
+            });
+
+            if (canceled || !filePath) {
+                return { success: false, message: '用户取消了保存操作' };
+            }
+
+            // 将 URL 转换为实际的文件数据并保存
+            const response = await fetch(fileData);
+            const buffer = await response.arrayBuffer();
+
+            fs.writeFileSync(filePath, Buffer.from(buffer));
+
+            return { success: true, filePath };
+        } catch (error) {
+            console.error('保存下载文件失败:', error);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    });
 
     console.log("设置处理程序注册完成");
 }

@@ -57,7 +57,8 @@ const invokeHandler = (channel: string, ...args: any[]) => {
         'signaling:sendMessage',
         'signaling:stop',
         'signaling:getServerConfig',
-        'signaling:getServerUrl'
+        'signaling:getServerUrl',
+        'file:saveDownload'
     ];
 
     const isAllowed = validChannels.includes(channel) ||
@@ -171,6 +172,11 @@ try {
                 ipcRenderer.on('signaling:deviceDisconnected', (_, deviceId) => callback(deviceId)),
             onMessage: (callback: (message: any) => void) =>
                 ipcRenderer.on('signaling:message', (_, message) => callback(message)),
+        },
+
+        file: {
+            saveDownload: (data: { fileName: string, fileData: string }) =>
+                ipcRenderer.invoke('file:saveDownload', data)
         }
     });
 

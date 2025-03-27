@@ -1,137 +1,122 @@
-import React, { useState } from "react";
-import FileTransferCard from "../FileTransferCard/FileTransferCard";
+import React from "react";
 import { usePeerJS } from "../../../hooks/usePeerJS";
+import {
+  Progress,
+  Card,
+  Text,
+  Flex,
+  Box,
+  Icon,
+  IconButton,
+  Tooltip,
+} from "@chakra-ui/react";
+import {
+  FaUpload,
+  FaDownload,
+  FaCheck,
+  FaTimes,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 
-interface TransferItem {
-  id: string;
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  transferredSize: number;
-  speed: string;
-  direction: "download" | "upload";
-  sourceDevice?: string;
-  targetDevice?: string;
-  progress: number;
-  timeRemaining: string;
-}
+export const CurrentTransfers: React.FC = () => {
+  const { transfers } = usePeerJS();
 
-interface CurrentTransfersProps {
-  transfers: TransferItem[];
-}
-
-export const CurrentTransfers: React.FC<CurrentTransfersProps> = ({
-  transfers,
-}) => {
-  const [showDetails, setShowDetails] = useState(false);
-  const [selectedTransfer, setSelectedTransfer] = useState<TransferItem | null>(
-    null
-  );
-
-  const { transfers: peerTransfers, sendFile, connectToPeer } = usePeerJS();
-
-  const handleTransferClick = (transfer: TransferItem) => {
-    setSelectedTransfer(transfer);
-    setShowDetails(true);
-  };
-
-  const closeDetails = () => {
-    setShowDetails(false);
-  };
-
-  const sendFileViaWebRTC = async (file: File, peerId: string) => {
-    try {
-      await sendFile(peerId, file);
-    } catch (error) {
-      console.error("文件传输失败:", error);
-      // 处理错误...
-    }
-  };
-
-  if (transfers.length === 0) {
+  if (!transfers || transfers.length === 0) {
     return null;
   }
 
+  // 辅助函数，格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    if (bytes < 1024 * 1024 * 1024)
+      return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+  };
+
+  // 显示每个正在进行的文件传输
   return (
-    <>
-      <div className="p-6 mb-6 bg-white rounded-xl shadow-sm">
-        <h3 className="mb-4 text-lg font-semibold text-gray-800">当前传输</h3>
-
+    <Box
+      position="fixed"
+      bottom="20px"
+      right="20px"
+      width="350px"
+      zIndex={1000}
+    >
+      <Card p={4} boxShadow="lg" bg="white" borderRadius="md">
+        <Text fontWeight="bold" mb={3}>
+          文件传输
+        </Text>
         {transfers.map((transfer) => (
-          <FileTransferCard
+          <Box
             key={transfer.id}
-            {...transfer}
-            onClick={() => handleTransferClick(transfer)}
-          />
-        ))}
-      </div>
-
-      {/* 传输详情弹窗 */}
-      {showDetails && (
-        <div className="fixed right-8 bottom-8 z-30 p-4 w-80 bg-white rounded-lg border border-gray-200 shadow-xl">
-          <div className="flex justify-between items-center mb-3">
-            <h4 className="font-semibold text-gray-800">传输详情</h4>
-            <button
-              onClick={closeDetails}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <i className="fas fa-times"></i>
-            </button>
-          </div>
-
-          <div className="mb-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">文件名称:</span>
-              <span className="font-medium">{selectedTransfer?.fileName}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">传输速度:</span>
-              <span className="font-medium">{selectedTransfer?.speed}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">剩余时间:</span>
-              <span className="font-medium">
-                {selectedTransfer?.timeRemaining}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">已传输:</span>
-              <span className="font-medium">
-                {(selectedTransfer?.transferredSize || 0) / (1024 * 1024)} MB /{" "}
-                {(selectedTransfer?.fileSize || 0) / (1024 * 1024)} MB
-              </span>
-            </div>
-          </div>
-
-          <div className="pt-3 mb-3 border-t border-gray-200">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">传输类型:</span>
-              <span className="font-medium">
-                {selectedTransfer?.direction === "download" ? "下载" : "上传"}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">
-                {selectedTransfer?.direction === "download" ? "来源:" : "目标:"}
-              </span>
-              <span className="font-medium">
-                {selectedTransfer?.direction === "download"
-                  ? selectedTransfer?.sourceDevice
-                  : selectedTransfer?.targetDevice}
-              </span>
-            </div>
-          </div>
-
-          <button
-            className="flex justify-center items-center py-2 w-full text-white bg-red-500 rounded transition-colors hover:bg-red-600"
-            onClick={closeDetails}
+            mb={3}
+            p={3}
+            borderWidth="1px"
+            borderRadius="md"
           >
-            <i className="mr-1 fas fa-times-circle"></i>
-            <span>关闭详情</span>
-          </button>
-        </div>
-      )}
-    </>
+            <Flex justify="space-between" align="center" mb={2}>
+              <Flex align="center">
+                <Icon
+                  as={transfer.direction === "upload" ? FaUpload : FaDownload}
+                  mr={2}
+                  color={
+                    transfer.direction === "upload" ? "blue.500" : "green.500"
+                  }
+                />
+                <Text fontWeight="medium" isTruncated maxWidth="200px">
+                  {transfer.name}
+                </Text>
+              </Flex>
+              <Flex>
+                {transfer.status === "completed" && (
+                  <Tooltip label="传输完成">
+                    <Icon as={FaCheck} color="green.500" />
+                  </Tooltip>
+                )}
+                {transfer.status === "error" && (
+                  <Tooltip label="传输失败">
+                    <Icon as={FaExclamationTriangle} color="red.500" />
+                  </Tooltip>
+                )}
+              </Flex>
+            </Flex>
+
+            <Text fontSize="sm" color="gray.600" mb={1}>
+              {formatFileSize(transfer.size)}
+              {transfer.direction === "upload" ? " → " : " ← "}
+              {transfer.peerId}
+            </Text>
+
+            <Progress
+              value={transfer.progress}
+              size="sm"
+              colorScheme={
+                transfer.status === "error"
+                  ? "red"
+                  : transfer.status === "completed"
+                  ? "green"
+                  : "blue"
+              }
+              borderRadius="full"
+            />
+
+            <Flex justify="space-between" mt={1}>
+              <Text fontSize="xs" color="gray.500">
+                {transfer.status === "completed"
+                  ? "已完成"
+                  : transfer.status === "error"
+                  ? "出错"
+                  : `${transfer.progress}%`}
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                {transfer.direction === "upload" ? "上传中" : "下载中"}
+              </Text>
+            </Flex>
+          </Box>
+        ))}
+      </Card>
+    </Box>
   );
 };
 

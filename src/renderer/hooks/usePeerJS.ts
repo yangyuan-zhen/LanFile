@@ -94,6 +94,10 @@ export const usePeerJS = () => {
     const handleIncomingConnection = useCallback((conn: any) => {
         console.log(`收到来自 ${conn.peer} 的连接`);
 
+        // 用于存储传输中的文件数据
+        const fileChunks: Record<string, Uint8Array[]> = {};
+        const fileInfo: Record<string, any> = {};
+
         conn.on('open', () => {
             console.log(`与 ${conn.peer} 的连接已打开`);
             setConnections(prev => {
@@ -108,6 +112,10 @@ export const usePeerJS = () => {
             if (data.type === 'file-info') {
                 // 处理文件信息
                 console.log('收到文件信息:', data);
+
+                // 存储文件信息，准备接收文件
+                fileInfo[data.transferId] = data;
+                fileChunks[data.transferId] = [];
 
                 // 创建新的传输记录
                 const transfer: FileTransfer = {
@@ -127,11 +135,69 @@ export const usePeerJS = () => {
                 conn.send({ type: 'file-info-received', transferId: data.transferId });
             }
             else if (data.type === 'file-chunk') {
-                // 处理文件块
+                // 确保我们有此传输的文件信息
+                const transferId = data.transferId;
+                if (!fileInfo[transferId]) {
+                    console.error('收到未知传输ID的文件块:', transferId);
+                    return;
+                }
+
+                // 将文件块转换为 Uint8Array 并存储
+                const chunk = new Uint8Array(data.data);
+                fileChunks[transferId].push(chunk);
+
+                // 计算已接收的总大小
+                const receivedSize = fileChunks[transferId].reduce(
+                    (total, chunk) => total + chunk.byteLength, 0
+                );
+
+                // 计算进度并更新
+                const progress = Math.min(100, Math.floor((receivedSize / fileInfo[transferId].size) * 100));
+
                 // 更新传输进度
+                setTransfers(prev =>
+                    prev.map(t => t.id === transferId ? { ...t, progress, status: 'transferring' } : t)
+                );
             }
             else if (data.type === 'file-complete') {
-                // 文件传输完成
+                const transferId = data.transferId;
+                if (!fileInfo[transferId] || !fileChunks[transferId]) {
+                    console.error('收到未知传输ID的完成消息:', transferId);
+                    return;
+                }
+
+                // 合并所有块，创建完整文件
+                const totalLength = fileChunks[transferId].reduce(
+                    (total, chunk) => total + chunk.byteLength, 0
+                );
+
+                const completeFile = new Uint8Array(totalLength);
+                let offset = 0;
+
+                for (const chunk of fileChunks[transferId]) {
+                    completeFile.set(chunk, offset);
+                    offset += chunk.byteLength;
+                }
+
+                // 创建 Blob 并触发下载
+                const blob = new Blob([completeFile], { type: fileInfo[transferId].type });
+                const url = URL.createObjectURL(blob);
+
+                // 使用 electron 的 API 保存文件
+                window.electron.invoke('file:saveDownload', {
+                    fileName: fileInfo[transferId].name,
+                    fileData: url
+                });
+
+                // 更新传输状态为完成
+                setTransfers(prev =>
+                    prev.map(t => t.id === transferId ?
+                        { ...t, progress: 100, status: 'completed' } : t)
+                );
+
+                // 清理缓存的数据
+                delete fileChunks[transferId];
+                delete fileInfo[transferId];
             }
         });
 
