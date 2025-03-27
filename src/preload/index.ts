@@ -58,7 +58,10 @@ const invokeHandler = (channel: string, ...args: any[]) => {
         'signaling:stop',
         'signaling:getServerConfig',
         'signaling:getServerUrl',
-        'file:saveDownload'
+        'file:saveDownload',
+        'file:saveToDownloads',
+        'file:openFolder',
+        'file:openFile'
     ];
 
     const isAllowed = validChannels.includes(channel) ||
@@ -176,7 +179,11 @@ try {
 
         file: {
             saveDownload: (data: { fileName: string, fileData: string }) =>
-                ipcRenderer.invoke('file:saveDownload', data)
+                ipcRenderer.invoke('file:saveDownload', data),
+            saveToDownloads: (data: { fileName: string, fileData: string, fileType: string }) =>
+                ipcRenderer.invoke('file:saveToDownloads', data),
+            openFolder: (folderPath: string) => ipcRenderer.invoke('file:openFolder', folderPath),
+            openFile: (filePath: string) => ipcRenderer.invoke('file:openFile', filePath)
         }
     });
 

@@ -668,67 +668,69 @@ export const usePeerJS = () => {
     // 完善 completeTransfer 函数实现
     const completeTransfer = async (transferId: string) => {
         try {
-            console.log(`开始完成传输: ${transferId}`);
+            console.log(`[usePeerJS] 准备合并文件:${transferId}`);
+
+            // 获取文件块
             const chunks = fileChunks.current[transferId];
             if (!chunks || chunks.length === 0) {
+                console.error(`[usePeerJS] 错误: 未找到文件块`);
                 throw new Error("没有接收到文件块");
-            }
-
-            // 过滤出有效的块
-            const validChunks = chunks.filter(chunk => chunk && chunk.byteLength);
-
-            // 计算总大小
-            const totalSize = validChunks.reduce((size, chunk) => size + chunk.byteLength, 0);
-
-            // 合并所有块
-            const fileData = new Uint8Array(totalSize);
-            let offset = 0;
-            for (const chunk of validChunks) {
-                fileData.set(chunk, offset);
-                offset += chunk.byteLength;
             }
 
             // 获取文件信息
             const info = fileInfo.current[transferId];
             if (!info) {
+                console.error(`[usePeerJS] 错误: 未找到文件信息`);
                 throw new Error("找不到文件信息");
             }
 
-            console.log(`准备保存文件: ${info.name}, 大小: ${totalSize} 字节`);
+            // 过滤出有效的块并合并
+            const validChunks = chunks.filter(chunk => chunk && chunk.byteLength);
+            const totalSize = validChunks.reduce((size, chunk) => size + chunk.byteLength, 0);
 
-            try {
-                // 使用正确的 API 保存文件
-                const savedPath = await window.electron.invoke('file:saveToDownloads', {
-                    fileName: info.name,
-                    fileData: Array.from(fileData),
-                    fileType: info.fileType || 'application/octet-stream'
-                });
+            console.log(`[usePeerJS] 准备合并文件:${transferId}，总大小:${totalSize} 字节`);
 
-                console.log(`文件成功保存到: ${savedPath}`);
-
-                // 更新传输状态
-                setTransfers(prev =>
-                    prev.map(t =>
-                        t.id === transferId
-                            ? { ...t, progress: 100, status: 'completed', savedPath }
-                            : t
-                    )
-                );
-
-                // 触发完成事件
-                window.dispatchEvent(new CustomEvent('file-transfer-complete', {
-                    detail: { transferId, savedPath }
-                }));
-
-                // 清理内存
-                delete fileChunks.current[transferId];
-                delete fileInfo.current[transferId];
-            } catch (saveError) {
-                console.error("保存文件失败:", saveError);
-                throw saveError;
+            // 合并所有块到一个ArrayBuffer
+            const fileData = new Uint8Array(totalSize);
+            let offset = 0;
+            for (const chunk of validChunks) {
+                fileData.set(new Uint8Array(chunk), offset);
+                offset += chunk.byteLength;
             }
+
+            // 调用主进程保存文件
+            console.log(`[usePeerJS] 调用主进程保存文件: ${info.name}`);
+            const savedPath = await window.electron.invoke('file:saveToDownloads', {
+                fileName: info.name,
+                fileData: Array.from(fileData),
+                fileType: info.fileType || 'application/octet-stream'
+            });
+
+            console.log(`[usePeerJS] 文件已自动保存到:${savedPath}`);
+
+            // 更新传输状态
+            setTransfers(prev =>
+                prev.map(t =>
+                    t.id === transferId
+                        ? { ...t, progress: 100, status: 'completed', savedPath }
+                        : t
+                )
+            );
+
+            // 清理内存
+            delete fileChunks.current[transferId];
+            delete fileInfo.current[transferId];
+
+            // 显示通知
+            if (window.Notification && Notification.permission === 'granted') {
+                new Notification('文件传输完成', {
+                    body: `${info.name} 已保存到下载文件夹`
+                });
+            }
+
+            return savedPath;
         } catch (error) {
-            console.error("完成传输时出错:", error);
+            console.error(`[usePeerJS] 完成传输错误:`, error);
             setTransfers(prev =>
                 prev.map(t =>
                     t.id === transferId
@@ -736,6 +738,7 @@ export const usePeerJS = () => {
                         : t
                 )
             );
+            throw error;
         }
     };
 

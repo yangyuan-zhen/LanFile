@@ -84,14 +84,54 @@ export const CurrentTransfers: React.FC = () => {
     }
   };
 
-  // 打开文件位置
-  const openFileLocation = (path: string) => {
-    window.electron.invoke("file:openFolder", path);
+  // 检查是否有活动的传输
+  const hasActiveTransfers =
+    transfers.filter(
+      (t) => t.status === "pending" || t.status === "transferring"
+    ).length > 0;
+
+  // 添加调试信息
+  console.log(`[CurrentTransfers] 当前传输任务:`, transfers);
+
+  // 处理传输完成事件
+  const handleTransferComplete = (transferId: string) => {
+    console.log(`[CurrentTransfers] 传输完成: ${transferId}`);
   };
 
-  // 打开文件
-  const openFile = (path: string) => {
-    window.electron.invoke("file:openFile", path);
+  // 处理传输打开文件
+  const handleOpenFile = async (filePath: string) => {
+    if (!filePath) {
+      console.error("文件路径为空，无法打开");
+      return;
+    }
+
+    try {
+      console.log(`[CurrentTransfers] 尝试打开文件: ${filePath}`);
+      const result = await window.electron.invoke("file:openFile", filePath);
+      if (!result.success) {
+        console.error("打开文件失败:", result.error);
+      }
+    } catch (error) {
+      console.error("打开文件错误:", error);
+    }
+  };
+
+  // 处理打开文件夹
+  const handleOpenFolder = async (filePath: string) => {
+    if (!filePath) {
+      console.error("文件路径为空，无法打开所在文件夹");
+      return;
+    }
+
+    try {
+      console.log(`[CurrentTransfers] 尝试打开文件夹: ${filePath}`);
+      const result = await window.electron.invoke("file:openFolder", filePath);
+      if (!result.success) {
+        console.error("打开文件夹失败:", result.error);
+      }
+    } catch (error) {
+      console.error("打开文件夹错误:", error);
+    }
   };
 
   return (
@@ -172,8 +212,11 @@ export const CurrentTransfers: React.FC = () => {
                   formatSpeed={formatSpeed}
                   formatTimeRemaining={formatTimeRemaining}
                   getStatusText={getStatusText}
-                  openFileLocation={openFileLocation}
-                  openFile={openFile}
+                  openFileLocation={handleOpenFolder}
+                  openFile={handleOpenFile}
+                  onOpenFile={handleOpenFile}
+                  onOpenFolder={handleOpenFolder}
+                  onTransferComplete={handleTransferComplete}
                 />
               </Box>
             ))
