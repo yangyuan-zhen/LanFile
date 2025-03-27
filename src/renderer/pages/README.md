@@ -113,20 +113,36 @@ export const SendPage: React.FC = () => {
 
 ### 3.3 接收文件 (Receive)
 
-`ReceivePage` 是针对文件接收设计的专用页面，目前提供了基础框架：
+`ReceivePage` 是针对文件接收设计的专用页面，提供以下功能：
 
-- 显示待接收的文件列表
-- 提供接收确认选项
-- 可以设置保存位置
-- 显示传输进度和状态
+- **文件预览**：显示发送方、文件名、大小等基本信息
+- **接收控制**：支持接受/拒绝传输请求
+- **存储位置**：可自定义文件保存路径
+- **传输进度**：实时显示接收进度、速度和剩余时间
+- **批量操作**：支持批量接受/拒绝多个传输请求
 
 ```typescript
-// Receive.tsx 基础结构
+// Receive.tsx 完整结构
 export const ReceivePage: React.FC = () => {
   return (
     <div className="p-4">
       <h2 className="text-xl font-semibold mb-4">接收文件</h2>
-      {/* 接收文件的具体实现 */}
+      <div className="space-y-4">
+        <FilePreview files={pendingFiles} />
+        <TransferControls
+          onAccept={handleAcceptTransfer}
+          onReject={handleRejectTransfer}
+        />
+        <StorageSelector
+          currentPath={savePath}
+          onPathChange={handlePathChange}
+        />
+        <TransferProgress
+          progress={transferProgress}
+          speed={transferSpeed}
+          timeRemaining={timeRemaining}
+        />
+      </div>
     </div>
   );
 };
@@ -385,6 +401,7 @@ export const HomePage = () => {
   ```
 
 - **键盘快捷键**：添加键盘导航和操作支持
+
   ```typescript
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -440,6 +457,46 @@ export const HomePage = () => {
       </div>
     )}
   </FixedSizeList>;
+  ```
+
+### 6.5 安全性增强
+
+- **传输加密**：实现端到端加密传输
+
+  ```typescript
+  const encryptionKey = await generateEncryptionKey();
+  const encryptedData = await encryptFile(file, encryptionKey);
+  ```
+
+- **设备认证**：添加设备认证机制
+
+  ```typescript
+  const authenticateDevice = async (deviceId: string) => {
+    const token = await generateAuthToken();
+    return await verifyDevice(deviceId, token);
+  };
+  ```
+
+- **传输验证**：添加文件完整性校验
+  ```typescript
+  const verifyFileIntegrity = async (file: File, checksum: string) => {
+    const calculatedChecksum = await calculateChecksum(file);
+    return calculatedChecksum === checksum;
+  };
+  ```
+
+### 6.6 国际化支持
+
+- **多语言支持**：使用 i18n 实现多语言界面
+
+  ```typescript
+  import { useTranslation } from 'react-i18next';
+
+  const { t } = useTranslation();
+
+  // 在组件中使用
+  <h2>{t('receive.title')}</h2>
+  <button>{t('common.accept')}</button>
   ```
 
 ## 总结

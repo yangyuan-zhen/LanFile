@@ -39,8 +39,57 @@ interface ElectronAPI {
   // 系统功能
   openExternal: (url: string) => Promise<void>;
   showItemInFolder: (path: string) => void;
-  openPath: (path: string) => Promise<string>;
+  openPath: (path: string) => Promise<void>;
+
+  // 文件传输
+  sendFile: (filePath: string, targetId: string) => Promise<void>;
+  receiveFile: (fileId: string, savePath: string) => Promise<void>;
+  cancelTransfer: (transferId: string) => void;
+
+  // 设备发现
+  discoverDevices: () => Promise<Device[]>;
+  getDeviceInfo: () => Promise<DeviceInfo>;
+
+  // 系统通知
+  showNotification: (options: NotificationOptions) => void;
 }
+
+interface Device {
+  id: string;
+  name: string;
+  ip: string;
+  platform: string;
+}
+
+interface DeviceInfo {
+  id: string;
+  name: string;
+  platform: string;
+  version: string;
+}
+
+interface NotificationOptions {
+  title: string;
+  body: string;
+  icon?: string;
+}
+```
+
+### 事件通道
+
+预加载脚本支持以下事件通道：
+
+```typescript
+// 文件传输事件
+"transfer:progress"; // 传输进度更新
+"transfer:complete"; // 传输完成
+"transfer:error"; // 传输错误
+"transfer:request"; // 新的传输请求
+
+// 设备发现事件
+"device:found"; // 发现新设备
+"device:lost"; // 设备离线
+"device:updated"; // 设备信息更新
 ```
 
 ## IPC 通信
@@ -68,6 +117,8 @@ window.electron.off("event-name", listener);
 2. **IPC 通道验证**: 验证所有 IPC 通道名称以防止注入攻击
 3. **有限的 API 暴露**: 只暴露必要的功能，避免过度暴露系统能力
 4. **沙盒化**: 支持渲染进程的沙盒化，限制能力
+5. **数据验证**: 对所有传入参数进行类型检查和验证
+6. **错误处理**: 实现全局错误捕获和日志记录机制
 
 ## 开发指南
 
