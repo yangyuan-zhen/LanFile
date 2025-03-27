@@ -694,14 +694,17 @@ export const usePeerJS = () => {
             }
 
             try {
-                // 调用 electron 的文件保存功能
-                const savedPath = await window.electron.invoke('file:saveToDownloads', {
+                // 使用简化的调用方式，排除类型问题
+                console.log('准备保存文件:', info.name, fileData.length, '字节');
+
+                const result = await window.electron.invoke('file:saveToDownloads', {
                     fileName: info.name,
                     fileData: Array.from(fileData),
-                    fileType: info.fileType
+                    fileType: info.fileType || 'application/octet-stream'
                 });
 
-                console.log('文件已保存到:', savedPath);
+                console.log('文件保存结果:', result);
+                const savedPath = result;
 
                 // 更新传输状态
                 setTransfers(prev =>

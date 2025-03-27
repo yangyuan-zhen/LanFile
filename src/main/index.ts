@@ -445,7 +445,7 @@ const createWindow = () => {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, '../preload/index.js'),
+            preload: path.join(__dirname, '../preload/preload.js'),
             sandbox: false
         }
     });
