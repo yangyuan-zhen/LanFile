@@ -589,6 +589,29 @@ export const usePeerJS = () => {
         }
     };
 
+    // 在文件传输完成时触发通知事件
+    const handleTransferComplete = (transfer: FileTransfer) => {
+        // 更新传输状态
+        setTransfers(prev =>
+            prev.map(t =>
+                t.id === transfer.id
+                    ? { ...t, progress: 100, status: 'completed' as const }
+                    : t
+            )
+        );
+
+        // 触发文件传输完成事件
+        window.dispatchEvent(new CustomEvent('file-transfer-complete'));
+
+        // 主动添加通知 (额外的通知触发方式)
+        if (window.electron) {
+            window.electron.invoke('notification:show', {
+                title: '文件传输完成',
+                body: `${transfer.name} 已${transfer.direction === 'upload' ? '上传' : '下载'}完成`
+            });
+        }
+    };
+
     // 确保返回所有需要的属性和方法
     return {
         isReady,

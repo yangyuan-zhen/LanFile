@@ -89,6 +89,45 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     });
   }, [transfers]); // 移除 notifications 依赖项
 
+  // 监听文件传输完成事件
+  useEffect(() => {
+    const handleTransferComplete = () => {
+      // 检查是否有新完成的传输
+      const newCompletedTransfers = transfers.filter(
+        (t) => t.status === "completed" && !notifiedTransfers.current.has(t.id)
+      );
+
+      // 处理每个新完成的传输
+      newCompletedTransfers.forEach((transfer) => {
+        // 添加到已通知集合
+        notifiedTransfers.current.add(transfer.id);
+
+        // 创建通知
+        addNotification({
+          title: "文件传输完成",
+          message: `${transfer.name} 已${
+            transfer.direction === "upload" ? "上传" : "下载"
+          }完成`,
+          type: "success",
+        });
+      });
+    };
+
+    // 监听自定义事件
+    window.addEventListener("file-transfer-complete", handleTransferComplete);
+
+    // 定期检查 (作为备份机制)
+    const checkInterval = setInterval(handleTransferComplete, 2000);
+
+    return () => {
+      window.removeEventListener(
+        "file-transfer-complete",
+        handleTransferComplete
+      );
+      clearInterval(checkInterval);
+    };
+  }, [transfers]);
+
   // 添加通知
   const addNotification = (
     notification: Omit<Notification, "id" | "read" | "timestamp">

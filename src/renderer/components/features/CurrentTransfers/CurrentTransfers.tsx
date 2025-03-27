@@ -87,40 +87,73 @@ export const CurrentTransfers: React.FC = () => {
     window.electron.invoke("file:openFile", path);
   };
 
-  // 在渲染传输项的部分添加进度条
+  // 在渲染传输项的部分，更改为使用 Chakra UI 的 Progress 组件
   const renderTransferItem = (transfer: FileTransfer) => (
-    <div className="flex items-center p-2 border-b">
-      <div className="flex-1">
+    <div className="flex flex-col p-3 border-b">
+      <div className="flex justify-between items-center mb-1">
         <p className="font-medium">{transfer.name}</p>
-        <p className="text-sm text-gray-500">
-          {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
-          {transfer.peerId}
-        </p>
-
-        {/* 添加进度条 */}
-        <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-          <div
-            className={`h-2.5 rounded-full ${
-              transfer.status === "error"
-                ? "bg-red-500"
-                : transfer.status === "completed"
-                ? "bg-green-500"
-                : "bg-blue-500"
-            }`}
-            style={{ width: `${transfer.progress}%` }}
-          ></div>
-        </div>
-
-        {/* 添加状态和速度信息 */}
-        <div className="flex justify-between mt-1 text-xs">
-          <span>{getStatusText(transfer.status)}</span>
-          <span>
-            {formatSize(transfer.size * (transfer.progress / 100))}/
-            {formatSize(transfer.size)}
-          </span>
-          {transfer.speed && <span>{formatSpeed(transfer.speed)}</span>}
-        </div>
+        <Badge
+          colorScheme={
+            transfer.status === "error"
+              ? "red"
+              : transfer.status === "completed"
+              ? "green"
+              : transfer.status === "transferring"
+              ? "blue"
+              : "gray"
+          }
+        >
+          {getStatusText(transfer.status)}
+        </Badge>
       </div>
+
+      <p className="text-sm text-gray-500">
+        {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
+        {transfer.peerId}
+      </p>
+
+      {/* 使用 Chakra UI 的 Progress 组件 */}
+      <Progress
+        mt={2}
+        size="sm"
+        value={transfer.progress}
+        colorScheme={
+          transfer.status === "error"
+            ? "red"
+            : transfer.status === "completed"
+            ? "green"
+            : "blue"
+        }
+        borderRadius="full"
+      />
+
+      <div className="flex justify-between mt-1 text-xs">
+        <span>
+          {formatSize(transfer.size * (transfer.progress / 100))}/
+          {formatSize(transfer.size)}
+        </span>
+        {transfer.speed && <span>{formatSpeed(transfer.speed)}</span>}
+      </div>
+
+      {/* 如果传输完成且有保存路径，添加操作按钮 */}
+      {transfer.status === "completed" && transfer.savedPath && (
+        <div className="flex mt-2 space-x-2">
+          <Button
+            size="xs"
+            leftIcon={<FaFolder />}
+            onClick={() => openFileLocation(transfer.savedPath!)}
+          >
+            打开文件夹
+          </Button>
+          <Button
+            size="xs"
+            leftIcon={<FaFile />}
+            onClick={() => openFile(transfer.savedPath!)}
+          >
+            打开文件
+          </Button>
+        </div>
+      )}
     </div>
   );
 
