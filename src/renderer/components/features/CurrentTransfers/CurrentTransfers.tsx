@@ -31,192 +31,31 @@ import type { FileTransfer } from "../../../hooks/usePeerJS";
 
 export const CurrentTransfers: React.FC = () => {
   const { transfers } = useGlobalPeerJS();
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [showCompleted, setShowCompleted] = useState(true);
 
-  // 过滤和排序传输
-  const filteredTransfers = transfers
-    .filter((t) => showCompleted || t.status !== "completed")
-    .sort((a, b) => {
-      // 首先按状态排序: 传输中 > 待处理 > 已完成 > 错误
-      const statusOrder = {
-        transferring: 0,
-        pending: 1,
-        completed: 2,
-        error: 3,
-      };
-      return statusOrder[a.status] - statusOrder[b.status];
-    });
-
-  // 计算正在传输的数量
-  const activeCount = transfers.filter(
-    (t) => t.status === "transferring"
-  ).length;
-  const completedCount = transfers.filter(
-    (t) => t.status === "completed"
-  ).length;
-
-  // 添加调试日志
-  console.log("CurrentTransfers 渲染:", transfers);
-
-  // 辅助函数，格式化文件大小
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    if (bytes < 1024 * 1024 * 1024)
-      return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
-  };
-
-  // 添加格式化速度的辅助函数
-  const formatSpeed = (bytesPerSecond?: number): string => {
-    if (!bytesPerSecond) return "";
-    if (bytesPerSecond < 1024) return bytesPerSecond.toFixed(1) + " B/s";
-    if (bytesPerSecond < 1024 * 1024)
-      return (bytesPerSecond / 1024).toFixed(1) + " KB/s";
-    return (bytesPerSecond / (1024 * 1024)).toFixed(1) + " MB/s";
-  };
-
-  // 打开文件位置
-  const openFileLocation = (path: string) => {
-    window.electron.invoke("file:openFolder", path);
-  };
-
-  // 打开文件
-  const openFile = (path: string) => {
-    window.electron.invoke("file:openFile", path);
-  };
-
-  // 修改渲染传输项的部分，使用更明显的进度条样式
-  const renderTransferItem = (transfer: FileTransfer) => (
-    <div className="p-4 mb-4 rounded-lg border border-gray-200">
-      <div className="flex justify-between items-center mb-2">
-        <div className="flex items-center">
-          <Icon
-            as={transfer.direction === "upload" ? FaUpload : FaDownload}
-            color={transfer.direction === "upload" ? "green.500" : "blue.500"}
-            mr={3}
-          />
-          <div>
-            <Text fontWeight="medium">{transfer.name}</Text>
-            <Text fontSize="sm" color="gray.500">
-              {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
-              {transfer.peerId}
-            </Text>
-          </div>
-        </div>
-        <div className="text-right">
-          {transfer.speed && (
-            <Text
-              fontSize="sm"
-              fontWeight="semibold"
-              color={transfer.direction === "upload" ? "green.500" : "blue.500"}
-            >
-              {formatSpeed(transfer.speed)}
-            </Text>
-          )}
-          <Text fontSize="xs" color="gray.500">
-            {transfer.status === "transferring"
-              ? "传输中"
-              : getStatusText(transfer.status)}
-          </Text>
-        </div>
-      </div>
-
-      <div className="relative pt-1">
-        <div className="flex justify-between items-center mb-2">
-          <span
-            className="inline-block text-xs font-semibold"
-            color={
-              transfer.status === "error"
-                ? "red.500"
-                : transfer.status === "completed"
-                ? "green.500"
-                : "blue.500"
-            }
-          >
-            {transfer.progress}%
-          </span>
-          <span className="inline-block text-xs font-semibold text-gray-600">
-            {formatSize(transfer.size * (transfer.progress / 100))}/
-            {formatSize(transfer.size)}
-          </span>
-        </div>
-
-        <Progress
-          mt={1}
-          size="sm"
-          value={transfer.progress}
-          colorScheme={
-            transfer.status === "error"
-              ? "red"
-              : transfer.status === "completed"
-              ? "green"
-              : "blue"
-          }
-          borderRadius="full"
-          hasStripe={transfer.status === "transferring"}
-          isAnimated={transfer.status === "transferring"}
-        />
-      </div>
-
-      {/* 如果传输完成且有保存路径，添加操作按钮 */}
-      {transfer.status === "completed" && transfer.savedPath && (
-        <div className="flex mt-3 space-x-2">
-          <Button
-            size="xs"
-            leftIcon={<Icon as={FaFolder} />}
-            onClick={() => openFileLocation(transfer.savedPath!)}
-          >
-            打开文件夹
-          </Button>
-          <Button
-            size="xs"
-            leftIcon={<Icon as={FaFile} />}
-            onClick={() => openFile(transfer.savedPath!)}
-          >
-            打开文件
-          </Button>
-        </div>
-      )}
-    </div>
+  // 每次渲染时打印收到的 transfers
+  console.log(
+    "[CurrentTransfers] Component Rendering. Received transfers:",
+    transfers
   );
 
-  // 添加辅助函数
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "等待中";
-      case "transferring":
-        return "传输中";
-      case "completed":
-        return "已完成";
-      case "error":
-        return "错误";
-      default:
-        return status;
-    }
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  };
-
-  // 在组件开始添加更多调试
+  // 使用 useEffect 监控 transfers 的变化
   useEffect(() => {
-    console.log("CurrentTransfers 组件挂载");
-    console.log("当前传输任务:", transfers);
-
-    // 添加固定时间检查，防止数据未及时更新
+    console.log(
+      "[CurrentTransfers] useEffect triggered due to transfers change:",
+      transfers
+    );
+    // 可以保留定时器检查，看看组件内部状态是否最终会更新
     const timer = setInterval(() => {
-      console.log("传输状态定时检查:", transfers);
-    }, 2000);
+      console.log(
+        "[CurrentTransfers] Interval Check. Current transfers state inside component:",
+        transfers
+      );
+    }, 3000);
 
     return () => clearInterval(timer);
-  }, [transfers]);
+  }, [transfers]); // 依赖数组包含 transfers
 
+  // --- 临时的简化渲染 ---
   return (
     <Box
       position="fixed"
@@ -225,85 +64,77 @@ export const CurrentTransfers: React.FC = () => {
       width="350px"
       zIndex={9999}
       borderRadius="md"
-      overflow="visible"
-      boxShadow="0 0 20px rgba(0,0,0,0.3)"
+      boxShadow="xl"
       bg="white"
+      border="1px solid"
+      borderColor="gray.200" // 使用灰色边框以便区分
+      p={4} // 添加一些内边距
     >
-      <Card p={0} bg="white" borderRadius="md">
-        {/* 标题栏 - 更明显的样式 */}
-        <Flex
-          justify="space-between"
-          align="center"
-          p={3}
-          bg="gray.50"
-          borderBottom="1px solid"
-          borderColor="gray.200"
+      <Text fontWeight="bold" mb={2}>
+        文件传输 (调试模式)
+      </Text>
+      <Text fontSize="sm" mb={1}>
+        从 Context 获取到的 Transfers 数量: {transfers?.length ?? "N/A"}
+      </Text>
+      <Box
+        maxHeight="300px"
+        overflowY="auto"
+        bg="gray.50"
+        p={2}
+        borderRadius="sm"
+      >
+        <pre
+          style={{
+            fontSize: "10px",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-all",
+          }}
         >
-          <Flex align="center">
-            <Text fontWeight="bold">文件传输</Text>
-            {activeCount > 0 && (
-              <Badge ml={2} colorScheme="blue" borderRadius="full">
-                {activeCount} 进行中
-              </Badge>
-            )}
-          </Flex>
-
-          <Flex>
-            {completedCount > 0 && (
-              <Tooltip label={showCompleted ? "隐藏已完成" : "显示已完成"}>
-                <IconButton
-                  aria-label="Toggle completed"
-                  icon={<FaCheck />}
-                  size="sm"
-                  variant="ghost"
-                  colorScheme={showCompleted ? "green" : "gray"}
-                  onClick={() => setShowCompleted(!showCompleted)}
-                  mr={1}
-                />
-              </Tooltip>
-            )}
-            {transfers.length > 0 && (
-              <IconButton
-                aria-label="Collapse"
-                icon={isExpanded ? <FaChevronDown /> : <FaChevronUp />}
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsExpanded(!isExpanded)}
-              />
-            )}
-          </Flex>
-        </Flex>
-
-        {/* 内容区 */}
-        <Collapse in={isExpanded} animateOpacity>
-          <Box
-            p={transfers.length > 0 ? 2 : 0}
-            maxHeight="400px"
-            overflowY="auto"
-          >
-            {!transfers || filteredTransfers.length === 0 ? (
-              <Flex
-                direction="column"
-                align="center"
-                justify="center"
-                py={4}
-                color="gray.500"
-              >
-                <Icon as={FaInbox} boxSize={8} mb={2} />
-                <Text>暂无传输任务</Text>
-              </Flex>
-            ) : (
-              filteredTransfers.map((transfer) => (
-                <React.Fragment key={transfer.id}>
-                  {renderTransferItem(transfer)}
-                </React.Fragment>
-              ))
-            )}
-          </Box>
-        </Collapse>
-      </Card>
+          {JSON.stringify(transfers, null, 2)}
+        </pre>
+      </Box>
     </Box>
   );
+  // --- 结束临时渲染 ---
+
+  /*
+  // --- 原来的渲染逻辑暂时注释掉 ---
+
+  // const [isExpanded, setIsExpanded] = useState(true);
+  // const [showCompleted, setShowCompleted] = useState(true);
+
+  // const filteredTransfers = transfers
+  //   .filter((t) => showCompleted || t.status !== "completed")
+  //   // ... sort logic ...
+
+  // const activeCount = transfers.filter(t => t.status === 'transferring').length;
+  // const completedCount = transfers.filter(t => t.status === 'completed').length;
+
+  // ... helper functions (formatFileSize, formatSpeed, etc.) ...
+
+  // const renderTransferItem = (transfer: FileTransfer) => ( ... );
+
+  // return (
+  //   <Box ... >
+  //     <Card ... >
+  //       <Flex ... > // Header
+  //         ...
+  //       </Flex>
+  //       <Collapse in={isExpanded} animateOpacity>
+  //         <Box ... > // Content
+  //           {filteredTransfers.length === 0 ? (
+  //             <Flex ... >No transfers</Flex>
+  //           ) : (
+  //             filteredTransfers.map(renderTransferItem)
+  //           )}
+  //         </Box>
+  //       </Collapse>
+  //     </Card>
+  //   </Box>
+  // );
+
+  // --- 结束原来的渲染逻辑 ---
+  */
 };
 
 export default CurrentTransfers;
