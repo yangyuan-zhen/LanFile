@@ -213,13 +213,13 @@ export const usePeerJS = () => {
                     // 更新传输状态为完成
                     setTransfers(prev =>
                         prev.map(t => t.id === transferId ?
-                            { ...t, progress: 100, status: 'completed', savedPath } : t)
+                            { ...t, progress: 100, status: 'completed' as const, savedPath } : t)
                     );
                 }).catch((error: any) => {
                     console.error('文件保存失败:', error);
                     setTransfers(prev =>
                         prev.map(t => t.id === transferId ?
-                            { ...t, status: 'error' } : t)
+                            { ...t, status: 'error' as const } : t)
                     );
                 });
 
