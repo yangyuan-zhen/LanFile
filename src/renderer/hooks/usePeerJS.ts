@@ -57,16 +57,12 @@ export const usePeerJS = () => {
     }, [transfers]);
 
     // 将 addFileTransfer 函数移到这里，在它被使用之前
-    const addFileTransfer = (fileInfo: Omit<FileTransfer, 'id'>) => {
+    const addFileTransfer = (fileInfo: Omit<FileTransfer, "id">) => {
         const id = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
         const newTransfer: FileTransfer = { id, ...fileInfo };
 
         debug("Adding new transfer:", newTransfer);
-        setTransfers(prev => {
-            const newTransfers = [...prev, newTransfer];
-            debug("Transfers after adding:", newTransfers);
-            return newTransfers;
-        });
+        setTransfers(prev => [...prev, newTransfer]);
 
         return id;
     };
@@ -678,12 +674,25 @@ export const usePeerJS = () => {
         });
     };
 
-    // 添加发送文件函数
+    // 修改 sendFile 函数
     const sendFile = async (peerId: string, file: File) => {
         try {
-            const conn = connections.get(peerId);
+            // 先检查现有连接
+            let conn = connections.get(peerId);
+
+            // 如果没有连接，尝试建立新连接
             if (!conn) {
-                throw new Error('未找到连接');
+                console.log('[usePeerJS] 未找到连接，尝试建立新连接');
+                conn = await connectToPeer(peerId);
+
+                if (!conn) {
+                    throw new Error('无法建立连接');
+                }
+            }
+
+            // 确保连接已打开
+            if (!conn.open) {
+                throw new Error('连接未打开');
             }
 
             // 生成传输ID
