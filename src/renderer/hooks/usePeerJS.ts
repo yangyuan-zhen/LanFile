@@ -27,6 +27,18 @@ const debug = (message: string, ...args: any[]) => {
     console.log(`[usePeerJS] ${message}`, ...args);
 };
 
+/**
+ * 文件传输模块 - 实现了基于PeerJS的P2P文件传输功能
+ * 
+ * 核心功能：
+ * 1. 文件分块发送与接收
+ * 2. 进度跟踪与速度计算
+ * 3. 自动文件保存
+ * 4. 错误处理与恢复
+ * 
+ * @version 1.0.0
+ * @lastUpdate 2023-xx-xx
+ */
 export const usePeerJS = () => {
     const [peer, setPeer] = useState<Peer | null>(null);
     const [connections, setConnections] = useState<Map<string, any>>(new Map());
@@ -571,7 +583,11 @@ export const usePeerJS = () => {
         }
     };
 
-    // 修改接收文件数据的函数以确保进度准确性
+    /**
+     * 处理接收到的文件块
+     * @param peerId 发送方的PeerID
+     * @param data 文件块数据
+     */
     const handleFileChunk = (peerId: string, data: any) => {
         const { transferId, data: chunkData, chunkIndex, totalChunks } = data;
 
