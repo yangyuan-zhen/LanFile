@@ -109,7 +109,46 @@ export const usePeerJS = () => {
                 });
 
                 peer.on('connection', (conn) => {
-                    handleIncomingConnection(conn);
+                    console.log(`[usePeerJS] 收到新连接: ${conn.peer}`);
+
+                    // 存储连接
+                    setConnections(prev => {
+                        const newConnections = new Map(prev);
+                        newConnections.set(conn.peer, conn);
+                        return newConnections;
+                    });
+
+                    // 处理文件信息
+                    conn.on('data', (data: any) => {
+                        if (data.type === 'file-info') {
+                            console.log(`[usePeerJS] 收到文件信息:`, data);
+
+                            // 存储文件信息
+                            fileInfo.current[data.transferId] = data;
+
+                            // 创建下载条目
+                            addFileTransfer({
+                                name: data.name,
+                                size: data.size,
+                                type: data.fileType,
+                                progress: 0,
+                                status: 'pending',
+                                direction: 'download',
+                                peerId: conn.peer
+                            });
+
+                            // 发送确认
+                            conn.send({
+                                type: 'file-info-received',
+                                transferId: data.transferId
+                            });
+
+                            console.log(`[usePeerJS] 发送文件信息确认: ${data.transferId}`);
+                        } else if (data.type === 'file-chunk') {
+                            // 处理文件块
+                            handleFileChunk(conn.peer, data);
+                        }
+                    });
                 });
 
                 peer.on('error', (err) => {
@@ -534,43 +573,60 @@ export const usePeerJS = () => {
 
     // 修改接收文件数据的函数以确保进度准确性
     const handleFileChunk = (peerId: string, data: any) => {
-        if (data.type === 'file-chunk') {
-            const { transferId, data: chunkData } = data;
+        const { transferId, data: chunkData, chunkIndex, totalChunks } = data;
 
-            console.log(`[usePeerJS] 收到文件块: ${transferId}, 大小: ${chunkData.byteLength} 字节`);
+        if (data.type !== 'file-chunk' || !transferId || !chunkData) {
+            console.error('[usePeerJS] 收到无效的文件块数据');
+            return;
+        }
 
-            // 初始化文件块数组
-            if (!fileChunks.current[transferId]) {
-                fileChunks.current[transferId] = [];
-                console.log(`[usePeerJS] 为传输 ${transferId} 初始化文件块数组`);
-            }
+        console.log(`[usePeerJS] 接收文件块: ${transferId}, 索引: ${chunkIndex}/${totalChunks}, 大小: ${chunkData.byteLength} 字节`);
 
-            // 存储文件块
+        // 初始化文件块数组
+        if (!fileChunks.current[transferId]) {
+            fileChunks.current[transferId] = [];
+            console.log(`[usePeerJS] 初始化传输 ${transferId} 的文件块数组`);
+        }
+
+        // 存储到指定位置
+        if (chunkIndex !== undefined) {
+            // 如果有索引信息，存储到特定位置
+            fileChunks.current[transferId][chunkIndex] = new Uint8Array(chunkData);
+        } else {
+            // 否则追加到末尾
             fileChunks.current[transferId].push(new Uint8Array(chunkData));
+        }
 
-            // 获取文件信息
-            const fileInfoData = fileInfo.current[transferId];
-            if (!fileInfoData) {
-                console.error(`[usePeerJS] 错误: 未找到传输 ${transferId} 的文件信息`);
-                return;
+        // 获取文件信息
+        const fileInfoData = fileInfo.current[transferId];
+        if (!fileInfoData) {
+            console.error(`[usePeerJS] 错误: 未找到传输 ${transferId} 的文件信息`);
+            return;
+        }
+
+        // 计算已接收字节数
+        let receivedSize = 0;
+        let validChunks = 0;
+
+        for (const chunk of fileChunks.current[transferId]) {
+            if (chunk && chunk.length) {
+                receivedSize += chunk.length;
+                validChunks++;
             }
+        }
 
-            // 计算已接收的总字节数
-            const receivedSize = fileChunks.current[transferId].reduce(
-                (total, chunk) => total + chunk.length,
-                0
-            );
+        console.log(`[usePeerJS] 文件接收进度: ${receivedSize}/${fileInfoData.size} 字节 (${Math.floor((receivedSize / fileInfoData.size) * 100)}%), 已接收 ${validChunks} 块`);
 
-            console.log(`[usePeerJS] 文件接收进度: ${receivedSize}/${fileInfoData.size} 字节 (${Math.floor((receivedSize / fileInfoData.size) * 100)}%)`);
+        // 更新进度
+        updateTransferProgress(transferId, receivedSize, fileInfoData.size);
 
-            // 更新进度
-            updateTransferProgress(transferId, receivedSize, fileInfoData.size);
-
-            // 检查是否接收完成
-            if (receivedSize >= fileInfoData.size) {
-                console.log(`[usePeerJS] 文件接收完成，准备处理: ${fileInfoData.name}`);
-                handleFileComplete(transferId);
-            }
+        // 检查是否完成
+        if (totalChunks && validChunks >= totalChunks) {
+            console.log(`[usePeerJS] 接收完成: 已收到所有 ${totalChunks} 块`);
+            handleFileComplete(transferId);
+        } else if (!totalChunks && receivedSize >= fileInfoData.size) {
+            console.log(`[usePeerJS] 接收完成: 已接收 ${receivedSize}/${fileInfoData.size} 字节`);
+            handleFileComplete(transferId);
         }
     };
 
@@ -737,22 +793,49 @@ export const usePeerJS = () => {
 
             // 分块发送文件
             let offset = 0;
-            while (offset < file.size) {
-                const chunk = await readFileChunk(file, offset, chunkSize);
-                conn.send({
-                    type: 'file-chunk',
-                    transferId,
-                    data: chunk
-                });
+            let chunkIndex = 0;
+            const totalChunks = Math.ceil(file.size / chunkSize);
 
-                offset += chunk.byteLength;
-                updateUploadProgress(transferId, offset, file.size);
+            console.log(`[usePeerJS] 开始发送文件 ${file.name}, 大小: ${file.size} 字节, 分 ${totalChunks} 块`);
 
-                // 可选：添加小延迟避免阻塞
-                await new Promise(resolve => setTimeout(resolve, 10));
+            try {
+                while (offset < file.size) {
+                    const chunk = await readFileChunk(file, offset, chunkSize);
+
+                    console.log(`[usePeerJS] 发送文件块 ${chunkIndex + 1}/${totalChunks}, 大小: ${chunk.byteLength} 字节`);
+
+                    // 使用更完整的块信息
+                    conn.send({
+                        type: 'file-chunk',
+                        transferId,
+                        chunkIndex,
+                        totalChunks,
+                        data: chunk
+                    });
+
+                    offset += chunk.byteLength;
+                    chunkIndex++;
+
+                    // 更新进度
+                    updateUploadProgress(transferId, offset, file.size);
+
+                    // 检查连接状态
+                    if (!conn.open) {
+                        throw new Error('连接已关闭');
+                    }
+
+                    // 添加小延迟避免网络拥塞
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+            } catch (error) {
+                console.error(`[usePeerJS] 发送文件 ${file.name} 时出错:`, error);
+                setTransfers(prev =>
+                    prev.map(t => t.id === transferId ? { ...t, status: 'error' } : t)
+                );
+                throw error;
             }
 
-            console.log(`[usePeerJS] 文件发送完成: ${file.name}`);
+            console.log(`[usePeerJS] 文件 ${file.name} 发送完成，共 ${chunkIndex} 块`);
             return transferId;
         } catch (error) {
             console.error('[usePeerJS] 发送文件失败:', error);
