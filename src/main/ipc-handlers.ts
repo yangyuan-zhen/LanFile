@@ -66,24 +66,28 @@ ipcMain.handle('file:openFile', async (event, filePath) => {
     }
 });
 
-// 获取设置
-ipcMain.handle('settings:get', async (event) => {
-    try {
-        return store.get('settings') || {};
-    } catch (error) {
-        console.error('[主进程] 获取设置错误:', error);
-        return {};
-    }
-});
+// 获取设置 - 添加防重复注册检查
+if (!ipcMain.listenerCount('settings:get')) {
+    ipcMain.handle('settings:get', async (event) => {
+        try {
+            return store.get('settings') || {};
+        } catch (error) {
+            console.error('[主进程] 获取设置错误:', error);
+            return {};
+        }
+    });
+}
 
-// 保存设置
-ipcMain.handle('settings:set', async (event, settings) => {
-    try {
-        console.log('[主进程] 保存设置:', settings);
-        store.set('settings', settings);
-        return { success: true };
-    } catch (error) {
-        console.error('[主进程] 保存设置错误:', error);
-        return { success: false, error: String(error) };
-    }
-}); 
+// 保存设置 - 添加防重复注册检查
+if (!ipcMain.listenerCount('settings:set')) {
+    ipcMain.handle('settings:set', async (event, settings) => {
+        try {
+            console.log('[主进程] 保存设置:', settings);
+            store.set('settings', settings);
+            return { success: true };
+        } catch (error) {
+            console.error('[主进程] 保存设置错误:', error);
+            return { success: false, error: String(error) };
+        }
+    });
+} 
