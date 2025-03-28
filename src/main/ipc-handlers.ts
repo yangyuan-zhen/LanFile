@@ -3,6 +3,20 @@ import fs from 'fs';
 import path from 'path';
 import store from './store';
 
+// 跟踪已注册的处理程序
+const registeredHandlers: Set<string> = new Set();
+
+// 安全注册处理程序的辅助函数
+function safeHandle(channel: string, handler: (event: any, ...args: any[]) => Promise<any>) {
+    if (!registeredHandlers.has(channel)) {
+        ipcMain.handle(channel, handler);
+        registeredHandlers.add(channel);
+        console.log(`[主进程] IPC处理程序已注册: ${channel}`);
+    } else {
+        console.log(`[主进程] 跳过已注册的IPC处理程序: ${channel}`);
+    }
+}
+
 // 定义设置类型
 interface Settings {
     downloadPath?: string;
@@ -66,28 +80,26 @@ ipcMain.handle('file:openFile', async (event, filePath) => {
     }
 });
 
-// 获取设置 - 添加防重复注册检查
-if (!ipcMain.listenerCount('settings:get')) {
-    ipcMain.handle('settings:get', async (event) => {
-        try {
-            return store.get('settings') || {};
-        } catch (error) {
-            console.error('[主进程] 获取设置错误:', error);
-            return {};
-        }
-    });
-}
+// 使用辅助函数注册设置处理程序
+safeHandle('settings:get', async (event) => {
+    try {
+        return store.get('settings') || {};
+    } catch (error) {
+        console.error('[主进程] 获取设置错误:', error);
+        return {};
+    }
+});
 
-// 保存设置 - 添加防重复注册检查
-if (!ipcMain.listenerCount('settings:set')) {
-    ipcMain.handle('settings:set', async (event, settings) => {
-        try {
-            console.log('[主进程] 保存设置:', settings);
-            store.set('settings', settings);
-            return { success: true };
-        } catch (error) {
-            console.error('[主进程] 保存设置错误:', error);
-            return { success: false, error: String(error) };
-        }
-    });
-} 
+safeHandle('settings:set', async (event, settings) => {
+    try {
+        console.log('[主进程] 保存设置:', settings);
+        store.set('settings', settings);
+        return { success: true };
+    } catch (error) {
+        console.error('[主进程] 保存设置错误:', error);
+        return { success: false, error: String(error) };
+    }
+});
+
+// 导出已注册的处理程序集合
+export { registeredHandlers }; 

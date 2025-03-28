@@ -63,71 +63,9 @@ async function getDeviceId(): Promise<string> {
 function setupIpcHandlers() {
     console.log("开始注册 IPC 处理器...");
 
-    // 设置相关处理器
-    ipcMain.handle('settings:getDownloadPath', () => {
-        try {
-            console.log("settings:getDownloadPath 被调用");
-            const downloadsPath = app.getPath('downloads');
-            console.log("系统下载路径:", downloadsPath);
-            return downloadsPath;
-        } catch (error) {
-            console.error("获取下载路径错误:", error);
-            return "";
-        }
-    });
-
-    ipcMain.handle('settings:setDownloadPath', (_, path: string) => {
-        try {
-            console.log("settings:setDownloadPath 被调用", path);
-            store.set('downloadPath', path);
-            return true;
-        } catch (error) {
-            console.error("设置下载路径错误:", error);
-            return false;
-        }
-    });
-
-    ipcMain.handle('settings:setPort', (_, port: number) => {
-        try {
-            console.log("设置端口:", port);
-            store.set('servicePort', port);
-
-            // 重要：通知网络服务更新端口
-            if (networkService) {
-                networkService.updateServicePort(port);
-            }
-
-            return true;
-        } catch (error) {
-            console.error("设置端口错误:", error);
-            return false;
-        }
-    });
-
-    // 文件对话框处理器
+    // 只注册其他未在 ipc-handlers.ts 中注册的处理程序
     ipcMain.handle('dialog:openDirectory', async () => {
-        try {
-            console.log("dialog:openDirectory 被调用");
-            const savedPath = store.get('downloadPath');
-            const defaultPath = typeof savedPath === 'string' && savedPath
-                ? savedPath
-                : app.getPath('downloads');
-
-            const result = await dialog.showSaveDialog({
-                title: '选择文件保存位置',
-                defaultPath,
-                buttonLabel: '保存',
-                filters: [
-                    { name: '所有文件', extensions: ['*'] }
-                ]
-            });
-
-            console.log('文件保存路径选择结果:', result);
-            return result;
-        } catch (error) {
-            console.error('选择文件保存路径失败:', error);
-            throw error;
-        }
+        // 处理打开目录对话框的逻辑
     });
 
     // 从 main.ts 合并的 IPC 处理器
@@ -321,75 +259,6 @@ function setupIpcHandlers() {
         return true;
     });
 
-    // 在主进程中添加处理程序
-    ipcMain.handle('settings:setHeartbeatType', async (_event, type: string) => {
-        // 实现保存心跳类型设置的逻辑
-        console.log('设置心跳检测类型:', type);
-        // 存储设置到配置文件或其他存储位置
-    });
-
-    // 添加 HTTP 请求处理程序
-    ipcMain.handle('http:request', async (_, options: {
-        url: string;
-        method?: string;
-        headers?: Record<string, string>;
-        body?: any;
-    }) => {
-        try {
-            console.log(`发起HTTP请求: ${options.method || 'GET'} ${options.url}`);
-
-            const response = await fetch(options.url, {
-                method: options.method || 'GET',
-                headers: options.headers || {},
-                body: options.body ? JSON.stringify(options.body) : undefined,
-            });
-
-            const data = await response.json();
-            return {
-                ok: response.ok,
-                status: response.status,
-                data,
-            };
-        } catch (error) {
-            console.error('HTTP请求失败:', error);
-            throw error;
-        }
-    });
-
-    // 获取设置
-    ipcMain.handle('settings:get', (event, key) => {
-        console.log("设置获取请求:", key);
-        try {
-            if (key) {
-                const value = settingsStore.get(key);
-                console.log(`获取设置 ${key}:`, value);
-                return value;
-            } else {
-                const allSettings = settingsStore.store;
-                console.log("获取所有设置:", allSettings);
-                return allSettings;
-            }
-        } catch (error) {
-            console.error("获取设置失败:", error);
-            throw error;
-        }
-    });
-
-    // 保存设置
-    ipcMain.handle('settings:save', (event, settings) => {
-        console.log("保存设置请求:", settings);
-        try {
-            for (const [key, value] of Object.entries(settings)) {
-                console.log(`保存设置 ${key}:`, value);
-                settingsStore.set(key, value);
-            }
-            return true;
-        } catch (error) {
-            console.error("保存设置失败:", error);
-            throw error;
-        }
-    });
-
     // 添加设备信息处理程序
     ipcMain.handle('device:getInfo', async () => {
         try {
@@ -439,7 +308,7 @@ function setupIpcHandlers() {
         }
     });
 
-    console.log("设置处理程序注册完成");
+    console.log("IPC 处理器注册完成");
 }
 
 // 创建窗口函数
