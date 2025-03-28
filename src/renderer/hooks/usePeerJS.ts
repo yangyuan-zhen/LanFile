@@ -537,9 +537,12 @@ export const usePeerJS = () => {
         if (data.type === 'file-chunk') {
             const { transferId, data: chunkData } = data;
 
+            console.log(`[usePeerJS] 收到文件块: ${transferId}, 大小: ${chunkData.byteLength} 字节`);
+
             // 初始化文件块数组
             if (!fileChunks.current[transferId]) {
                 fileChunks.current[transferId] = [];
+                console.log(`[usePeerJS] 为传输 ${transferId} 初始化文件块数组`);
             }
 
             // 存储文件块
@@ -547,7 +550,10 @@ export const usePeerJS = () => {
 
             // 获取文件信息
             const fileInfoData = fileInfo.current[transferId];
-            if (!fileInfoData) return;
+            if (!fileInfoData) {
+                console.error(`[usePeerJS] 错误: 未找到传输 ${transferId} 的文件信息`);
+                return;
+            }
 
             // 计算已接收的总字节数
             const receivedSize = fileChunks.current[transferId].reduce(
@@ -555,11 +561,14 @@ export const usePeerJS = () => {
                 0
             );
 
+            console.log(`[usePeerJS] 文件接收进度: ${receivedSize}/${fileInfoData.size} 字节 (${Math.floor((receivedSize / fileInfoData.size) * 100)}%)`);
+
             // 更新进度
             updateTransferProgress(transferId, receivedSize, fileInfoData.size);
 
             // 检查是否接收完成
             if (receivedSize >= fileInfoData.size) {
+                console.log(`[usePeerJS] 文件接收完成，准备处理: ${fileInfoData.name}`);
                 handleFileComplete(transferId);
             }
         }

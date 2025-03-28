@@ -26,14 +26,13 @@ interface Settings {
 safeHandle('file:saveToDownloads', async (event, args) => {
     try {
         const { fileName, fileData, fileType } = args;
-        console.log(`[主进程] 开始保存文件: ${fileName}, 类型: ${fileType}`);
+        console.log(`[主进程] 开始保存文件: ${fileName}, 类型: ${fileType}, 数据长度: ${fileData.length}`);
 
-        // 从设置中获取用户自定义下载目录
+        // 从设置中获取下载目录
         const settings = store.get('settings') as Settings || {};
         const userDownloadPath = settings.downloadPath;
-
-        // 使用用户设置的路径或默认下载路径
         const downloadPath = userDownloadPath || app.getPath('downloads');
+
         console.log(`[主进程] 保存到目录: ${downloadPath}`);
 
         // 确保目录存在
@@ -41,10 +40,11 @@ safeHandle('file:saveToDownloads', async (event, args) => {
             fs.mkdirSync(downloadPath, { recursive: true });
         }
 
+        // 构造文件路径
         const filePath = path.join(downloadPath, fileName);
         console.log(`[主进程] 完整文件路径: ${filePath}`);
 
-        // 将 Array 转回 Buffer
+        // 将数组转回 Buffer
         const buffer = Buffer.from(fileData);
         console.log(`[主进程] 创建的Buffer大小: ${buffer.length} 字节`);
 
