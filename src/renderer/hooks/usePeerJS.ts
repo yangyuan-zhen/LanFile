@@ -401,142 +401,6 @@ export const usePeerJS = () => {
         }
     }, [peer, isReady, connections]);
 
-    // 发送文件方法
-    const sendFile = useCallback(async (peerIp: string, file: File) => {
-        return new Promise<string>(async (resolve, reject) => {
-            try {
-                let conn = connections.get(peerIp);
-                if (!conn) {
-                    conn = await connectToPeer(peerIp);
-                    if (!conn) throw new Error("连接失败");
-                }
-
-                // 创建传输记录
-                const transferId = addFileTransfer({
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                    progress: 0,
-                    status: 'pending',
-                    direction: 'upload',
-                    peerId: conn.peer
-                });
-
-                // 先发送文件信息并等待确认
-                const fileInfoData = {
-                    type: 'file-info',
-                    transferId,
-                    name: file.name,
-                    size: file.size,
-                    fileType: file.type
-                };
-
-                // 存储到发送方的 fileInfo
-                fileInfo.current[transferId] = fileInfoData;
-
-                // 发送文件信息并等待确认
-                const confirmed = await new Promise<boolean>((resolveConfirm) => {
-                    const timeout = setTimeout(() => {
-                        resolveConfirm(false);
-                    }, 5000);
-
-                    const handleConfirm = (data: any) => {
-                        if (data.type === 'file-info-received' && data.transferId === transferId) {
-                            clearTimeout(timeout);
-                            conn.off('data', handleConfirm);
-                            resolveConfirm(true);
-                        }
-                    };
-
-                    conn.on('data', handleConfirm);
-                    conn.send(fileInfoData);
-                });
-
-                if (!confirmed) {
-                    throw new Error("文件信息确认超时");
-                }
-
-                // 初始化传输时间统计
-                transferTimes.current[transferId] = {
-                    lastTime: Date.now(),
-                    lastBytes: 0,
-                    startTime: Date.now(),
-                    totalBytes: 0
-                };
-
-                // 开始分块发送
-                let offset = 0;
-                let chunkIndex = 0;
-                const totalChunks = Math.ceil(file.size / chunkSize);
-
-                while (offset < file.size) {
-                    const chunk = await readFileChunk(file, offset, chunkSize);
-                    conn.send({
-                        type: 'file-chunk',
-                        transferId,
-                        data: chunk,
-                        index: chunkIndex,
-                        total: totalChunks
-                    });
-
-                    offset += chunk.byteLength;
-                    chunkIndex++;
-                    updateUploadProgress(transferId, offset, file.size);
-                }
-
-                resolve(transferId);
-            } catch (error) {
-                console.error('发送文件失败:', error);
-                reject(error);
-            }
-        });
-    }, [connections, connectToPeer, addFileTransfer]);
-
-    // 新增函数：发送文件信息并等待确认
-    const sendFileInfo = (conn: any, file: File, transferId: string): Promise<boolean> => {
-        return new Promise((resolve) => {
-            console.log(`发送文件信息: ${transferId}`);
-
-            // 存储文件信息，用于重传
-            const info = {
-                type: 'file-info',
-                transferId,
-                name: file.name,
-                size: file.size,
-                fileType: file.type
-            };
-
-            fileInfo.current[transferId] = info;
-
-            // 发送文件信息
-            conn.send(info);
-
-            // 等待确认
-            const timeout = setTimeout(() => {
-                console.log(`文件信息发送超时: ${transferId}`);
-                removeListener();
-                resolve(false); // 超时，未收到确认
-            }, 10000);
-
-            // 监听确认消息
-            const handleData = (data: any) => {
-                if (data.type === 'file-info-received' && data.transferId === transferId) {
-                    console.log(`收到文件信息确认: ${transferId}`);
-                    clearTimeout(timeout);
-                    removeListener();
-                    resolve(true);
-                }
-            };
-
-            const removeListener = () => {
-                // 移除监听器逻辑，根据 PeerJS 的实现可能需要调整
-                conn.off('data', handleData);
-            };
-
-            conn.on('data', handleData);
-        });
-    };
-
     // 辅助函数：发送文件块
     const sendFileChunks = async (conn: any, file: File, transferId: string) => {
         const fileReader = new FileReader();
@@ -812,6 +676,70 @@ export const usePeerJS = () => {
             reader.onerror = () => reject(new Error('读取文件块时出错'));
             reader.readAsArrayBuffer(blob);
         });
+    };
+
+    // 添加发送文件函数
+    const sendFile = async (peerId: string, file: File) => {
+        try {
+            const conn = connections.get(peerId);
+            if (!conn) {
+                throw new Error('未找到连接');
+            }
+
+            // 生成传输ID
+            const transferId = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
+
+            // 添加到传输列表
+            addFileTransfer({
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                progress: 0,
+                status: 'pending',
+                direction: 'upload',
+                peerId
+            });
+
+            // 发送文件信息
+            conn.send({
+                type: 'file-info',
+                transferId,
+                name: file.name,
+                size: file.size,
+                fileType: file.type
+            });
+
+            // 初始化传输时间统计
+            transferTimes.current[transferId] = {
+                startTime: Date.now(),
+                lastTime: Date.now(),
+                lastBytes: 0,
+                totalBytes: 0
+            };
+
+            // 分块发送文件
+            let offset = 0;
+            while (offset < file.size) {
+                const chunk = await readFileChunk(file, offset, chunkSize);
+                conn.send({
+                    type: 'file-chunk',
+                    transferId,
+                    data: chunk
+                });
+
+                offset += chunk.byteLength;
+                updateUploadProgress(transferId, offset, file.size);
+
+                // 可选：添加小延迟避免阻塞
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+
+            console.log(`[usePeerJS] 文件发送完成: ${file.name}`);
+            return transferId;
+        } catch (error) {
+            console.error('[usePeerJS] 发送文件失败:', error);
+            throw error;
+        }
     };
 
     // 确保返回所有需要的属性和方法
