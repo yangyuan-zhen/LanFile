@@ -22,8 +22,8 @@ interface Settings {
     downloadPath?: string;
 }
 
-// 处理自动保存文件到下载目录
-ipcMain.handle('file:saveToDownloads', async (event, args) => {
+// 处理文件保存
+safeHandle('file:saveToDownloads', async (event, args) => {
     try {
         const { fileName, fileData, fileType } = args;
         console.log(`[主进程] 开始保存文件: ${fileName}, 类型: ${fileType}`);
@@ -34,7 +34,7 @@ ipcMain.handle('file:saveToDownloads', async (event, args) => {
 
         // 使用用户设置的路径或默认下载路径
         const downloadPath = userDownloadPath || app.getPath('downloads');
-        console.log(`[主进程] 保存到用户设置的目录: ${downloadPath}`);
+        console.log(`[主进程] 保存到目录: ${downloadPath}`);
 
         // 确保目录存在
         if (!fs.existsSync(downloadPath)) {
@@ -46,36 +46,39 @@ ipcMain.handle('file:saveToDownloads', async (event, args) => {
 
         // 将 Array 转回 Buffer
         const buffer = Buffer.from(fileData);
+        console.log(`[主进程] 创建的Buffer大小: ${buffer.length} 字节`);
 
         // 写入文件
         fs.writeFileSync(filePath, buffer);
         console.log(`[主进程] 文件已成功写入: ${filePath}`);
 
-        return filePath;
+        return { success: true, filePath };
     } catch (error) {
         console.error('[主进程] 保存文件错误:', error);
-        throw error;
-    }
-});
-
-// 打开文件所在文件夹
-ipcMain.handle('file:openFolder', async (event, filePath) => {
-    try {
-        shell.showItemInFolder(filePath);
-        return { success: true };
-    } catch (error) {
-        console.error('打开文件夹失败:', error);
         return { success: false, error: String(error) };
     }
 });
 
-// 打开文件
-ipcMain.handle('file:openFile', async (event, filePath) => {
+// 处理打开文件
+safeHandle('file:openFile', async (event, filePath) => {
     try {
-        shell.openPath(filePath);
+        const { shell } = require('electron');
+        await shell.openPath(filePath);
         return { success: true };
     } catch (error) {
-        console.error('打开文件失败:', error);
+        console.error('[主进程] 打开文件错误:', error);
+        return { success: false, error: String(error) };
+    }
+});
+
+// 处理打开文件夹
+safeHandle('file:openFolder', async (event, filePath) => {
+    try {
+        const { shell } = require('electron');
+        await shell.showItemInFolder(filePath);
+        return { success: true };
+    } catch (error) {
+        console.error('[主进程] 打开文件夹错误:', error);
         return { success: false, error: String(error) };
     }
 });

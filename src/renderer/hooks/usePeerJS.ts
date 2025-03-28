@@ -16,6 +16,13 @@ export interface FileTransfer {
     savedPath?: string;
 }
 
+interface FileInfoType {
+    name: string;
+    size: number;
+    fileType: string;
+    [key: string]: any;
+}
+
 const debug = (message: string, ...args: any[]) => {
     console.log(`[usePeerJS] ${message}`, ...args);
 };
@@ -30,9 +37,9 @@ export const usePeerJS = () => {
     const [deviceId, setDeviceId] = useState<string>('');
     const isConnecting = useRef<boolean>(false);
 
-    // 提升到全局，而不是每个连接单独维护
+    // 修改 useRef 的类型声明
     const fileChunks = useRef<Record<string, Uint8Array[]>>({});
-    const fileInfo = useRef<Record<string, any>>({});
+    const fileInfo = useRef<Record<string, FileInfoType>>({});
 
     // 修改 transferTimes 的类型定义
     const transferTimes = useRef<Record<string, {
@@ -665,80 +672,49 @@ export const usePeerJS = () => {
         }
     };
 
-    // 完善 completeTransfer 函数实现
-    const completeTransfer = async (transferId: string) => {
+    // 在收到文件完成消息时的处理
+    const handleFileComplete = async (transferId: string) => {
         try {
-            console.log(`[usePeerJS] 准备合并文件:${transferId}`);
+            const fileInfoData = fileInfo.current[transferId];
+            const fileData = fileChunks.current[transferId];
 
-            // 获取文件块
-            const chunks = fileChunks.current[transferId];
-            if (!chunks || chunks.length === 0) {
-                console.error(`[usePeerJS] 错误: 未找到文件块`);
-                throw new Error("没有接收到文件块");
+            if (!fileInfoData || !fileData) {
+                console.error('[usePeerJS] 找不到文件信息或数据:', transferId);
+                return;
             }
 
-            // 获取文件信息
-            const info = fileInfo.current[transferId];
-            if (!info) {
-                console.error(`[usePeerJS] 错误: 未找到文件信息`);
-                throw new Error("找不到文件信息");
-            }
+            console.log(`[usePeerJS] 准备保存文件: ${fileInfoData.name}`);
 
-            // 过滤出有效的块并合并
-            const validChunks = chunks.filter(chunk => chunk && chunk.byteLength);
-            const totalSize = validChunks.reduce((size, chunk) => size + chunk.byteLength, 0);
-
-            console.log(`[usePeerJS] 准备合并文件:${transferId}，总大小:${totalSize} 字节`);
-
-            // 合并所有块到一个ArrayBuffer
-            const fileData = new Uint8Array(totalSize);
-            let offset = 0;
-            for (const chunk of validChunks) {
-                fileData.set(new Uint8Array(chunk), offset);
-                offset += chunk.byteLength;
-            }
-
-            // 调用主进程保存文件
-            console.log(`[usePeerJS] 调用主进程保存文件: ${info.name}`);
-            const savedPath = await window.electron.invoke('file:saveToDownloads', {
-                fileName: info.name,
-                fileData: Array.from(fileData),
-                fileType: info.fileType || 'application/octet-stream'
+            const result = await window.electron.invoke('file:saveToDownloads', {
+                fileName: fileInfoData.name,
+                fileData: Array.from(new Uint8Array(Buffer.concat(fileData))),
+                fileType: fileInfoData.fileType
             });
 
-            console.log(`[usePeerJS] 文件已自动保存到:${savedPath}`);
+            if (result.success) {
+                console.log(`[usePeerJS] 文件已保存: ${result.filePath}`);
 
-            // 更新传输状态
+                // 更新传输状态
+                setTransfers(prev =>
+                    prev.map(t => t.id === transferId ?
+                        { ...t, progress: 100, status: 'completed', savedPath: result.filePath } : t)
+                );
+
+                // 触发完成事件
+                window.dispatchEvent(new CustomEvent('file-transfer-complete'));
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('[usePeerJS] 保存文件失败:', error);
             setTransfers(prev =>
-                prev.map(t =>
-                    t.id === transferId
-                        ? { ...t, progress: 100, status: 'completed', savedPath }
-                        : t
-                )
+                prev.map(t => t.id === transferId ?
+                    { ...t, status: 'error' } : t)
             );
-
-            // 清理内存
+        } finally {
+            // 清理数据
             delete fileChunks.current[transferId];
             delete fileInfo.current[transferId];
-
-            // 显示通知
-            if (window.Notification && Notification.permission === 'granted') {
-                new Notification('文件传输完成', {
-                    body: `${info.name} 已保存到下载文件夹`
-                });
-            }
-
-            return savedPath;
-        } catch (error) {
-            console.error(`[usePeerJS] 完成传输错误:`, error);
-            setTransfers(prev =>
-                prev.map(t =>
-                    t.id === transferId
-                        ? { ...t, status: 'error' }
-                        : t
-                )
-            );
-            throw error;
         }
     };
 
@@ -777,7 +753,7 @@ export const usePeerJS = () => {
                 // 添加有效性检查
                 const receivedChunks = fileChunks.current[transferId].filter(c => c && c.byteLength);
                 if (receivedChunks.length === total) {
-                    completeTransfer(transferId);
+                    handleFileComplete(transferId);
                 } else {
                     console.warn(`传输未完成: ${receivedChunks.length}/${total} 块已接收`);
                 }
