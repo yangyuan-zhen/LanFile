@@ -867,6 +867,7 @@ export const usePeerJS = () => {
         transfers,
         deviceId,
         connectToPeer,
-        sendFile
+        sendFile,
+        connections
     };
 };
