@@ -666,14 +666,40 @@ export const usePeerJS = () => {
 
         console.log(`[usePeerJS] 文件接收进度: ${receivedSize}/${fileInfoData.size} 字节 (${Math.floor((receivedSize / fileInfoData.size) * 100)}%), 已接收 ${validChunks} 块`);
 
-        // 更新进度
-        if (receivedSize > 0) {
-            console.log(`[usePeerJS] 文件块处理更新进度: ${transferId}, ${receivedSize}/${fileInfoData.size}`);
-            // 确保使用异步方式调用，以避免阻塞当前操作
-            setTimeout(() => {
-                updateTransferProgress(transferId, receivedSize, fileInfoData.size);
-            }, 0);
+        // 确保传输存在于状态中
+        const existingTransfer = transfers.find(t => t.id === transferId);
+        if (!existingTransfer) {
+            console.log(`[usePeerJS] 找不到传输 ${transferId}，创建新传输任务`);
+            // 创建传输对象
+            const newTransfer: FileTransfer = {
+                id: transferId,
+                name: fileInfoData.name,
+                size: fileInfoData.size,
+                type: fileInfoData.fileType,
+                progress: 0,
+                status: 'transferring' as const,
+                direction: 'download' as const,
+                peerId
+            };
+
+            // 添加到状态
+            setTransfers(prev => [...prev, newTransfer]);
+
+            // 初始化时间统计
+            if (!transferTimes.current[transferId]) {
+                transferTimes.current[transferId] = {
+                    startTime: Date.now(),
+                    lastTime: Date.now(),
+                    lastBytes: 0,
+                    totalBytes: receivedSize
+                };
+            }
         }
+
+        // 更新进度，延迟一点以确保状态已更新
+        setTimeout(() => {
+            updateTransferProgress(transferId, receivedSize, fileInfoData.size);
+        }, 50);
 
         // 检查是否完成
         if (totalChunks && validChunks >= totalChunks) {
