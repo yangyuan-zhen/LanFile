@@ -65,16 +65,20 @@ export const usePeerJS = () => {
 
     // 在 useEffect 中添加日志，监控 transfers 状态变化
     useEffect(() => {
-        debug("Transfers state updated:", transfers);
+        console.log("[usePeerJS] transfers 状态更新:", transfers);
     }, [transfers]);
 
-    // 将 addFileTransfer 函数移到这里，在它被使用之前
+    // 修改 addFileTransfer 函数，添加调试日志
     const addFileTransfer = (fileInfo: Omit<FileTransfer, "id">) => {
         const id = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
         const newTransfer: FileTransfer = { id, ...fileInfo };
 
-        debug("Adding new transfer:", newTransfer);
-        setTransfers(prev => [...prev, newTransfer]);
+        console.log("[usePeerJS] 添加新传输:", newTransfer);
+        setTransfers(prev => {
+            const updated = [...prev, newTransfer];
+            console.log("[usePeerJS] 更新后的传输列表:", updated);
+            return updated;
+        });
 
         return id;
     };
@@ -758,6 +762,8 @@ export const usePeerJS = () => {
     // 修改 sendFile 函数
     const sendFile = async (peerId: string, file: File) => {
         try {
+            console.log("[usePeerJS] 开始发送文件:", file.name, "到:", peerId);
+
             // 先检查现有连接
             let conn = connections.get(peerId);
 
@@ -777,10 +783,7 @@ export const usePeerJS = () => {
             }
 
             // 生成传输ID
-            const transferId = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
-
-            // 添加到传输列表
-            addFileTransfer({
+            const transferId = addFileTransfer({
                 name: file.name,
                 size: file.size,
                 type: file.type,
@@ -789,6 +792,8 @@ export const usePeerJS = () => {
                 direction: 'upload',
                 peerId
             });
+
+            console.log("[usePeerJS] 创建新的上传传输:", transferId);
 
             // 发送文件信息
             conn.send({
@@ -887,6 +892,7 @@ export const usePeerJS = () => {
         deviceId,
         connectToPeer,
         sendFile,
-        connections
+        connections,
+        addFileTransfer
     };
 };
