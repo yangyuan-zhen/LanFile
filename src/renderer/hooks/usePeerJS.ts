@@ -65,6 +65,9 @@ export const usePeerJS = () => {
     // 添加peer名称映射
     const peerNames = useRef<Map<string, { name: string }>>(new Map());
 
+    // 添加传输状态缓存
+    const transferCache = useRef<Record<string, FileTransfer>>({});
+
     const { chunkSize } = useSettings();
 
     // 在 useEffect 中添加日志，监控 transfers 状态变化
@@ -77,12 +80,11 @@ export const usePeerJS = () => {
         const id = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
         const newTransfer: FileTransfer = { id, ...fileInfo };
 
+        // 立即添加到缓存，确保可以立即找到
+        transferCache.current[id] = newTransfer;
+
         console.log("[usePeerJS] 添加新传输:", newTransfer);
-        setTransfers(prev => {
-            const updated = [...prev, newTransfer];
-            console.log("[usePeerJS] 更新后的传输列表:", updated);
-            return updated;
-        });
+        setTransfers(prev => [...prev, newTransfer]);
 
         return id;
     };
@@ -570,71 +572,55 @@ export const usePeerJS = () => {
 
         console.log(`[usePeerJS] 传输进度详细更新: ${transferId}, ${progress}%, ${bytesReceived}/${fileSize} 字节`);
 
-        // 检查传输是否存在于当前状态中
-        const transferIndex = transfers.findIndex(t => t.id === transferId);
-        if (transferIndex === -1) {
-            console.error(`[usePeerJS] 找不到ID为 ${transferId} 的传输任务，将尝试创建或恢复`);
+        // 先从缓存中查找
+        let transfer = transferCache.current[transferId];
 
-            // 获取文件信息
-            const fileInfoData = fileInfo.current[transferId];
-            if (!fileInfoData) {
-                console.error(`[usePeerJS] 无法恢复传输: 找不到文件信息 ${transferId}`);
-                return;
+        // 如果缓存中没有，从状态中查找并更新缓存
+        if (!transfer) {
+            const stateTransfer = transfers.find(t => t.id === transferId);
+            if (stateTransfer) {
+                transfer = stateTransfer;
+                transferCache.current[transferId] = stateTransfer;
+            } else {
+                // 尝试创建新传输
+                const fileInfoData = fileInfo.current[transferId];
+                if (!fileInfoData) {
+                    console.error(`[usePeerJS] 无法创建传输: 找不到文件信息 ${transferId}`);
+                    return;
+                }
+
+                // 创建新传输
+                transfer = {
+                    id: transferId,
+                    name: fileInfoData.name,
+                    size: fileInfoData.size,
+                    type: fileInfoData.fileType || 'application/octet-stream',
+                    progress: 0,
+                    status: 'transferring' as const,
+                    direction: 'download' as const,
+                    peerId: '',
+                    deviceName: '未知设备'
+                };
+
+                // 更新缓存和状态
+                transferCache.current[transferId] = transfer;
+                setTransfers(prev => [...prev, transfer]);
+                console.log(`[usePeerJS] 已创建新传输: ${transferId}`);
             }
-
-            // 创建新传输对象
-            const newTransfer: FileTransfer = {
-                id: transferId,
-                name: fileInfoData.name,
-                size: fileInfoData.size,
-                type: fileInfoData.fileType || 'application/octet-stream',
-                progress: progress,
-                status: progress >= 100 ? 'completed' as const : 'transferring' as const,
-                direction: 'download' as const,
-                peerId: '',  // 无法确定peer ID，设为空
-                deviceName: '未知设备'
-            };
-
-            // 添加到状态
-            setTransfers(prev => [...prev, newTransfer]);
-            console.log(`[usePeerJS] 已创建新传输: ${transferId}, 进度: ${progress}%`);
-            return;
         }
 
         // 更新传输进度
-        setTransfers(prev => {
-            const updated = prev.map(t => {
-                if (t.id === transferId) {
-                    // 计算速度
-                    const timeElapsed = (now - (transferTimes.current[transferId]?.startTime || now)) / 1000;
-                    const speed = timeElapsed > 0 ? bytesReceived / timeElapsed : 0;
+        const updatedTransfer = {
+            ...transfer,
+            progress,
+            status: progress >= 100 ? 'completed' as const : 'transferring' as const
+        };
 
-                    // 计算剩余时间
-                    const bytesRemaining = fileSize - bytesReceived;
-                    const timeRemaining = speed > 0 ? bytesRemaining / speed : 0;
-
-                    console.log(`[usePeerJS] 更新传输进度: ${transferId}, 从 ${t.progress}% 到 ${progress}%`);
-
-                    return {
-                        ...t,
-                        progress,
-                        status: progress >= 100 ? 'completed' as const : 'transferring' as const,
-                        speed,
-                        timeRemaining
-                    };
-                }
-                return t;
-            });
-
-            // 确保传输不会被意外过滤掉
-            return updated;
-        });
-
-        // 确保UI立即更新
-        requestAnimationFrame(() => {
-            const updatedTransfer = transfers.find(t => t.id === transferId);
-            console.log(`[usePeerJS] RAF更新后: ${transferId}, 进度=${updatedTransfer?.progress}%`);
-        });
+        // 更新缓存和状态
+        transferCache.current[transferId] = updatedTransfer;
+        setTransfers(prev => prev.map(t =>
+            t.id === transferId ? updatedTransfer : t
+        ));
     };
 
     // 在文件传输完成时触发通知事件
