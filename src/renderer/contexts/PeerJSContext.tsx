@@ -19,6 +19,7 @@ interface PeerJSContextType {
   connectToPeer: (peerId: string) => Promise<any>;
   connections: Map<string, any>;
   addFileTransfer: (fileInfo: Omit<FileTransfer, "id">) => string;
+  _updateVersion: number;
 }
 
 const PeerJSContext = createContext<PeerJSContextType | undefined>(undefined);
@@ -28,9 +29,15 @@ export const PeerJSProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const peerJS = usePeerJS();
+  const [forceUpdate, setForceUpdate] = useState(0);
 
-  // 添加这行代码查看完整的 peerJS 对象结构
-  console.log("[PeerJSProvider] 完整的peerJS对象:", Object.keys(peerJS));
+  // 使用 transfers 更新触发强制刷新
+  useEffect(() => {
+    if (peerJS.transfers.length > 0) {
+      // 当传输列表变化时强制更新
+      setForceUpdate((prev) => prev + 1);
+    }
+  }, [peerJS.transfers]);
 
   // 添加调试日志
   useEffect(() => {
@@ -38,11 +45,20 @@ export const PeerJSProvider: React.FC<{ children: ReactNode }> = ({
       transfers: peerJS.transfers,
       isReady: peerJS.isReady,
       deviceId: peerJS.deviceId,
+      forceUpdate, // 记录强制更新计数
     });
-  }, [peerJS.transfers, peerJS.isReady, peerJS.deviceId]);
+  }, [peerJS.transfers, peerJS.isReady, peerJS.deviceId, forceUpdate]);
+
+  // 创建带有强制更新版本号的值对象
+  const contextValue = {
+    ...peerJS,
+    _updateVersion: forceUpdate, // 添加版本号以触发订阅组件更新
+  };
 
   return (
-    <PeerJSContext.Provider value={peerJS}>{children}</PeerJSContext.Provider>
+    <PeerJSContext.Provider value={contextValue}>
+      {children}
+    </PeerJSContext.Provider>
   );
 };
 
@@ -53,7 +69,17 @@ export const useGlobalPeerJS = () => {
     throw new Error("useGlobalPeerJS must be used within a PeerJSProvider");
   }
 
-  // 添加调试输出
-  console.log("[useGlobalPeerJS] 当前context:", context);
+  // 添加调试输出，但减少频率
+  useEffect(() => {
+    console.log("[useGlobalPeerJS] 当前transfers状态:", {
+      count: context.transfers.length,
+      items: context.transfers.map((t) => ({
+        id: t.id,
+        progress: t.progress,
+        status: t.status,
+      })),
+    });
+  }, [context.transfers.length, context._updateVersion]);
+
   return context;
 };

@@ -19,19 +19,23 @@ export const CurrentTransfers: React.FC = () => {
   const [showCompleted, setShowCompleted] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // 添加更频繁的刷新以确保进度条更新
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setRefreshKey((prev) => prev + 1);
+    }, 500); // 更频繁的刷新
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // 当transfers更新时也更新刷新键
+  useEffect(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, [transfers]);
+
   // 添加调试日志
   useEffect(() => {
     console.log("[CurrentTransfers] 原始传输列表:", transfers);
-  }, [transfers]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      if (transfers.some((t) => t.status === "transferring")) {
-        setRefreshKey((prev) => prev + 1);
-      }
-    }, 1000);
-
-    return () => clearInterval(intervalId);
   }, [transfers]);
 
   // 过滤和排序传输
