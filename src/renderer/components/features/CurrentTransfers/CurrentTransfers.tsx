@@ -66,21 +66,53 @@ export const CurrentTransfers: React.FC = () => {
     setTransfers((prev) => prev.filter((t) => t.id !== transferId));
   };
 
-  // 添加去重逻辑，确保同名文件只显示最新的传输
+  // 恢复之前的排序和过滤逻辑，同时保留新添加的清除功能
   const filteredTransfers = useMemo(() => {
-    // 获取每个文件名的最新传输记录
+    // 按文件名和方向分组，保留最新的条目
     const latestTransfers = new Map();
 
-    // 按时间倒序处理，这样最新的会覆盖旧的
-    [...transfers].reverse().forEach((transfer) => {
-      // 使用文件名作为键
-      if (!latestTransfers.has(transfer.name)) {
-        latestTransfers.set(transfer.name, transfer);
-      }
+    // 先按时间戳（从ID中提取）排序，确保最新的条目会覆盖旧的
+    const sortedTransfers = [...transfers].sort((a, b) => {
+      // 从ID中提取时间戳: transfer-TIMESTAMP-xxx
+      const getTimestamp = (id: string) => {
+        const parts = id.split("-");
+        return parts.length > 1 ? Number(parts[1]) : 0;
+      };
+      return getTimestamp(b.id) - getTimestamp(a.id);
     });
 
-    return Array.from(latestTransfers.values());
-  }, [transfers]);
+    // 对于每个文件名+方向组合，只保留最新的条目
+    for (const transfer of sortedTransfers) {
+      const key = `${transfer.name}-${transfer.direction}-${transfer.peerId}`;
+      if (
+        !latestTransfers.has(key) ||
+        (transfer.status === "completed" &&
+          latestTransfers.get(key).status !== "completed")
+      ) {
+        latestTransfers.set(key, transfer);
+      }
+    }
+
+    // 转换回数组并应用显示筛选
+    let result = Array.from(latestTransfers.values());
+
+    // 应用显示/隐藏已完成的选项
+    if (!showCompleted) {
+      result = result.filter((t) => t.status !== "completed");
+    }
+
+    // 最后按状态和时间排序
+    return result.sort((a, b) => {
+      // 优先显示正在传输的项目
+      if (a.status === "transferring" && b.status !== "transferring") return -1;
+      if (a.status !== "transferring" && b.status === "transferring") return 1;
+      // 其次是等待中的项目
+      if (a.status === "pending" && b.status !== "pending") return -1;
+      if (a.status !== "pending" && b.status === "pending") return 1;
+      // 然后按ID排序（较新的在前）
+      return b.id.localeCompare(a.id);
+    });
+  }, [transfers, showCompleted, refreshKey]);
 
   // 计算正在传输的数量
   const activeCount = transfers.filter(
