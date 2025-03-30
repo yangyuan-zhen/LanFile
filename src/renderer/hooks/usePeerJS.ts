@@ -21,6 +21,7 @@ interface FileInfoType {
     name: string;
     size: number;
     fileType: string;
+    sender: string;
     [key: string]: any;
 }
 
@@ -578,38 +579,68 @@ export const usePeerJS = () => {
         // 如果缓存中没有，从状态中查找并更新缓存
         if (!transfer) {
             const stateTransfer = transfers.find(t => t.id === transferId);
+
             if (stateTransfer) {
                 transfer = stateTransfer;
                 transferCache.current[transferId] = stateTransfer;
             } else {
                 // 尝试创建新传输
                 const fileInfoData = fileInfo.current[transferId];
+
                 if (!fileInfoData) {
-                    console.error(`[usePeerJS] 无法创建传输: 找不到文件信息 ${transferId}`);
-                    return;
+                    console.warn(`[usePeerJS] 无法找到文件信息: ${transferId}，创建默认传输信息`);
+
+                    // 创建默认的文件信息用于恢复
+                    fileInfo.current[transferId] = {
+                        name: `未知文件-${transferId.substr(-6)}`,
+                        size: fileSize,
+                        fileType: 'application/octet-stream',
+                        sender: ''
+                    };
+
+                    // 使用创建的默认信息
+                    transfer = {
+                        id: transferId,
+                        name: `未知文件-${transferId.substr(-6)}`,
+                        size: fileSize,
+                        type: 'application/octet-stream',
+                        progress: 0,
+                        status: 'transferring' as const,
+                        direction: 'download' as const,
+                        peerId: '',
+                        deviceName: '未知设备'
+                    };
+                } else {
+                    transfer = {
+                        id: transferId,
+                        name: fileInfoData.name,
+                        size: fileInfoData.size,
+                        type: fileInfoData.fileType || 'application/octet-stream',
+                        progress: 0,
+                        status: 'transferring' as const,
+                        direction: 'download' as const,
+                        peerId: fileInfoData.sender || '',
+                        deviceName: getPeerNameFromId(fileInfoData.sender) || '未知设备'
+                    };
                 }
 
-                // 创建新传输
-                transfer = {
-                    id: transferId,
-                    name: fileInfoData.name,
-                    size: fileInfoData.size,
-                    type: fileInfoData.fileType || 'application/octet-stream',
-                    progress: 0,
-                    status: 'transferring' as const,
-                    direction: 'download' as const,
-                    peerId: '',
-                    deviceName: '未知设备'
-                };
+                // 初始化传输统计
+                if (!transferTimes.current[transferId]) {
+                    transferTimes.current[transferId] = {
+                        startTime: now,
+                        lastTime: now,
+                        lastBytes: 0,
+                        totalBytes: bytesReceived
+                    };
+                }
 
                 // 更新缓存和状态
                 transferCache.current[transferId] = transfer;
                 setTransfers(prev => [...prev, transfer]);
-                console.log(`[usePeerJS] 已创建新传输: ${transferId}`);
             }
         }
 
-        // 更新传输进度
+        // 更新进度
         const updatedTransfer = {
             ...transfer,
             progress,
@@ -618,9 +649,7 @@ export const usePeerJS = () => {
 
         // 更新缓存和状态
         transferCache.current[transferId] = updatedTransfer;
-        setTransfers(prev => prev.map(t =>
-            t.id === transferId ? updatedTransfer : t
-        ));
+        setTransfers(prev => prev.map(t => t.id === transferId ? updatedTransfer : t));
     };
 
     // 在文件传输完成时触发通知事件
