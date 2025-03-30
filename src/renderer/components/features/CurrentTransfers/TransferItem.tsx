@@ -162,10 +162,16 @@ const TransferItem: React.FC<TransferItemProps> = ({
           borderRadius="full"
           hasStripe={transfer.status === "transferring"}
           isAnimated={transfer.status === "transferring"}
-          transition="width 0.2s ease-in-out"
           sx={{
-            "& > div:first-of-type": {
+            track: {
+              bg: "gray.200",
+            },
+            filledTrack: {
               transition: "width 0.3s ease-in-out",
+              bg: `${progressColorScheme}.500`,
+            },
+            "> div": {
+              height: "8px",
             },
           }}
         />
