@@ -775,10 +775,10 @@ export const usePeerJS = () => {
                 throw new Error('连接未打开');
             }
 
-            // 创建唯一的传输ID
+            // 创建唯一的传输ID - 保持此ID一致!
             const transferId = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
 
-            // 在这里使用同一个transferId变量添加到transfers状态
+            // 创建传输对象并添加到状态中
             const newTransfer: FileTransfer = {
                 id: transferId,
                 name: file.name,
@@ -790,7 +790,21 @@ export const usePeerJS = () => {
                 peerId
             };
 
-            // 将transferId存储在任何需要的地方，确保一致性
+            // 立即将新传输添加到状态中
+            setTransfers(prev => [...prev, newTransfer]);
+
+            console.log("[usePeerJS] 创建新的上传传输:", transferId);
+
+            // 发送文件信息
+            conn.send({
+                type: 'file-info',
+                transferId,
+                name: file.name,
+                size: file.size,
+                fileType: file.type
+            });
+
+            // 初始化传输时间统计
             transferTimes.current[transferId] = {
                 startTime: Date.now(),
                 lastTime: Date.now(),
@@ -798,13 +812,46 @@ export const usePeerJS = () => {
                 totalBytes: 0
             };
 
-            // 在文件发送逻辑中也使用同样的transferId
-            // ... 文件发送代码
+            // 分块发送文件
+            let offset = 0;
+            let chunkIndex = 0;
+            const totalChunks = Math.ceil(file.size / chunkSize);
 
-            // 立即将新传输添加到状态中
-            setTransfers(prev => [...prev, newTransfer]);
+            console.log(`[usePeerJS] 开始发送文件 ${file.name}, 大小: ${file.size} 字节, 分 ${totalChunks} 块`);
 
-            return transferId;
+            try {
+                while (offset < file.size) {
+                    const chunk = await readFileChunk(file, offset, chunkSize);
+
+                    conn.send({
+                        type: 'file-chunk',
+                        transferId,
+                        chunkIndex,
+                        totalChunks,
+                        data: chunk
+                    });
+
+                    offset += chunk.byteLength;
+                    chunkIndex++;
+
+                    // 更新进度 - 使用同一个 transferId!
+                    updateUploadProgress(transferId, offset, file.size);
+
+                    // 检查连接状态
+                    if (!conn.open) {
+                        throw new Error('连接已关闭');
+                    }
+                }
+
+                console.log(`[usePeerJS] 文件 ${file.name} 发送完成，共 ${chunkIndex} 块`);
+                return transferId;
+            } catch (error) {
+                console.error(`[usePeerJS] 发送文件 ${file.name} 时出错:`, error);
+                setTransfers(prev =>
+                    prev.map(t => t.id === transferId ? { ...t, status: 'error' as const } : t)
+                );
+                throw error;
+            }
         } catch (error) {
             console.error('[usePeerJS] 发送文件失败:', error);
             throw error;
