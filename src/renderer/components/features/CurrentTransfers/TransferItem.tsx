@@ -93,6 +93,10 @@ const TransferItem: React.FC<TransferItemProps> = ({
     }
   }, [transfer.status, transfer.direction]);
 
+  console.log(
+    `渲染TransferItem: ${transfer.id}, 进度: ${transfer.progress}%, 状态: ${transfer.status}`
+  );
+
   return (
     <Box p={4} borderWidth="1px" borderRadius="lg" bg="white" boxShadow="sm">
       <Flex justify="space-between" align="center" mb={2}>
@@ -166,28 +170,16 @@ const TransferItem: React.FC<TransferItemProps> = ({
               top: 0,
             }}
           >
-            {/* 条纹动画 */}
+            {/* 条纹动画 - 使用CSS类而不是内联样式 */}
             {transfer.status === "transferring" && (
               <div
-                className="progress-stripes"
+                className="progress-bar-animated"
                 style={{
                   position: "absolute",
                   top: 0,
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  backgroundImage: `linear-gradient(
-                  45deg,
-                  rgba(255, 255, 255, 0.2) 25%,
-                  transparent 25%,
-                  transparent 50%,
-                  rgba(255, 255, 255, 0.2) 50%,
-                  rgba(255, 255, 255, 0.2) 75%,
-                  transparent 75%,
-                  transparent
-                )`,
-                  backgroundSize: "20px 20px",
-                  animation: "progress-stripes 1s linear infinite",
                 }}
               />
             )}
