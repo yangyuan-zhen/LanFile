@@ -17,6 +17,7 @@ interface PeerJSContextType {
   sendFile: (peerId: string, file: File) => Promise<string>;
   connectToPeer: (peerId: string) => Promise<any>;
   connections: Map<string, any>;
+  addFileTransfer: (fileInfo: Omit<FileTransfer, "id">) => string;
 }
 
 const PeerJSContext = createContext<PeerJSContextType | undefined>(undefined);
@@ -26,6 +27,9 @@ export const PeerJSProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const peerJS = usePeerJS();
+
+  // 添加这行代码查看完整的 peerJS 对象结构
+  console.log("[PeerJSProvider] 完整的peerJS对象:", Object.keys(peerJS));
 
   // 添加调试日志
   useEffect(() => {
