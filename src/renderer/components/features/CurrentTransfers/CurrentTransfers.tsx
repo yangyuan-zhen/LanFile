@@ -17,6 +17,17 @@ export const CurrentTransfers: React.FC = () => {
   const peerContext = useGlobalPeerJS();
   const { transfers } = peerContext || { transfers: [] };
   const [showCompleted, setShowCompleted] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (transfers.some((t) => t.status === "transferring")) {
+        setRefreshKey((prev) => prev + 1);
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [transfers]);
 
   // 过滤和排序传输
   const filteredTransfers = transfers
@@ -194,7 +205,7 @@ export const CurrentTransfers: React.FC = () => {
           </Flex>
         ) : (
           filteredTransfers.map((transfer) => (
-            <Box key={transfer.id} mb={3}>
+            <Box key={`${transfer.id}-${refreshKey}`} mb={3}>
               <TransferItem
                 transfer={transfer}
                 formatSize={formatSize}

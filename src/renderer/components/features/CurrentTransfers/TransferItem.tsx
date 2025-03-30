@@ -162,6 +162,12 @@ const TransferItem: React.FC<TransferItemProps> = ({
           borderRadius="full"
           hasStripe={transfer.status === "transferring"}
           isAnimated={transfer.status === "transferring"}
+          transition="width 0.2s ease-in-out"
+          sx={{
+            "& > div:first-of-type": {
+              transition: "width 0.3s ease-in-out",
+            },
+          }}
         />
       </Box>
 

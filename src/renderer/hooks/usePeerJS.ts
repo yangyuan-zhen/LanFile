@@ -859,6 +859,25 @@ export const usePeerJS = () => {
         }
     };
 
+    // 在 updateTransfer 函数中确保正确更新进度
+    const updateTransfer = (id: string, update: Partial<FileTransfer>) => {
+        setTransfers(prev => prev.map(t => {
+            if (t.id === id) {
+                // 确保进度值是有效的数字
+                const progress = typeof update.progress === 'number'
+                    ? Math.min(100, Math.max(0, update.progress))
+                    : t.progress;
+
+                return {
+                    ...t,
+                    ...update,
+                    progress, // 使用验证后的进度值
+                };
+            }
+            return t;
+        }));
+    };
+
     // 确保返回所有需要的属性和方法
     return {
         isReady,
