@@ -31,16 +31,39 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
       setSelectedFiles([]);
     };
 
-    // 监听传输状态变化
+    // 监听传输状态变化，添加文件名匹配逻辑
     useEffect(() => {
-      // 检查是否有传输完成
-      const hasCompletedUploads = transfers.some(
-        (t) => t.direction === "upload" && t.status === "completed"
+      if (!clearAfterUpload || selectedFiles.length === 0) return;
+
+      // 获取当前已完成的上传文件名集合
+      const completedUploads = transfers
+        .filter((t) => t.direction === "upload" && t.status === "completed")
+        .map((t) => t.name);
+
+      if (completedUploads.length === 0) return;
+
+      // 找出已经完成传输的文件
+      const filesToRemove = selectedFiles.filter((fileItem) =>
+        completedUploads.includes(fileItem.file.name)
       );
 
-      // 如果有上传完成且启用了自动清除
-      if (hasCompletedUploads && clearAfterUpload && selectedFiles.length > 0) {
-        clearAllFiles();
+      if (filesToRemove.length > 0) {
+        console.log(
+          `[FileUploader] 清除已完成传输的文件:`,
+          filesToRemove.map((f) => f.file.name)
+        );
+
+        // 释放已完成文件的预览URL
+        filesToRemove.forEach((file) => {
+          if (file.preview) {
+            URL.revokeObjectURL(file.preview);
+          }
+        });
+
+        // 更新选中文件列表，移除已完成传输的文件
+        setSelectedFiles((prev) =>
+          prev.filter((f) => !completedUploads.includes(f.file.name))
+        );
       }
     }, [transfers, clearAfterUpload, selectedFiles]);
 

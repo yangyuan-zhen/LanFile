@@ -1,6 +1,12 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Text, Icon, Button, Box, Flex, Tooltip } from "@chakra-ui/react";
-import { FaUpload, FaDownload, FaFolder, FaFile } from "react-icons/fa";
+import {
+  FaUpload,
+  FaDownload,
+  FaFolder,
+  FaFile,
+  FaTimes,
+} from "react-icons/fa";
 import type { FileTransfer } from "../../../hooks/usePeerJS";
 import { formatBytes, formatTime } from "../../../utils/formatUtils";
 
@@ -15,6 +21,7 @@ interface TransferItemProps {
   onOpenFile: (filePath: string) => void;
   onOpenFolder: (filePath: string) => void;
   onTransferComplete: (transferId: string) => void;
+  onClearTransfer?: (transferId: string) => void;
 }
 
 export const TransferItem: React.FC<TransferItemProps> = ({
@@ -28,6 +35,7 @@ export const TransferItem: React.FC<TransferItemProps> = ({
   onOpenFile,
   onOpenFolder,
   onTransferComplete,
+  onClearTransfer,
 }) => {
   // 重要：确保进度值是有效的数字
   const progress =
@@ -109,6 +117,23 @@ export const TransferItem: React.FC<TransferItemProps> = ({
     `渲染TransferItem: ${transfer.id}, 进度: ${transfer.progress}%, 状态: ${transfer.status}`
   );
 
+  const getDeviceDisplay = (transfer: FileTransfer) => {
+    if (transfer.deviceName && transfer.deviceName !== "未知设备") {
+      return transfer.deviceName;
+    }
+
+    // 从peerId中提取IP地址 (假设peerId格式包含IP信息)
+    const ipMatch = transfer.peerId.match(
+      /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/
+    );
+    if (ipMatch) {
+      return ipMatch[0];
+    }
+
+    // 如果没有IP格式，显示截断的peerId
+    return transfer.peerId.substring(0, 8) + "...";
+  };
+
   return (
     <Box
       key={transfer.id} // 确保每个传输项有唯一的 key
@@ -135,7 +160,7 @@ export const TransferItem: React.FC<TransferItemProps> = ({
             </Tooltip>
             <Text fontSize="sm" color="gray.500">
               {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
-              {transfer.deviceName || transfer.peerId.substring(0, 10) + "..."}
+              {getDeviceDisplay(transfer)}
             </Text>
           </Box>
         </Flex>
@@ -219,6 +244,14 @@ export const TransferItem: React.FC<TransferItemProps> = ({
             onClick={() => openFile && openFile(transfer.savedPath!)}
           >
             打开文件
+          </Button>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => onClearTransfer && onClearTransfer(transfer.id)}
+            title="清除此传输记录"
+          >
+            <Icon as={FaTimes} color="gray.500" />
           </Button>
         </Flex>
       )}
