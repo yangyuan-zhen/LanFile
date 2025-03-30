@@ -20,3 +20,12 @@ body {
 #root {
   height: 100vh;
 }
+
+@keyframes progress-stripes {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 20px 0;
+  }
+}

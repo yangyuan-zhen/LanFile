@@ -31,7 +31,11 @@ const TransferItem: React.FC<TransferItemProps> = ({
 }) => {
   // 添加调试日志
   useEffect(() => {
-    console.log(`[TransferItem] 渲染传输项:`, transfer);
+    console.log("TransferItem render:", {
+      id: transfer.id,
+      progress: transfer.progress,
+      size: transfer.size,
+    });
   }, [transfer]);
 
   // 在状态变为完成时调用 onTransferComplete
@@ -72,34 +76,22 @@ const TransferItem: React.FC<TransferItemProps> = ({
 
   // 计算已传输大小
   const transferredSize = useMemo(() => {
-    return transfer.size * (transfer.progress / 100);
+    return Math.floor((transfer.size * transfer.progress) / 100);
   }, [transfer.size, transfer.progress]);
 
   // 根据状态确定颜色
   const statusColor = useMemo(() => {
     switch (transfer.status) {
-      case "error":
-        return "red.500";
+      case "transferring":
+        return transfer.direction === "upload" ? "green.500" : "blue.500";
       case "completed":
         return "green.500";
-      case "transferring":
-        return "blue.500";
+      case "error":
+        return "red.500";
       default:
         return "gray.500";
     }
-  }, [transfer.status]);
-
-  // 进度条颜色方案
-  const progressColorScheme = useMemo(() => {
-    switch (transfer.status) {
-      case "error":
-        return "red";
-      case "completed":
-        return "green";
-      default:
-        return "blue";
-    }
-  }, [transfer.status]);
+  }, [transfer.status, transfer.direction]);
 
   return (
     <Box p={4} borderWidth="1px" borderRadius="lg" bg="white" boxShadow="sm">
@@ -140,61 +132,67 @@ const TransferItem: React.FC<TransferItemProps> = ({
       <Box pt={1}>
         <Flex justify="space-between" align="center" mb={1}>
           <Text fontSize="xs" fontWeight="semibold" color={statusColor}>
-            {transfer.progress}%
+            {Math.round(transfer.progress)}%
           </Text>
           <Text fontSize="xs" fontWeight="semibold" color="gray.600">
             {formatSize(transferredSize)}/{formatSize(transfer.size)}
           </Text>
         </Flex>
 
-        {/* 自定义CSS进度条 */}
-        <Box
-          position="relative"
-          height="8px"
-          width="100%"
-          bg="gray.200"
-          borderRadius="full"
-          overflow="hidden"
+        {/* 进度条容器 */}
+        <div
+          className="progress-bar-container"
+          style={{
+            width: "100%",
+            height: "8px",
+            backgroundColor: "#EDF2F7",
+            borderRadius: "9999px",
+            overflow: "hidden",
+            position: "relative",
+          }}
         >
-          <Box
-            position="absolute"
-            left="0"
-            top="0"
-            height="100%"
-            width={`${transfer.progress}%`}
-            bg={transfer.direction === "upload" ? "green.500" : "blue.500"}
-            transition="width 0.3s ease-in-out"
-            borderRadius="full"
-            {...(transfer.status === "transferring" && {
-              background:
-                transfer.direction === "upload"
-                  ? "linear-gradient(90deg, #38A169, #48BB78)"
-                  : "linear-gradient(90deg, #3182CE, #4299E1)",
-            })}
-          />
-
-          {/* 添加条纹动画效果（如果正在传输） */}
-          {transfer.status === "transferring" && (
-            <Box
-              position="absolute"
-              left="0"
-              top="0"
-              height="100%"
-              width={`${transfer.progress}%`}
-              borderRadius="full"
-              opacity="0.3"
-              backgroundSize="20px 20px"
-              backgroundImage="linear-gradient(45deg, rgba(255, 255, 255, 0.4) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.4) 75%, transparent 75%, transparent)"
-              animation="progress-bar-stripes 1s linear infinite"
-              sx={{
-                "@keyframes progress-bar-stripes": {
-                  "0%": { backgroundPosition: "0 0" },
-                  "100%": { backgroundPosition: "20px 0" },
-                },
-              }}
-            />
-          )}
-        </Box>
+          {/* 进度条 */}
+          <div
+            className="progress-bar"
+            style={{
+              width: `${transfer.progress}%`,
+              height: "100%",
+              backgroundColor:
+                transfer.direction === "upload" ? "#38A169" : "#3182CE",
+              borderRadius: "9999px",
+              transition: "width 0.3s ease-in-out",
+              position: "absolute",
+              left: 0,
+              top: 0,
+            }}
+          >
+            {/* 条纹动画 */}
+            {transfer.status === "transferring" && (
+              <div
+                className="progress-stripes"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundImage: `linear-gradient(
+                  45deg,
+                  rgba(255, 255, 255, 0.2) 25%,
+                  transparent 25%,
+                  transparent 50%,
+                  rgba(255, 255, 255, 0.2) 50%,
+                  rgba(255, 255, 255, 0.2) 75%,
+                  transparent 75%,
+                  transparent
+                )`,
+                  backgroundSize: "20px 20px",
+                  animation: "progress-stripes 1s linear infinite",
+                }}
+              />
+            )}
+          </div>
+        </div>
       </Box>
 
       {transfer.status === "completed" && transfer.savedPath && (
