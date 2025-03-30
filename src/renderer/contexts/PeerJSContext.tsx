@@ -8,34 +8,36 @@ import React, {
 import { usePeerJS } from "../hooks/usePeerJS";
 import type { FileTransfer } from "../hooks/usePeerJS";
 
-// 创建上下文
-export const PeerJSContext = createContext<
-  ReturnType<typeof usePeerJS> | undefined
->(undefined);
+// 确保Context包含transfers
+interface PeerJSContextType {
+  isReady: boolean;
+  error: string | null;
+  transfers: FileTransfer[];
+  deviceId: string;
+  sendFile: (peerId: string, file: File) => Promise<string>;
+  connectToPeer: (peerId: string) => Promise<any>;
+  connections: Map<string, any>;
+}
+
+const PeerJSContext = createContext<PeerJSContextType | undefined>(undefined);
 
 // 创建提供者组件
 export const PeerJSProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const peerState = usePeerJS();
-  const [, forceUpdate] = useState({});
+  const peerJS = usePeerJS();
 
-  // 添加调试日志和强制更新
+  // 添加调试日志
   useEffect(() => {
-    console.log("[PeerJSContext] 传输状态更新:", peerState.transfers);
-
-    // 每当transfers变化时，强制组件树重新渲染
-    const timer = setTimeout(() => {
-      forceUpdate({});
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [peerState.transfers]);
+    console.log("[PeerJSContext] PeerJS状态更新:", {
+      transfers: peerJS.transfers,
+      isReady: peerJS.isReady,
+      deviceId: peerJS.deviceId,
+    });
+  }, [peerJS.transfers, peerJS.isReady, peerJS.deviceId]);
 
   return (
-    <PeerJSContext.Provider value={peerState}>
-      {children}
-    </PeerJSContext.Provider>
+    <PeerJSContext.Provider value={peerJS}>{children}</PeerJSContext.Provider>
   );
 };
 
@@ -45,5 +47,8 @@ export const useGlobalPeerJS = () => {
   if (context === undefined) {
     throw new Error("useGlobalPeerJS must be used within a PeerJSProvider");
   }
+
+  // 添加调试输出
+  console.log("[useGlobalPeerJS] 当前context:", context);
   return context;
 };
