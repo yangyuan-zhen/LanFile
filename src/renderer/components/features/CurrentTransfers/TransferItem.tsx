@@ -1,13 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import {
-  Text,
-  Progress,
-  Icon,
-  Button,
-  Box,
-  Flex,
-  Tooltip,
-} from "@chakra-ui/react";
+import { Text, Icon, Button, Box, Flex, Tooltip } from "@chakra-ui/react";
 import { FaUpload, FaDownload, FaFolder, FaFile } from "react-icons/fa";
 import type { FileTransfer } from "../../../hooks/usePeerJS";
 import { formatBytes, formatTime } from "../../../utils/formatUtils";
@@ -155,26 +147,54 @@ const TransferItem: React.FC<TransferItemProps> = ({
           </Text>
         </Flex>
 
-        <Progress
-          value={transfer.progress}
-          size="sm"
-          colorScheme={progressColorScheme}
+        {/* 自定义CSS进度条 */}
+        <Box
+          position="relative"
+          height="8px"
+          width="100%"
+          bg="gray.200"
           borderRadius="full"
-          hasStripe={transfer.status === "transferring"}
-          isAnimated={transfer.status === "transferring"}
-          sx={{
-            track: {
-              bg: "gray.200",
-            },
-            filledTrack: {
-              transition: "width 0.3s ease-in-out",
-              bg: `${progressColorScheme}.500`,
-            },
-            "> div": {
-              height: "8px",
-            },
-          }}
-        />
+          overflow="hidden"
+        >
+          <Box
+            position="absolute"
+            left="0"
+            top="0"
+            height="100%"
+            width={`${transfer.progress}%`}
+            bg={transfer.direction === "upload" ? "green.500" : "blue.500"}
+            transition="width 0.3s ease-in-out"
+            borderRadius="full"
+            {...(transfer.status === "transferring" && {
+              background:
+                transfer.direction === "upload"
+                  ? "linear-gradient(90deg, #38A169, #48BB78)"
+                  : "linear-gradient(90deg, #3182CE, #4299E1)",
+            })}
+          />
+
+          {/* 添加条纹动画效果（如果正在传输） */}
+          {transfer.status === "transferring" && (
+            <Box
+              position="absolute"
+              left="0"
+              top="0"
+              height="100%"
+              width={`${transfer.progress}%`}
+              borderRadius="full"
+              opacity="0.3"
+              backgroundSize="20px 20px"
+              backgroundImage="linear-gradient(45deg, rgba(255, 255, 255, 0.4) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.4) 75%, transparent 75%, transparent)"
+              animation="progress-bar-stripes 1s linear infinite"
+              sx={{
+                "@keyframes progress-bar-stripes": {
+                  "0%": { backgroundPosition: "0 0" },
+                  "100%": { backgroundPosition: "20px 0" },
+                },
+              }}
+            />
+          )}
+        </Box>
       </Box>
 
       {transfer.status === "completed" && transfer.savedPath && (
