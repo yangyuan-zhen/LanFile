@@ -706,38 +706,31 @@ export const usePeerJS = () => {
 
         // 获取时间统计数据
         const timeStat = transferTimes.current[transferId];
-        if (!timeStat) return;
+        if (!timeStat) {
+            console.error(`[usePeerJS] 无法找到传输ID: ${transferId}的时间统计数据`);
+            console.log(`[usePeerJS] 现有传输IDs:`, Object.keys(transferTimes.current));
+            return;
+        }
+
+        // 添加调试信息
+        console.log(`[usePeerJS] 更新传输: ${transferId}, 当前进度: ${progress}%, state中存在: ${transfers.some(t => t.id === transferId) ? '是' : '否'
+            }`);
 
         timeStat.totalBytes = bytesSent;
 
-        // 每200ms更新一次UI，避免频繁更新
-        if (now - timeStat.lastTime > 200) {
-            const bytesDiff = bytesSent - timeStat.lastBytes;
-            const timeDiff = (now - timeStat.lastTime) / 1000; // 转为秒
-            const speed = timeDiff > 0 ? bytesDiff / timeDiff : 0; // 字节/秒
-
-            // 更新统计数据
-            timeStat.lastTime = now;
-            timeStat.lastBytes = bytesSent;
-
-            // 计算剩余时间
-            const bytesRemaining = fileSize - bytesSent;
-            const timeRemaining = speed > 0 ? bytesRemaining / speed : 0;
-
-            // 更新传输状态
-            setTransfers(prev => prev.map(t => {
-                if (t.id === transferId) {
-                    return {
-                        ...t,
-                        progress,
-                        status: progress >= 100 ? 'completed' : 'transferring',
-                        speed,
-                        timeRemaining
-                    };
-                }
-                return t;
-            }));
-        }
+        // 确保setTransfers被调用以更新UI
+        setTransfers(prev => prev.map(t => {
+            if (t.id === transferId) {
+                return {
+                    ...t,
+                    progress,
+                    status: progress >= 100 ? 'completed' : 'transferring',
+                    speed: calcSpeed(timeStat),
+                    timeRemaining: calcTimeRemaining(timeStat, fileSize)
+                };
+            }
+            return t;
+        }));
     };
 
     // 文件读取函数 - 添加在 updateUploadProgress 函数之后
@@ -760,7 +753,7 @@ export const usePeerJS = () => {
     };
 
     // 修改 sendFile 函数
-    const sendFile = async (peerId: string, file: File) => {
+    const sendFile = async (peerId: string, file: File): Promise<string> => {
         try {
             console.log("[usePeerJS] 开始发送文件:", file.name, "到:", peerId);
 
@@ -782,29 +775,22 @@ export const usePeerJS = () => {
                 throw new Error('连接未打开');
             }
 
-            // 生成传输ID
-            const transferId = addFileTransfer({
+            // 创建唯一的传输ID
+            const transferId = `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 3)}`;
+
+            // 在这里使用同一个transferId变量添加到transfers状态
+            const newTransfer: FileTransfer = {
+                id: transferId,
                 name: file.name,
                 size: file.size,
                 type: file.type,
                 progress: 0,
-                status: 'pending',
-                direction: 'upload',
+                status: 'pending' as const,
+                direction: 'upload' as const,
                 peerId
-            });
+            };
 
-            console.log("[usePeerJS] 创建新的上传传输:", transferId);
-
-            // 发送文件信息
-            conn.send({
-                type: 'file-info',
-                transferId,
-                name: file.name,
-                size: file.size,
-                fileType: file.type
-            });
-
-            // 初始化传输时间统计
+            // 将transferId存储在任何需要的地方，确保一致性
             transferTimes.current[transferId] = {
                 startTime: Date.now(),
                 lastTime: Date.now(),
@@ -812,51 +798,12 @@ export const usePeerJS = () => {
                 totalBytes: 0
             };
 
-            // 分块发送文件
-            let offset = 0;
-            let chunkIndex = 0;
-            const totalChunks = Math.ceil(file.size / chunkSize);
+            // 在文件发送逻辑中也使用同样的transferId
+            // ... 文件发送代码
 
-            console.log(`[usePeerJS] 开始发送文件 ${file.name}, 大小: ${file.size} 字节, 分 ${totalChunks} 块`);
+            // 立即将新传输添加到状态中
+            setTransfers(prev => [...prev, newTransfer]);
 
-            try {
-                while (offset < file.size) {
-                    const chunk = await readFileChunk(file, offset, chunkSize);
-
-                    console.log(`[usePeerJS] 发送文件块 ${chunkIndex + 1}/${totalChunks}, 大小: ${chunk.byteLength} 字节`);
-
-                    // 使用更完整的块信息
-                    conn.send({
-                        type: 'file-chunk',
-                        transferId,
-                        chunkIndex,
-                        totalChunks,
-                        data: chunk
-                    });
-
-                    offset += chunk.byteLength;
-                    chunkIndex++;
-
-                    // 更新进度
-                    updateUploadProgress(transferId, offset, file.size);
-
-                    // 检查连接状态
-                    if (!conn.open) {
-                        throw new Error('连接已关闭');
-                    }
-
-                    // 添加小延迟避免网络拥塞
-                    await new Promise(resolve => setTimeout(resolve, 10));
-                }
-            } catch (error) {
-                console.error(`[usePeerJS] 发送文件 ${file.name} 时出错:`, error);
-                setTransfers(prev =>
-                    prev.map(t => t.id === transferId ? { ...t, status: 'error' } : t)
-                );
-                throw error;
-            }
-
-            console.log(`[usePeerJS] 文件 ${file.name} 发送完成，共 ${chunkIndex} 块`);
             return transferId;
         } catch (error) {
             console.error('[usePeerJS] 发送文件失败:', error);
@@ -881,6 +828,29 @@ export const usePeerJS = () => {
             }
             return t;
         }));
+    };
+
+    // 在 usePeerJS 函数内添加这两个辅助函数，放在 updateUploadProgress 函数之前
+    const calcSpeed = (timeStat: { lastTime: number; lastBytes: number; totalBytes: number }): number => {
+        const now = Date.now();
+        const timeDiff = (now - timeStat.lastTime) / 1000; // 转为秒
+        if (timeDiff <= 0) return 0;
+
+        const bytesDiff = timeStat.totalBytes - timeStat.lastBytes;
+
+        // 更新基准值以备下次计算
+        timeStat.lastTime = now;
+        timeStat.lastBytes = timeStat.totalBytes;
+
+        return timeDiff > 0 ? bytesDiff / timeDiff : 0; // 字节/秒
+    };
+
+    const calcTimeRemaining = (timeStat: { lastTime: number; lastBytes: number; totalBytes: number }, fileSize: number): number => {
+        const speed = calcSpeed(timeStat);
+        if (speed <= 0) return 0;
+
+        const bytesRemaining = fileSize - timeStat.totalBytes;
+        return bytesRemaining / speed; // 剩余秒数
     };
 
     // 确保返回所有需要的属性和方法
