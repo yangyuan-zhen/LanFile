@@ -11,6 +11,7 @@ import type { FileTransfer } from "../hooks/usePeerJS";
 // 确保Context包含transfers
 interface PeerJSContextType {
   isReady: boolean;
+  status: "idle" | "connecting" | "connected" | "error";
   error: string | null;
   transfers: FileTransfer[];
   deviceId: string;
