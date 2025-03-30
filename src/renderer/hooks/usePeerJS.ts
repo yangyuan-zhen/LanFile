@@ -142,24 +142,30 @@ export const usePeerJS = () => {
                             // 存储文件信息
                             fileInfo.current[data.transferId] = data;
 
-                            // 创建下载条目
-                            addFileTransfer({
+                            // 重要：使用服务器发来的transferId创建下载条目
+                            const transferId = data.transferId;
+                            console.log(`[usePeerJS] 创建下载传输，使用ID: ${transferId}`);
+
+                            // 添加传输条目，使用相同的ID
+                            const newTransfer: FileTransfer = {
+                                id: transferId, // 使用服务器发来的ID而不是生成新ID
                                 name: data.name,
                                 size: data.size,
                                 type: data.fileType,
                                 progress: 0,
-                                status: 'pending',
-                                direction: 'download',
+                                status: 'pending' as const,
+                                direction: 'download' as const,
                                 peerId: conn.peer
-                            });
+                            };
+
+                            // 直接添加到状态，确保ID匹配
+                            setTransfers(prev => [...prev, newTransfer]);
 
                             // 发送确认
                             conn.send({
                                 type: 'file-info-received',
                                 transferId: data.transferId
                             });
-
-                            console.log(`[usePeerJS] 发送文件信息确认: ${data.transferId}`);
                         } else if (data.type === 'file-chunk') {
                             // 处理文件块
                             handleFileChunk(conn.peer, data);
