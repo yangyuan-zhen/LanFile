@@ -19,6 +19,11 @@ export const CurrentTransfers: React.FC = () => {
   const [showCompleted, setShowCompleted] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // 添加调试日志
+  useEffect(() => {
+    console.log("[CurrentTransfers] 原始传输列表:", transfers);
+  }, [transfers]);
+
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (transfers.some((t) => t.status === "transferring")) {
@@ -31,9 +36,14 @@ export const CurrentTransfers: React.FC = () => {
 
   // 过滤和排序传输
   const filteredTransfers = transfers
-    .filter((t) => showCompleted || t.status !== "completed")
+    .filter((t) => {
+      const shouldShow = showCompleted || t.status !== "completed";
+      console.log(
+        `[CurrentTransfers] 过滤传输: ${t.id}, status: ${t.status}, shouldShow: ${shouldShow}`
+      );
+      return shouldShow;
+    })
     .sort((a, b) => {
-      // 首先按状态排序: 传输中 > 待处理 > 已完成 > 错误
       const statusOrder = {
         transferring: 0,
         pending: 1,
@@ -42,6 +52,11 @@ export const CurrentTransfers: React.FC = () => {
       };
       return statusOrder[a.status] - statusOrder[b.status];
     });
+
+  // 添加调试日志
+  useEffect(() => {
+    console.log("[CurrentTransfers] 过滤后的传输列表:", filteredTransfers);
+  }, [filteredTransfers]);
 
   // 计算正在传输的数量
   const activeCount = transfers.filter(
@@ -202,6 +217,10 @@ export const CurrentTransfers: React.FC = () => {
           >
             <Icon as={FaInbox} boxSize={8} mb={3} />
             <Text>暂无传输任务</Text>
+            {/* 添加调试信息 */}
+            <Text fontSize="xs" color="gray.400" mt={2}>
+              总任务数: {transfers?.length || 0}
+            </Text>
           </Flex>
         ) : (
           filteredTransfers.map((transfer) => (
