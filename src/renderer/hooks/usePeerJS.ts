@@ -571,17 +571,41 @@ export const usePeerJS = () => {
         console.log(`[usePeerJS] 传输进度详细更新: ${transferId}, ${progress}%, ${bytesReceived}/${fileSize} 字节`);
 
         // 检查传输是否存在于当前状态中
-        const existingTransfer = transfers.find(t => t.id === transferId);
-        if (!existingTransfer) {
-            console.error(`[usePeerJS] 找不到ID为 ${transferId} 的传输任务`);
+        const transferIndex = transfers.findIndex(t => t.id === transferId);
+        if (transferIndex === -1) {
+            console.error(`[usePeerJS] 找不到ID为 ${transferId} 的传输任务，将尝试创建或恢复`);
+
+            // 获取文件信息
+            const fileInfoData = fileInfo.current[transferId];
+            if (!fileInfoData) {
+                console.error(`[usePeerJS] 无法恢复传输: 找不到文件信息 ${transferId}`);
+                return;
+            }
+
+            // 创建新传输对象
+            const newTransfer: FileTransfer = {
+                id: transferId,
+                name: fileInfoData.name,
+                size: fileInfoData.size,
+                type: fileInfoData.fileType || 'application/octet-stream',
+                progress: progress,
+                status: progress >= 100 ? 'completed' as const : 'transferring' as const,
+                direction: 'download' as const,
+                peerId: '',  // 无法确定peer ID，设为空
+                deviceName: '未知设备'
+            };
+
+            // 添加到状态
+            setTransfers(prev => [...prev, newTransfer]);
+            console.log(`[usePeerJS] 已创建新传输: ${transferId}, 进度: ${progress}%`);
             return;
         }
 
-        // 确保此次更新会立即反映到UI
+        // 更新传输进度
         setTransfers(prev => {
-            return prev.map(t => {
+            const updated = prev.map(t => {
                 if (t.id === transferId) {
-                    // 计算已传输时间和速度
+                    // 计算速度
                     const timeElapsed = (now - (transferTimes.current[transferId]?.startTime || now)) / 1000;
                     const speed = timeElapsed > 0 ? bytesReceived / timeElapsed : 0;
 
@@ -589,7 +613,7 @@ export const usePeerJS = () => {
                     const bytesRemaining = fileSize - bytesReceived;
                     const timeRemaining = speed > 0 ? bytesRemaining / speed : 0;
 
-                    console.log(`[usePeerJS] 更新传输UI: ${transferId}, 进度: ${progress}%, 原状态: ${t.status}`);
+                    console.log(`[usePeerJS] 更新传输进度: ${transferId}, 从 ${t.progress}% 到 ${progress}%`);
 
                     return {
                         ...t,
@@ -601,6 +625,9 @@ export const usePeerJS = () => {
                 }
                 return t;
             });
+
+            // 确保传输不会被意外过滤掉
+            return updated;
         });
 
         // 确保UI立即更新
