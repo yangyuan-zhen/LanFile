@@ -602,6 +602,12 @@ export const usePeerJS = () => {
                 return t;
             });
         });
+
+        // 确保UI立即更新
+        requestAnimationFrame(() => {
+            const updatedTransfer = transfers.find(t => t.id === transferId);
+            console.log(`[usePeerJS] RAF更新后: ${transferId}, 进度=${updatedTransfer?.progress}%`);
+        });
     };
 
     // 在文件传输完成时触发通知事件
@@ -988,6 +994,7 @@ export const usePeerJS = () => {
         status,
         error,
         transfers,
+        setTransfers,
         deviceId,
         connectToPeer,
         sendFile,

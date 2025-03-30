@@ -4,16 +4,18 @@ import React, {
   ReactNode,
   useEffect,
   useState,
+  PropsWithChildren,
 } from "react";
 import { usePeerJS } from "../hooks/usePeerJS";
 import type { FileTransfer } from "../hooks/usePeerJS";
 
 // 确保Context包含transfers
-interface PeerJSContextType {
+export interface PeerJSContextType {
   isReady: boolean;
   status: "idle" | "connecting" | "connected" | "error";
   error: string | null;
   transfers: FileTransfer[];
+  setTransfers: React.Dispatch<React.SetStateAction<FileTransfer[]>>;
   deviceId: string;
   sendFile: (peerId: string, file: File) => Promise<string>;
   connectToPeer: (peerId: string) => Promise<any>;
@@ -25,9 +27,7 @@ interface PeerJSContextType {
 const PeerJSContext = createContext<PeerJSContextType | undefined>(undefined);
 
 // 创建提供者组件
-export const PeerJSProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+export const PeerJSProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const peerJS = usePeerJS();
   const [forceUpdate, setForceUpdate] = useState(0);
 

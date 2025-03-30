@@ -167,17 +167,16 @@ export const TransferItem: React.FC<TransferItemProps> = ({
         }}
       >
         <div
-          className="progress-bar"
           style={{
-            width: `${progress}%`, // 使用验证后的进度值
+            width: `${progress}%`,
             height: "100%",
             backgroundColor:
               transfer.direction === "upload" ? "#38A169" : "#3182CE",
-            borderRadius: "9999px",
-            transition: "width 0.2s ease-in-out",
             position: "absolute",
             left: 0,
             top: 0,
+            borderRadius: "4px",
+            transition: "width 0.1s linear",
           }}
         />
         {transfer.status === "transferring" && (

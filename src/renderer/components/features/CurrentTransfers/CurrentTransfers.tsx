@@ -15,7 +15,10 @@ import TransferItem from "./TransferItem";
 
 export const CurrentTransfers: React.FC = () => {
   const peerContext = useGlobalPeerJS();
-  const { transfers } = peerContext || { transfers: [] };
+  const { transfers, setTransfers } = peerContext || {
+    transfers: [],
+    setTransfers: () => {},
+  };
   const [showCompleted, setShowCompleted] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -34,6 +37,28 @@ export const CurrentTransfers: React.FC = () => {
       transfers.map((t) => `${t.id} (${t.name}: ${t.progress}%)`)
     );
   }, [transfers]);
+
+  // 添加强制更新机制
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // 获取当前活动的传输
+      const activeTransfers = transfers.filter(
+        (t) => t.status === "transferring" || t.status === "pending"
+      );
+
+      if (activeTransfers.length > 0) {
+        console.log(
+          "[CurrentTransfers] 强制刷新活动传输",
+          activeTransfers.map((t) => `${t.id}:${t.progress}%`)
+        );
+
+        // 强制刷新 - 创建transfers的深拷贝触发更新
+        setTransfers((prev) => [...prev.map((t) => ({ ...t }))]);
+      }
+    }, 200); // 更频繁地刷新
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   // 改进过滤和排序，确保每个文件只显示最新的传输条目
   const filteredTransfers = useMemo(() => {
