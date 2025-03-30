@@ -17,7 +17,7 @@ interface TransferItemProps {
   onTransferComplete: (transferId: string) => void;
 }
 
-const TransferItem: React.FC<TransferItemProps> = ({
+export const TransferItem: React.FC<TransferItemProps> = ({
   transfer,
   formatSize,
   formatSpeed,
@@ -29,6 +29,18 @@ const TransferItem: React.FC<TransferItemProps> = ({
   onOpenFolder,
   onTransferComplete,
 }) => {
+  // 重要：确保进度值是有效的数字
+  const progress =
+    typeof transfer.progress === "number"
+      ? Math.min(100, Math.max(0, transfer.progress))
+      : 0;
+
+  useEffect(() => {
+    console.log(
+      `[TransferItem] 渲染进度条: ID=${transfer.id}, 进度=${progress}%, 状态=${transfer.status}`
+    );
+  }, [transfer.id, progress, transfer.status]);
+
   // 添加调试日志
   useEffect(() => {
     console.log("TransferItem render:", {
@@ -98,7 +110,15 @@ const TransferItem: React.FC<TransferItemProps> = ({
   );
 
   return (
-    <Box p={4} borderWidth="1px" borderRadius="lg" bg="white" boxShadow="sm">
+    <Box
+      key={transfer.id} // 确保每个传输项有唯一的 key
+      className="transfer-item"
+      mb={4}
+      p={4}
+      borderWidth="1px"
+      borderRadius="lg"
+      data-testid={`transfer-item-${transfer.id}`}
+    >
       <Flex justify="space-between" align="center" mb={2}>
         <Flex align="center">
           <Icon
@@ -115,7 +135,7 @@ const TransferItem: React.FC<TransferItemProps> = ({
             </Tooltip>
             <Text fontSize="sm" color="gray.500">
               {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
-              {transfer.peerId}
+              {transfer.deviceName || transfer.peerId.substring(0, 10) + "..."}
             </Text>
           </Box>
         </Flex>
@@ -133,59 +153,55 @@ const TransferItem: React.FC<TransferItemProps> = ({
         </Box>
       </Flex>
 
-      <Box pt={1}>
-        <Flex justify="space-between" align="center" mb={1}>
-          <Text fontSize="xs" fontWeight="semibold" color={statusColor}>
-            {Math.round(transfer.progress)}%
-          </Text>
-          <Text fontSize="xs" fontWeight="semibold" color="gray.600">
-            {formatSize(transferredSize)}/{formatSize(transfer.size)}
-          </Text>
-        </Flex>
-
-        {/* 进度条容器 */}
+      {/* 进度条部分 */}
+      <div
+        className="progress-container"
+        style={{
+          position: "relative",
+          height: "8px",
+          borderRadius: "4px",
+          backgroundColor: "#E2E8F0",
+          overflow: "hidden",
+          marginTop: "8px",
+          marginBottom: "8px",
+        }}
+      >
         <div
-          className="progress-bar-container"
+          className="progress-bar"
           style={{
-            width: "100%",
-            height: "8px",
-            backgroundColor: "#EDF2F7",
+            width: `${progress}%`, // 使用验证后的进度值
+            height: "100%",
+            backgroundColor:
+              transfer.direction === "upload" ? "#38A169" : "#3182CE",
             borderRadius: "9999px",
-            overflow: "hidden",
-            position: "relative",
+            transition: "width 0.2s ease-in-out",
+            position: "absolute",
+            left: 0,
+            top: 0,
           }}
-        >
-          {/* 进度条 */}
+        />
+        {transfer.status === "transferring" && (
           <div
-            className="progress-bar"
+            className="progress-bar-animated"
             style={{
-              width: `${transfer.progress}%`,
-              height: "100%",
-              backgroundColor:
-                transfer.direction === "upload" ? "#38A169" : "#3182CE",
-              borderRadius: "9999px",
-              transition: "width 0.3s ease-in-out",
               position: "absolute",
-              left: 0,
               top: 0,
+              left: 0,
+              width: `${progress}%`, // 确保动画覆盖整个进度条
+              height: "100%",
             }}
-          >
-            {/* 条纹动画 - 使用CSS类而不是内联样式 */}
-            {transfer.status === "transferring" && (
-              <div
-                className="progress-bar-animated"
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                }}
-              />
-            )}
-          </div>
-        </div>
-      </Box>
+          />
+        )}
+      </div>
+
+      {/* 进度信息显示 */}
+      <Flex justifyContent="space-between" fontSize="sm">
+        <Text fontWeight="medium">{progress}%</Text>
+        <Text>
+          {formatSize(transfer.size * (progress / 100))} /{" "}
+          {formatSize(transfer.size)}
+        </Text>
+      </Flex>
 
       {transfer.status === "completed" && transfer.savedPath && (
         <Flex mt={3} gap={2}>

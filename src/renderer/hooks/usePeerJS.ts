@@ -11,6 +11,7 @@ export interface FileTransfer {
     status: 'pending' | 'transferring' | 'completed' | 'error';
     direction: 'upload' | 'download';
     peerId: string;
+    deviceName?: string;
     speed?: number;
     timeRemaining?: number;
     savedPath?: string;
@@ -60,6 +61,9 @@ export const usePeerJS = () => {
         startTime: number;
         totalBytes: number;
     }>>({});
+
+    // 添加peer名称映射
+    const peerNames = useRef<Map<string, { name: string }>>(new Map());
 
     const { chunkSize } = useSettings();
 
@@ -155,7 +159,8 @@ export const usePeerJS = () => {
                                 progress: 0,
                                 status: 'pending' as const,
                                 direction: 'download' as const,
-                                peerId: conn.peer
+                                peerId: conn.peer,
+                                deviceName: getPeerNameFromId(conn.peer) || "未知设备"
                             };
 
                             // 直接添加到状态，确保ID匹配
@@ -170,6 +175,11 @@ export const usePeerJS = () => {
                             // 处理文件块
                             handleFileChunk(conn.peer, data);
                         }
+                    });
+
+                    // 将对等方设备名添加到映射表
+                    peerNames.current.set(conn.peer, {
+                        name: conn.metadata?.deviceName || `设备_${conn.peer.substring(0, 6)}`
                     });
                 });
 
@@ -227,7 +237,8 @@ export const usePeerJS = () => {
                     progress: 0,
                     status: 'pending',
                     direction: 'download',
-                    peerId: conn.peer
+                    peerId: conn.peer,
+                    deviceName: getPeerNameFromId(conn.peer) || "未知设备"
                 });
 
                 // 发送确认
@@ -679,7 +690,8 @@ export const usePeerJS = () => {
                 progress: 0,
                 status: 'transferring' as const,
                 direction: 'download' as const,
-                peerId
+                peerId,
+                deviceName: getPeerNameFromId(peerId) || "未知设备"
             };
 
             // 添加到状态
@@ -848,7 +860,8 @@ export const usePeerJS = () => {
                 progress: 0,
                 status: 'pending' as const,
                 direction: 'upload' as const,
-                peerId
+                peerId,
+                deviceName: getPeerNameFromId(peerId) || "未知设备"
             };
 
             // 立即将新传输添加到状态中
@@ -959,6 +972,14 @@ export const usePeerJS = () => {
 
         const bytesRemaining = fileSize - timeStat.totalBytes;
         return bytesRemaining / speed; // 剩余秒数
+    };
+
+    // 添加获取设备名称的辅助函数
+    const getPeerNameFromId = (peerId: string): string | undefined => {
+        // 从连接中获取设备名称，或从某个映射表中查询
+        // 这里需要根据您的应用架构来实现
+        const peerInfo = peerNames.current.get(peerId);
+        return peerInfo?.name;
     };
 
     // 确保返回所有需要的属性和方法
