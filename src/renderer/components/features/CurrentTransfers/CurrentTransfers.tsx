@@ -9,14 +9,13 @@ import {
   Tooltip,
   Badge,
 } from "@chakra-ui/react";
-import { FaCheck, FaInbox, FaChevronUp, FaChevronDown } from "react-icons/fa";
+import { FaCheck, FaInbox } from "react-icons/fa";
 import type { FileTransfer } from "../../../hooks/usePeerJS";
 import TransferItem from "./TransferItem";
 
 export const CurrentTransfers: React.FC = () => {
   const peerContext = useGlobalPeerJS();
   const { transfers } = peerContext || { transfers: [] };
-  const [isExpanded, setIsExpanded] = useState(true);
   const [showCompleted, setShowCompleted] = useState(true);
 
   // 过滤和排序传输
@@ -152,7 +151,7 @@ export const CurrentTransfers: React.FC = () => {
         align="center"
         p={3}
         bg="gray.50"
-        borderBottom={isExpanded ? "1px solid" : "none"}
+        borderBottom="1px solid"
         borderColor="gray.200"
       >
         <Flex align="center">
@@ -178,51 +177,40 @@ export const CurrentTransfers: React.FC = () => {
               />
             </Tooltip>
           )}
-          <Tooltip label={isExpanded ? "收起" : "展开"}>
-            <IconButton
-              aria-label={isExpanded ? "收起" : "展开"}
-              icon={isExpanded ? <FaChevronDown /> : <FaChevronUp />}
-              size="sm"
-              variant="ghost"
-              onClick={() => setIsExpanded((prev) => !prev)}
-            />
-          </Tooltip>
         </Flex>
       </Flex>
 
-      {isExpanded && (
-        <Box p={3} maxHeight="400px" overflowY="auto">
-          {!transfers || filteredTransfers.length === 0 ? (
-            <Flex
-              direction="column"
-              align="center"
-              justify="center"
-              py={6}
-              color="gray.500"
-            >
-              <Icon as={FaInbox} boxSize={8} mb={3} />
-              <Text>暂无传输任务</Text>
-            </Flex>
-          ) : (
-            filteredTransfers.map((transfer) => (
-              <Box key={transfer.id} mb={3}>
-                <TransferItem
-                  transfer={transfer}
-                  formatSize={formatSize}
-                  formatSpeed={formatSpeed}
-                  formatTimeRemaining={formatTimeRemaining}
-                  getStatusText={getStatusText}
-                  openFileLocation={handleOpenFolder}
-                  openFile={handleOpenFile}
-                  onOpenFile={handleOpenFile}
-                  onOpenFolder={handleOpenFolder}
-                  onTransferComplete={handleTransferComplete}
-                />
-              </Box>
-            ))
-          )}
-        </Box>
-      )}
+      <Box p={3} maxHeight="400px" overflowY="auto">
+        {!transfers || filteredTransfers.length === 0 ? (
+          <Flex
+            direction="column"
+            align="center"
+            justify="center"
+            py={6}
+            color="gray.500"
+          >
+            <Icon as={FaInbox} boxSize={8} mb={3} />
+            <Text>暂无传输任务</Text>
+          </Flex>
+        ) : (
+          filteredTransfers.map((transfer) => (
+            <Box key={transfer.id} mb={3}>
+              <TransferItem
+                transfer={transfer}
+                formatSize={formatSize}
+                formatSpeed={formatSpeed}
+                formatTimeRemaining={formatTimeRemaining}
+                getStatusText={getStatusText}
+                openFileLocation={handleOpenFolder}
+                openFile={handleOpenFile}
+                onOpenFile={handleOpenFile}
+                onOpenFolder={handleOpenFolder}
+                onTransferComplete={handleTransferComplete}
+              />
+            </Box>
+          ))
+        )}
+      </Box>
     </Box>
   );
 };
