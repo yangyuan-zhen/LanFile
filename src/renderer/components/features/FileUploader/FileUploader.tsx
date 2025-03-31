@@ -1,4 +1,10 @@
-import React, { useState, forwardRef, useEffect } from "react";
+import React, {
+  useState,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from "react";
 import { FolderUp, X } from "lucide-react";
 import { useGlobalPeerJS } from "../../../contexts/PeerJSContext";
 
@@ -13,12 +19,11 @@ interface PreviewFile {
   preview?: string;
 }
 
-// 在组件外部添加接口定义
-interface FileUploaderRef {
-  files: FileList;
-  getFiles: () => File[];
+// 定义组件ref的类型
+export interface FileUploaderRef {
+  getFiles: () => FileList | null;
   clear: () => void;
-  inputElement: HTMLInputElement;
+  inputElement: HTMLInputElement | null;
 }
 
 const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
@@ -28,7 +33,7 @@ const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     const { transfers } = useGlobalPeerJS();
 
     // 添加单独的 ref 用于 input 元素
-    const inputRef = React.useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // 清除所有选中的文件
     const clearAllFiles = () => {
@@ -231,24 +236,16 @@ const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
       return selectedFiles.map((item) => item.file);
     };
 
-    // 将此方法通过 ref 暴露出去
-    React.useImperativeHandle(ref, () => {
-      // 创建一个类似 FileList 的对象，提供 item 方法
-      const fileArray = selectedFiles.map((item) => item.file);
-      const fileListLike = {
-        ...fileArray,
-        item: (index: number) => fileArray[index],
-        length: fileArray.length,
-        [Symbol.iterator]: fileArray[Symbol.iterator].bind(fileArray),
-      } as unknown as FileList;
-
-      return {
-        files: fileListLike,
-        getFiles: getSelectedFiles,
-        clear: clearAllFiles,
-        inputElement: inputRef.current as HTMLInputElement,
-      };
-    });
+    // 暴露必要的方法和属性
+    useImperativeHandle(ref, () => ({
+      getFiles: () => inputRef.current?.files || null,
+      clear: () => {
+        if (inputRef.current) {
+          inputRef.current.value = "";
+        }
+      },
+      inputElement: inputRef.current,
+    }));
 
     return (
       <div className="p-6 mb-6 bg-white rounded-xl shadow-sm">

@@ -27,6 +27,8 @@ const NotificationDropdown: React.FC = () => {
     // 检查是否有未读通知
     if (notifications.some((n) => !n.read)) {
       setHasUnread(true);
+    } else {
+      setHasUnread(false); // 确保当没有未读通知时，红点不显示
     }
   }, [notifications]);
 
@@ -35,6 +37,12 @@ const NotificationDropdown: React.FC = () => {
     if (isOpen) {
       setHasUnread(false);
     }
+  };
+
+  // 清除全部通知并重置红点状态
+  const handleClearAll = () => {
+    notifications.forEach((n) => removeNotification(n.id));
+    setHasUnread(false); // 添加这一行，确保红点消失
   };
 
   // 格式化时间
@@ -62,9 +70,7 @@ const NotificationDropdown: React.FC = () => {
             {notifications.length > 0 && (
               <button
                 className="text-xs text-gray-500 hover:text-gray-700"
-                onClick={() =>
-                  notifications.forEach((n) => removeNotification(n.id))
-                }
+                onClick={handleClearAll}
               >
                 清除全部
               </button>

@@ -16,6 +16,8 @@ export interface FileTransfer {
     speed?: number;
     timeRemaining?: number;
     savedPath?: string;
+    lastUpdated?: number;
+    _forceUpdate?: number;
 }
 
 interface FileInfoType {

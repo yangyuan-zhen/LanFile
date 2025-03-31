@@ -3,6 +3,7 @@ import NetworkService from "../../components/features/NetworkService/NetworkServ
 import FileList from "../../components/features/FileList/FileList";
 import FileUploader from "../../components/features/FileUploader/FileUploader";
 import CurrentTransfers from "../../components/features/CurrentTransfers/CurrentTransfers";
+import { FileUploaderRef } from "../../components/features/FileUploader/FileUploader";
 
 export const HomePage = () => {
   const networkInfo = {
@@ -74,12 +75,12 @@ export const HomePage = () => {
     // 实现文件上传逻辑
   };
 
-  // 添加文件选择状态的引用
-  const fileUploaderRef = useRef<HTMLInputElement>(null);
+  // 使用正确的类型创建ref
+  const fileUploaderRef = useRef<FileUploaderRef>(null);
 
   // 获取已选择的文件
   const getSelectedFiles = () => {
-    return fileUploaderRef.current?.files || null;
+    return fileUploaderRef.current?.getFiles() || null;
   };
 
   return (

@@ -13,36 +13,116 @@ import { FaCheck, FaInbox } from "react-icons/fa";
 import type { FileTransfer } from "../../../hooks/usePeerJS";
 import TransferItem from "./TransferItem";
 import { useTransferEvents } from "../../../hooks/useTransferEvents";
+import { PeerJSProvider } from "../../../contexts/PeerJSContext";
 
 export const CurrentTransfers: React.FC = () => {
   const peerContext = useGlobalPeerJS();
-  const { transfers, setTransfers } = peerContext || {
-    transfers: [],
-    setTransfers: () => {},
-  };
+
+  if (!peerContext) {
+    console.log("PeerJS 上下文不可用，请确保组件在 PeerJSProvider 内使用");
+    return null;
+  }
+
+  const { transfers, setTransfers } = peerContext;
   const [showCompleted, setShowCompleted] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // 使用事件系统获取传输
   const { transfers: eventTransfers } = useTransferEvents();
 
-  // 只使用一种刷新方式，避免多重刷新导致的问题
+  // 合并从事件系统获取的传输信息
+  useEffect(() => {
+    if (eventTransfers && eventTransfers.length > 0) {
+      console.log(
+        "[CurrentTransfers] 从事件系统接收到传输:",
+        eventTransfers.map((t) => `${t.id} (${t.progress}%)`)
+      );
+
+      // 将事件系统的传输合并到当前传输列表
+      setTransfers((prevTransfers) => {
+        // 创建新传输ID Map
+        const prevMap = new Map(prevTransfers.map((t) => [t.id, t]));
+
+        // 遍历事件传输，将新传输添加到列表或更新现有传输
+        eventTransfers.forEach((transfer) => {
+          prevMap.set(transfer.id, {
+            ...(prevMap.get(transfer.id) || {}),
+            ...transfer,
+            // 确保时间戳更新，强制触发重渲染
+            lastUpdated: Date.now(),
+          });
+        });
+
+        return Array.from(prevMap.values());
+      });
+    }
+  }, [eventTransfers]);
+
+  // 加强对活动传输的监听，确保更平滑的状态更新
+  useEffect(() => {
+    const handleTransferUpdate = (event: CustomEvent) => {
+      const transfer = event.detail;
+      if (!transfer || !transfer.id) return;
+
+      console.log(
+        `[CurrentTransfers] 接收到传输更新事件: ${transfer.id}, 进度: ${transfer.progress}%`
+      );
+
+      setTransfers((prevTransfers) => {
+        const transferIndex = prevTransfers.findIndex(
+          (t) => t.id === transfer.id
+        );
+        if (transferIndex === -1) {
+          // 新传输，添加到列表
+          return [...prevTransfers, transfer];
+        } else {
+          // 更新现有传输
+          const updatedTransfers = [...prevTransfers];
+          updatedTransfers[transferIndex] = {
+            ...updatedTransfers[transferIndex],
+            ...transfer,
+            lastUpdated: Date.now(),
+          };
+          return updatedTransfers;
+        }
+      });
+    };
+
+    // 监听传输更新事件
+    window.addEventListener(
+      "file-transfer-update",
+      handleTransferUpdate as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "file-transfer-update",
+        handleTransferUpdate as EventListener
+      );
+    };
+  }, []);
+
+  // 只使用一种刷新方式，避免多重刷新导致的问题 - 降低刷新频率
   useEffect(() => {
     const intervalId = setInterval(() => {
       setRefreshKey((prev) => prev + 1);
-    }, 500);
+    }, 200); // 提高刷新频率以更新进度条
     return () => clearInterval(intervalId);
   }, []);
 
   // 添加日志，帮助调试
   useEffect(() => {
-    console.log(
-      "[CurrentTransfers] 当前传输项IDs:",
-      transfers.map((t) => `${t.id} (${t.name}: ${t.progress}%)`)
-    );
-  }, [transfers]);
+    if (transfers && transfers.length > 0) {
+      console.log(
+        "[CurrentTransfers] 当前传输项详情:",
+        transfers.map(
+          (t) => `${t.id} (${t.name}: ${t.progress}%, 状态: ${t.status})`
+        )
+      );
+    }
+  }, [transfers, refreshKey]);
 
-  // 添加强制更新机制
+  // 添加强制更新机制 - 优化逻辑，确保活动传输实时更新
   useEffect(() => {
     const intervalId = setInterval(() => {
       // 获取当前活动的传输
@@ -56,13 +136,18 @@ export const CurrentTransfers: React.FC = () => {
           activeTransfers.map((t) => `${t.id}:${t.progress}%`)
         );
 
-        // 强制刷新 - 创建transfers的深拷贝触发更新
-        setTransfers((prev) => [...prev.map((t) => ({ ...t }))]);
+        // 强制刷新 - 添加时间戳触发更新
+        setTransfers((prev) =>
+          prev.map((t) => ({
+            ...t,
+            _forceUpdate: Date.now(), // 添加强制更新标记
+          }))
+        );
       }
-    }, 200); // 更频繁地刷新
+    }, 150); // 更频繁地刷新活动传输
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [transfers]);
 
   // 添加清除已完成传输的功能
   const handleClearCompletedTransfer = (transferId: string) => {
@@ -248,22 +333,6 @@ export const CurrentTransfers: React.FC = () => {
             </Badge>
           )}
         </Flex>
-
-        <Flex>
-          {completedCount > 0 && (
-            <Tooltip label={showCompleted ? "隐藏已完成" : "显示已完成"}>
-              <IconButton
-                aria-label={showCompleted ? "隐藏已完成" : "显示已完成"}
-                icon={<FaCheck />}
-                size="sm"
-                variant="ghost"
-                colorScheme={showCompleted ? "green" : "gray"}
-                onClick={() => setShowCompleted((prev) => !prev)}
-                mr={1}
-              />
-            </Tooltip>
-          )}
-        </Flex>
       </Flex>
 
       <Box p={3} maxHeight="400px" overflowY="auto">
@@ -277,14 +346,13 @@ export const CurrentTransfers: React.FC = () => {
           >
             <Icon as={FaInbox} boxSize={8} mb={3} />
             <Text>暂无传输任务</Text>
-            {/* 添加调试信息 */}
-            <Text fontSize="xs" color="gray.400" mt={2}>
-              总任务数: {transfers?.length || 0}
-            </Text>
           </Flex>
         ) : (
           filteredTransfers.map((transfer) => (
-            <Box key={`${transfer.id}-${refreshKey}`} mb={3}>
+            <Box
+              key={`${transfer.id}-${transfer.progress}-${refreshKey}`}
+              mb={3}
+            >
               <TransferItem
                 transfer={transfer}
                 formatSize={formatSize}
