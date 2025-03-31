@@ -13,11 +13,22 @@ interface PreviewFile {
   preview?: string;
 }
 
-const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
+// 在组件外部添加接口定义
+interface FileUploaderRef {
+  files: FileList;
+  getFiles: () => File[];
+  clear: () => void;
+  inputElement: HTMLInputElement;
+}
+
+const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
   ({ onFileSelect, clearAfterUpload = true }, ref) => {
     // 添加状态来跟踪已选择的文件
     const [selectedFiles, setSelectedFiles] = useState<PreviewFile[]>([]);
     const { transfers } = useGlobalPeerJS();
+
+    // 添加单独的 ref 用于 input 元素
+    const inputRef = React.useRef<HTMLInputElement>(null);
 
     // 清除所有选中的文件
     const clearAllFiles = () => {
@@ -34,6 +45,13 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
     // 监听传输状态变化，添加文件名匹配逻辑
     useEffect(() => {
       if (!clearAfterUpload || selectedFiles.length === 0) return;
+
+      console.log(
+        "[FileUploader] 检查传输状态变化:",
+        transfers
+          .filter((t) => t.direction === "upload")
+          .map((t) => `${t.name}: ${t.status}`)
+      );
 
       // 获取当前已完成的上传文件名集合
       const completedUploads = transfers
@@ -69,9 +87,13 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
 
     // 在组件内部添加事件监听器
     useEffect(() => {
-      const handleTransferComplete = () => {
+      const handleTransferComplete = (event: Event) => {
+        console.log(
+          "[FileUploader] 收到文件传输完成事件:",
+          (event as CustomEvent).detail
+        );
         // 清除已选择的文件
-        setSelectedFiles([]);
+        clearAllFiles();
       };
 
       window.addEventListener("file-transfer-complete", handleTransferComplete);
@@ -204,6 +226,30 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
       return null;
     };
 
+    // 提供一个获取当前选中文件的方法
+    const getSelectedFiles = () => {
+      return selectedFiles.map((item) => item.file);
+    };
+
+    // 将此方法通过 ref 暴露出去
+    React.useImperativeHandle(ref, () => {
+      // 创建一个类似 FileList 的对象，提供 item 方法
+      const fileArray = selectedFiles.map((item) => item.file);
+      const fileListLike = {
+        ...fileArray,
+        item: (index: number) => fileArray[index],
+        length: fileArray.length,
+        [Symbol.iterator]: fileArray[Symbol.iterator].bind(fileArray),
+      } as unknown as FileList;
+
+      return {
+        files: fileListLike,
+        getFiles: getSelectedFiles,
+        clear: clearAllFiles,
+        inputElement: inputRef.current as HTMLInputElement,
+      };
+    });
+
     return (
       <div className="p-6 mb-6 bg-white rounded-xl shadow-sm">
         <div className="text-center">
@@ -231,7 +277,7 @@ const FileUploader = forwardRef<HTMLInputElement, FileUploaderProps>(
               <input
                 id="file-upload"
                 type="file"
-                ref={ref}
+                ref={inputRef}
                 multiple
                 className="hidden"
                 onChange={handleFileUpload}

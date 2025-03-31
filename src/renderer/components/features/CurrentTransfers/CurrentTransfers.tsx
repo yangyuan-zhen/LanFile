@@ -12,6 +12,7 @@ import {
 import { FaCheck, FaInbox } from "react-icons/fa";
 import type { FileTransfer } from "../../../hooks/usePeerJS";
 import TransferItem from "./TransferItem";
+import { useTransferEvents } from "../../../hooks/useTransferEvents";
 
 export const CurrentTransfers: React.FC = () => {
   const peerContext = useGlobalPeerJS();
@@ -21,6 +22,9 @@ export const CurrentTransfers: React.FC = () => {
   };
   const [showCompleted, setShowCompleted] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // 使用事件系统获取传输
+  const { transfers: eventTransfers } = useTransferEvents();
 
   // 只使用一种刷新方式，避免多重刷新导致的问题
   useEffect(() => {

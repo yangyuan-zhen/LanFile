@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Peer from 'peerjs';
 import { useSettings } from './useSettings';
+import { publishTransferEvent } from './useTransferEvents';
 
 export interface FileTransfer {
     id: string;
@@ -650,6 +651,12 @@ export const usePeerJS = () => {
         // 更新缓存和状态
         transferCache.current[transferId] = updatedTransfer;
         setTransfers(prev => prev.map(t => t.id === transferId ? updatedTransfer : t));
+
+        // 发布进度事件
+        publishTransferEvent({
+            type: 'progress',
+            transfer: updatedTransfer
+        });
     };
 
     // 在文件传输完成时触发通知事件
@@ -966,6 +973,15 @@ export const usePeerJS = () => {
                 }
 
                 console.log(`[usePeerJS] 文件 ${file.name} 发送完成，共 ${chunkIndex} 块`);
+
+                // 更新传输状态为已完成
+                updateTransfer(transferId, { status: 'completed', progress: 100 });
+
+                // 触发文件传输完成事件
+                window.dispatchEvent(new CustomEvent('file-transfer-complete', {
+                    detail: { fileName: file.name, transferId }
+                }));
+
                 return transferId;
             } catch (error) {
                 console.error(`[usePeerJS] 发送文件 ${file.name} 时出错:`, error);

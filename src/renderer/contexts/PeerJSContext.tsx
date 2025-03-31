@@ -29,13 +29,13 @@ const PeerJSContext = createContext<PeerJSContextType | undefined>(undefined);
 // 创建提供者组件
 export const PeerJSProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const peerJS = usePeerJS();
-  const [forceUpdate, setForceUpdate] = useState(0);
+  const [_updateVersion, setUpdateVersion] = useState(0);
 
   // 使用 transfers 更新触发强制刷新
   useEffect(() => {
     if (peerJS.transfers.length > 0) {
       // 当传输列表变化时强制更新
-      setForceUpdate((prev) => prev + 1);
+      setUpdateVersion((prev) => prev + 1);
     }
   }, [peerJS.transfers]);
 
@@ -45,14 +45,14 @@ export const PeerJSProvider: React.FC<PropsWithChildren> = ({ children }) => {
       transfers: peerJS.transfers,
       isReady: peerJS.isReady,
       deviceId: peerJS.deviceId,
-      forceUpdate, // 记录强制更新计数
+      _updateVersion, // 记录强制更新计数
     });
-  }, [peerJS.transfers, peerJS.isReady, peerJS.deviceId, forceUpdate]);
+  }, [peerJS.transfers, peerJS.isReady, peerJS.deviceId, _updateVersion]);
 
   // 创建带有强制更新版本号的值对象
   const contextValue = {
     ...peerJS,
-    _updateVersion: forceUpdate, // 添加版本号以触发订阅组件更新
+    _updateVersion, // 添加版本号以触发订阅组件更新
   };
 
   return (
