@@ -227,24 +227,35 @@ export const TransferItem: React.FC<TransferItemProps> = ({
         </Text>
       </Flex>
 
-      {transfer.status === "completed" && transfer.savedPath && (
+      {/* 操作按钮组 - 根据不同状态显示不同按钮 */}
+      {transfer.status === "completed" && (
         <Flex mt={3} gap={2}>
-          <Button
-            size="xs"
-            leftIcon={<Icon as={FaFolder} />}
-            onClick={() =>
-              openFileLocation && openFileLocation(transfer.savedPath!)
-            }
-          >
-            打开文件夹
-          </Button>
-          <Button
-            size="xs"
-            leftIcon={<Icon as={FaFile} />}
-            onClick={() => openFile && openFile(transfer.savedPath!)}
-          >
-            打开文件
-          </Button>
+          {/* 下载完成的文件才显示打开按钮 */}
+          {transfer.direction === "download" && (
+            <>
+              <Button
+                size="xs"
+                leftIcon={<Icon as={FaFolder} />}
+                onClick={() =>
+                  transfer.savedPath ? onOpenFolder(transfer.savedPath) : null
+                }
+                isDisabled={!transfer.savedPath}
+              >
+                打开文件夹
+              </Button>
+              <Button
+                size="xs"
+                leftIcon={<Icon as={FaFile} />}
+                onClick={() =>
+                  transfer.savedPath ? onOpenFile(transfer.savedPath) : null
+                }
+                isDisabled={!transfer.savedPath}
+              >
+                打开文件
+              </Button>
+            </>
+          )}
+          {/* 所有已完成传输都显示清除按钮 */}
           <Button
             size="xs"
             variant="ghost"

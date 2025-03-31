@@ -55,6 +55,10 @@ const TransferSimulator: React.FC = () => {
           deviceName: "测试设备",
           speed: speed,
           timeRemaining: ((100 - manualProgress) / 100) * (fileSize / speed),
+          savedPath:
+            direction === "download"
+              ? `C:/Users/测试用户/Downloads/${fileName}`
+              : undefined,
         },
       ]);
     }
@@ -100,6 +104,10 @@ const TransferSimulator: React.FC = () => {
           deviceName: "测试设备",
           speed: speed,
           timeRemaining: fileSize / speed,
+          savedPath:
+            direction === "download"
+              ? `C:/Users/测试用户/Downloads/${fileName}`
+              : undefined,
         },
       ]);
 
@@ -186,6 +194,10 @@ const TransferSimulator: React.FC = () => {
             deviceName: `测试设备 ${idx + 1}`,
             speed: (1 + Math.random() * 5) * 1024 * 1024, // 1-6MB/s
             timeRemaining: Math.random() * 60, // 0-60s
+            savedPath:
+              direction === "download"
+                ? `C:/Users/测试用户/Downloads/${fileName}`
+                : undefined,
           };
         });
 
