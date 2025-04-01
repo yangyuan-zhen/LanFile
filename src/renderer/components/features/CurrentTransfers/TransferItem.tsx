@@ -179,44 +179,25 @@ export const TransferItem: React.FC<TransferItemProps> = ({
       </Flex>
 
       {/* 进度条部分 */}
-      <div
-        className="progress-container"
-        style={{
-          position: "relative",
-          height: "8px",
-          borderRadius: "4px",
-          backgroundColor: "#E2E8F0",
-          overflow: "hidden",
-          marginTop: "8px",
-          marginBottom: "8px",
-        }}
-      >
-        <div
-          style={{
-            width: `${progress}%`,
-            height: "100%",
-            backgroundColor:
-              transfer.direction === "upload" ? "#38A169" : "#3182CE",
-            position: "absolute",
-            left: 0,
-            top: 0,
-            borderRadius: "4px",
-            transition: "width 0.1s linear",
-          }}
-        />
-        {transfer.status === "transferring" && (
-          <div
-            className="progress-bar-animated"
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: `${progress}%`, // 确保动画覆盖整个进度条
-              height: "100%",
-            }}
+      <Box mt={2} position="relative">
+        <Box h="4px" w="100%" bg="gray.100" borderRadius="full">
+          <Box
+            h="100%"
+            w={`${progress}%`}
+            bg={statusColor}
+            borderRadius="full"
+            transition="width 0.3s ease-in-out"
+            data-testid={`progress-bar-${transfer.id}`}
           />
+        </Box>
+
+        {/* 当进度异常时显示警告 */}
+        {(Number.isNaN(progress) || progress < 0 || progress > 100) && (
+          <Text fontSize="xs" color="red.500" mt={1}>
+            进度数据异常: {transfer.progress}
+          </Text>
         )}
-      </div>
+      </Box>
 
       {/* 进度信息显示 */}
       <Flex justifyContent="space-between" fontSize="sm">

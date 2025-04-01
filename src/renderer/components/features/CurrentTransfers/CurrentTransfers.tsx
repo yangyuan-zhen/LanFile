@@ -142,29 +142,34 @@ export const CurrentTransfers: React.FC = () => {
     }
   }, [transfers, refreshKey]);
 
-  // 添加强制更新机制 - 优化逻辑，确保活动传输实时更新
+  // 在 useEffect 中添加调试代码
+  useEffect(() => {
+    console.log(
+      "[CurrentTransfers] 收到更新的传输数据:",
+      transfers.map((t) => `${t.id} (${t.progress || 0}%, ${t.status})`)
+    );
+
+    // 检查传输对象的完整性
+    transfers.forEach((t) => {
+      if (!t.id || t.progress === undefined) {
+        console.warn("[CurrentTransfers] 发现不完整的传输对象:", t);
+      }
+    });
+  }, [transfers]);
+
+  // 替换现有的强制刷新逻辑，修复过于频繁的重渲染问题
   useEffect(() => {
     const intervalId = setInterval(() => {
-      // 获取当前活动的传输
+      // 只有存在活动传输时才刷新
       const activeTransfers = transfers.filter(
         (t) => t.status === "transferring" || t.status === "pending"
       );
 
       if (activeTransfers.length > 0) {
-        console.log(
-          "[CurrentTransfers] 强制刷新活动传输",
-          activeTransfers.map((t) => `${t.id}:${t.progress}%`)
-        );
-
-        // 强制刷新 - 添加时间戳触发更新
-        setTransfers((prev) =>
-          prev.map((t) => ({
-            ...t,
-            _forceUpdate: Date.now(), // 添加强制更新标记
-          }))
-        );
+        // 更高效的刷新方式
+        setRefreshKey(Date.now());
       }
-    }, 150); // 更频繁地刷新活动传输
+    }, 500); // 降低频率到500ms，减少性能压力
 
     return () => clearInterval(intervalId);
   }, [transfers]);

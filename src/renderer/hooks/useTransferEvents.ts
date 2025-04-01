@@ -38,17 +38,22 @@ export const useTransferEvents = () => {
 
             console.log(`[TransferEvents] 处理传输事件: ${type} ${transfer.id} (${transfer.progress || 0}%)`);
 
-            // 更重要的是保证transfer对象完整
+            // 确保传输对象完整且进度值合法
+            const safeTransfer = {
+                ...transfer,
+                progress: typeof transfer.progress === 'number' && !isNaN(transfer.progress)
+                    ? Math.min(Math.max(0, transfer.progress), 100) // 确保进度在0-100之间
+                    : 0
+            };
+
             setTransfers(prev => {
-                const exists = prev.some(t => t.id === transfer.id);
+                const exists = prev.some(t => t.id === safeTransfer.id);
 
                 if (exists) {
-                    // 更新现有传输
-                    return prev.map(t => t.id === transfer.id ? { ...t, ...transfer } : t);
+                    return prev.map(t => t.id === safeTransfer.id ? { ...t, ...safeTransfer } : t);
                 } else {
-                    // 添加新传输
-                    console.log(`[TransferEvents] 添加新传输: ${transfer.id}`);
-                    return [...prev, transfer];
+                    console.log(`[TransferEvents] 添加新传输: ${safeTransfer.id}`);
+                    return [...prev, safeTransfer];
                 }
             });
         };
