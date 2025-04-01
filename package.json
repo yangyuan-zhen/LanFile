@@ -1,6 +1,6 @@
 {
-  "name": "lanfile",
-  "version": "1.0.0",
+  "name": "lanfile-pc",
+  "version": "1.0.1",
   "description": "LAN File Transfer Application",
   "main": "dist/main/index.js",
   "scripts": {
