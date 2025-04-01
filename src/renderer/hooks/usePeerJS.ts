@@ -161,7 +161,7 @@ export const usePeerJS = () => {
                                 id: transferId, // 使用服务器发来的ID而不是生成新ID
                                 name: data.name,
                                 size: data.size,
-                                type: data.fileType,
+                                type: data.type,
                                 progress: 0,
                                 status: 'pending' as const,
                                 direction: 'download' as const,
@@ -239,7 +239,7 @@ export const usePeerJS = () => {
                 addFileTransfer({
                     name: data.name,
                     size: data.size,
-                    type: data.fileType,
+                    type: data.type,
                     progress: 0,
                     status: 'pending',
                     direction: 'download',
@@ -570,95 +570,85 @@ export const usePeerJS = () => {
     }
 
     // 修改更新传输进度的函数，添加速度计算
-    const updateTransferProgress = (transferId: string, bytesReceived: number, fileSize: number) => {
-        const progress = Math.min(100, Math.floor((bytesReceived / fileSize) * 100));
-        const now = Date.now();
+    const updateTransferProgress = (transferId: string, progress: number, bytesTransferred: number) => {
+        console.log(`[usePeerJS] 更新传输: ${transferId}, 当前进度: ${Math.round(progress)}%`);
 
-        console.log(`[usePeerJS] 传输进度详细更新: ${transferId}, ${progress}%, ${bytesReceived}/${fileSize} 字节`);
+        // 查找现有传输
+        const existingTransferIndex = transfers.findIndex(t => t.id === transferId);
+        const exists = existingTransferIndex >= 0;
 
-        // 先从缓存中查找
-        let transfer = transferCache.current[transferId];
+        // 创建更新后的传输对象
+        const updatedTransfer = exists
+            ? {
+                ...transfers[existingTransferIndex],
+                progress,
+                lastUpdated: Date.now(),
+            }
+            : null; // 如果不存在，我们需要获取完整传输信息
 
-        // 如果缓存中没有，从状态中查找并更新缓存
-        if (!transfer) {
-            const stateTransfer = transfers.find(t => t.id === transferId);
+        // 如果传输存在于状态中，直接更新
+        if (exists && updatedTransfer) {
+            // 更新本地状态
+            const newTransfers = [...transfers];
+            newTransfers[existingTransferIndex] = updatedTransfer;
+            setTransfers(newTransfers);
 
-            if (stateTransfer) {
-                transfer = stateTransfer;
-                transferCache.current[transferId] = stateTransfer;
+            // 发布事件
+            publishTransferEvent({
+                type: 'progress',
+                transfer: updatedTransfer
+            });
+
+            // 触发DOM事件（备用机制）
+            const transferEvent = new CustomEvent('transferEvent', {
+                detail: {
+                    type: 'progress',
+                    transfer: updatedTransfer
+                }
+            });
+            window.dispatchEvent(transferEvent);
+        }
+        else {
+            // 如果传输不在状态中，需要从transferInfoMap获取完整信息
+            const transferInfo = transferCache.current[transferId];
+            if (transferInfo) {
+                // 创建完整的传输对象
+                const newTransfer: FileTransfer = {
+                    id: transferId,
+                    name: transferInfo.name,
+                    size: transferInfo.size,
+                    type: transferInfo.type,
+                    progress: progress,
+                    status: progress >= 100 ? 'completed' : 'transferring',
+                    direction: transferInfo.direction,
+                    peerId: transferInfo.peerId,
+                    deviceName: getPeerNameFromId(transferInfo.peerId) || "未知设备",
+                    lastUpdated: Date.now()
+                };
+
+                // 添加到状态
+                setTransfers(prev => [...prev, newTransfer]);
+
+                // 发布事件
+                publishTransferEvent({
+                    type: 'new',
+                    transfer: newTransfer
+                });
+
+                // 触发DOM事件
+                const transferEvent = new CustomEvent('transferEvent', {
+                    detail: {
+                        type: 'new',
+                        transfer: newTransfer
+                    }
+                });
+                window.dispatchEvent(transferEvent);
+
+                console.log(`[usePeerJS] 添加新传输到状态: ${transferId}`);
             } else {
-                // 尝试创建新传输
-                const fileInfoData = fileInfo.current[transferId];
-
-                if (!fileInfoData) {
-                    console.warn(`[usePeerJS] 无法找到文件信息: ${transferId}，创建默认传输信息`);
-
-                    // 创建默认的文件信息用于恢复
-                    fileInfo.current[transferId] = {
-                        name: `未知文件-${transferId.substr(-6)}`,
-                        size: fileSize,
-                        fileType: 'application/octet-stream',
-                        sender: ''
-                    };
-
-                    // 使用创建的默认信息
-                    transfer = {
-                        id: transferId,
-                        name: `未知文件-${transferId.substr(-6)}`,
-                        size: fileSize,
-                        type: 'application/octet-stream',
-                        progress: 0,
-                        status: 'transferring' as const,
-                        direction: 'download' as const,
-                        peerId: '',
-                        deviceName: '未知设备'
-                    };
-                } else {
-                    transfer = {
-                        id: transferId,
-                        name: fileInfoData.name,
-                        size: fileInfoData.size,
-                        type: fileInfoData.fileType || 'application/octet-stream',
-                        progress: 0,
-                        status: 'transferring' as const,
-                        direction: 'download' as const,
-                        peerId: fileInfoData.sender || '',
-                        deviceName: getPeerNameFromId(fileInfoData.sender) || '未知设备'
-                    };
-                }
-
-                // 初始化传输统计
-                if (!transferTimes.current[transferId]) {
-                    transferTimes.current[transferId] = {
-                        startTime: now,
-                        lastTime: now,
-                        lastBytes: 0,
-                        totalBytes: bytesReceived
-                    };
-                }
-
-                // 更新缓存和状态
-                transferCache.current[transferId] = transfer;
-                setTransfers(prev => [...prev, transfer]);
+                console.error(`[usePeerJS] 无法更新传输 ${transferId}: 找不到传输信息`);
             }
         }
-
-        // 更新进度
-        const updatedTransfer = {
-            ...transfer,
-            progress,
-            status: progress >= 100 ? 'completed' as const : 'transferring' as const
-        };
-
-        // 更新缓存和状态
-        transferCache.current[transferId] = updatedTransfer;
-        setTransfers(prev => prev.map(t => t.id === transferId ? updatedTransfer : t));
-
-        // 发布进度事件
-        publishTransferEvent({
-            type: 'progress',
-            transfer: updatedTransfer
-        });
     };
 
     // 在文件传输完成时触发通知事件
@@ -743,7 +733,7 @@ export const usePeerJS = () => {
                 id: transferId,
                 name: fileInfoData.name,
                 size: fileInfoData.size,
-                type: fileInfoData.fileType,
+                type: fileInfoData.type,
                 progress: 0,
                 status: 'transferring' as const,
                 direction: 'download' as const,
@@ -804,7 +794,7 @@ export const usePeerJS = () => {
             const result = await window.electron.invoke('file:saveToDownloads', {
                 fileName: fileInfoData.name,
                 fileData: Array.from(combinedArray),
-                fileType: fileInfoData.fileType
+                fileType: fileInfoData.type
             });
 
             if (result.success) {

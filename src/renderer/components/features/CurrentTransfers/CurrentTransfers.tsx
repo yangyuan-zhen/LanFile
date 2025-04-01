@@ -70,57 +70,65 @@ export const CurrentTransfers: React.FC = () => {
     }
   }, [eventTransfers, setTransfers]);
 
-  // 加强对活动传输的监听，确保更平滑的状态更新
-  useEffect(() => {
-    const handleTransferUpdate = (event: CustomEvent) => {
-      const transfer = event.detail;
-      if (!transfer || !transfer.id) return;
-
-      console.log(
-        `[CurrentTransfers] 接收到传输更新事件: ${transfer.id}, 进度: ${transfer.progress}%`
-      );
-
-      setTransfers((prevTransfers) => {
-        const transferIndex = prevTransfers.findIndex(
-          (t) => t.id === transfer.id
-        );
-        if (transferIndex === -1) {
-          // 新传输，添加到列表
-          return [...prevTransfers, transfer];
-        } else {
-          // 更新现有传输
-          const updatedTransfers = [...prevTransfers];
-          updatedTransfers[transferIndex] = {
-            ...updatedTransfers[transferIndex],
-            ...transfer,
-            lastUpdated: Date.now(),
-          };
-          return updatedTransfers;
-        }
-      });
-    };
-
-    // 监听传输更新事件
-    window.addEventListener(
-      "file-transfer-update",
-      handleTransferUpdate as EventListener
-    );
-
-    return () => {
-      window.removeEventListener(
-        "file-transfer-update",
-        handleTransferUpdate as EventListener
-      );
-    };
-  }, []);
-
-  // 只使用一种刷新方式，避免多重刷新导致的问题 - 降低刷新频率
+  // 修改刷新频率并简化日志输出
   useEffect(() => {
     const intervalId = setInterval(() => {
       setRefreshKey((prev) => prev + 1);
-    }, 200); // 目前每200毫秒刷新一次，太频繁了
+    }, 1000); // 降低到1秒刷新一次
     return () => clearInterval(intervalId);
   }, []);
+
+  // 减少日志输出，只在传输发生实际变化时记录
+  useEffect(() => {
+    console.log(`[CurrentTransfers] 当前传输任务: ${transfers.length}项`);
+
+    // 只在有传输时才打印详情，并且降低频率
+    if (transfers.length > 0 && refreshKey % 5 === 0) {
+      console.log(
+        "[CurrentTransfers] 传输项摘要:",
+        transfers.map((t) => `${t.id.substring(0, 8)}... (${t.progress}%)`)
+      );
+    }
+  }, [transfers.length, refreshKey]);
+
+  // 添加直接监听DOM事件的备用机制
+  useEffect(() => {
+    const handleDirectEvent = (event: CustomEvent) => {
+      try {
+        const { type, transfer } = event.detail;
+        if (!transfer || !transfer.id) return;
+
+        console.log(
+          `[CurrentTransfers] 直接接收到传输事件: ${type}, ${transfer.id}`
+        );
+
+        // 无论事件类型如何，更新传输
+        setTransfers((prev) => {
+          const exists = prev.some((t) => t.id === transfer.id);
+          if (!exists) {
+            console.log(`[CurrentTransfers] 添加新传输: ${transfer.id}`);
+            return [...prev, transfer];
+          } else {
+            return prev.map((t) =>
+              t.id === transfer.id ? { ...t, ...transfer } : t
+            );
+          }
+        });
+      } catch (error) {
+        console.error("[CurrentTransfers] 处理事件出错:", error);
+      }
+    };
+
+    window.addEventListener(
+      "transferEvent",
+      handleDirectEvent as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        "transferEvent",
+        handleDirectEvent as EventListener
+      );
+  }, [setTransfers]);
 
   // 添加日志，帮助调试
   useEffect(() => {
