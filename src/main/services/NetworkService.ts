@@ -3,6 +3,7 @@ import dgram from 'dgram';
 import { ipcMain } from 'electron';
 import { networkInterfaces } from 'os';
 import { heartbeatService } from './HeartbeatService';
+import net from 'net';
 
 export interface NetworkDevice {
     name: string;
@@ -19,6 +20,8 @@ export class NetworkService extends EventEmitter {
     private deviceName: string;
     private port: number;
     private udpServer: dgram.Socket | null = null;
+    private bandwidthTestServer: net.Server | null = null;
+    private bandwidthTestPort: number = 8766;
 
     constructor(deviceId: string, deviceName: string, port: number) {
         super();
@@ -92,6 +95,8 @@ export class NetworkService extends EventEmitter {
             this.socket.close();
             this.socket = null;
         }
+
+        this.stopBandwidthTestServer();
     }
 
     public publishService(port: number): void {
@@ -170,6 +175,144 @@ export class NetworkService extends EventEmitter {
 
         console.log(`发送UDP广播到: ${broadcastAddresses.join(', ')}`);
     }
+
+    /**
+     * 启动带宽测试服务器
+     * 用于接收带宽测试请求
+     */
+    public startBandwidthTestServer(): void {
+        if (this.bandwidthTestServer) return;
+
+        this.bandwidthTestServer = net.createServer();
+        this.bandwidthTestServer.on('connection', this.handleBandwidthTestConnection.bind(this));
+        this.bandwidthTestServer.listen(this.bandwidthTestPort, () => {
+            console.log(`带宽测试服务器启动在端口: ${this.bandwidthTestPort}`);
+        });
+
+        this.bandwidthTestServer.on('error', (err) => {
+            console.error('带宽测试服务器错误:', err);
+        });
+    }
+
+    /**
+     * 处理带宽测试连接
+     */
+    private handleBandwidthTestConnection(socket: net.Socket): void {
+        console.log(`收到来自 ${socket.remoteAddress} 的带宽测试连接`);
+
+        // 创建测试数据 (1MB)
+        const testData = Buffer.alloc(1024 * 1024, 'B');
+
+        // 发送测试数据
+        socket.write(testData);
+
+        socket.on('error', (err) => {
+            console.error('带宽测试连接错误:', err);
+            socket.destroy();
+        });
+    }
+
+    /**
+     * 测量与指定设备的网络带宽
+     * @param ip 目标设备IP
+     * @param port 目标设备带宽测试端口
+     * @returns 带宽测量结果 (bytes/second)
+     */
+    public async measureBandwidth(ip: string, port: number = this.bandwidthTestPort): Promise<number> {
+        return new Promise((resolve, reject) => {
+            const socket = new net.Socket();
+            const startTime = Date.now();
+            let bytesReceived = 0;
+            let testComplete = false;
+
+            // 设置5秒超时
+            socket.setTimeout(5000);
+
+            socket.on('data', (data) => {
+                bytesReceived += data.length;
+
+                // 接收到足够的数据后计算带宽
+                if (bytesReceived >= 1024 * 1024 && !testComplete) {
+                    testComplete = true;
+                    const endTime = Date.now();
+                    const durationSeconds = (endTime - startTime) / 1000;
+                    const bandwidth = bytesReceived / durationSeconds;
+
+                    socket.destroy();
+                    resolve(bandwidth);
+                }
+            });
+
+            socket.on('timeout', () => {
+                socket.destroy();
+                if (!testComplete) {
+                    reject(new Error('带宽测试超时'));
+                }
+            });
+
+            socket.on('error', (err) => {
+                socket.destroy();
+                if (!testComplete) {
+                    reject(err);
+                }
+            });
+
+            socket.on('close', () => {
+                if (!testComplete) {
+                    reject(new Error('连接关闭，带宽测试未完成'));
+                }
+            });
+
+            socket.connect(port, ip);
+        });
+    }
+
+    /**
+     * 执行多次带宽测试并返回平均值，以获得更准确的结果
+     * @param ip 目标设备IP
+     * @param port 目标设备带宽测试端口
+     * @param samples 测试次数
+     * @returns 平均带宽 (bytes/second)
+     */
+    public async getAverageBandwidth(ip: string, port: number = this.bandwidthTestPort, samples: number = 3): Promise<number> {
+        console.log(`开始对 ${ip}:${port} 进行带宽测试，样本数: ${samples}`);
+
+        let successfulTests = 0;
+        let totalBandwidth = 0;
+
+        for (let i = 0; i < samples; i++) {
+            try {
+                const bandwidth = await this.measureBandwidth(ip, port);
+                totalBandwidth += bandwidth;
+                successfulTests++;
+                console.log(`带宽测试 #${i + 1}: ${(bandwidth / (1024 * 1024)).toFixed(2)} MB/s`);
+            } catch (error) {
+                console.error(`带宽测试 #${i + 1} 失败:`, error);
+            }
+
+            // 测试之间等待短暂时间
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        if (successfulTests === 0) {
+            throw new Error('所有带宽测试都失败');
+        }
+
+        const averageBandwidth = totalBandwidth / successfulTests;
+        console.log(`平均带宽: ${(averageBandwidth / (1024 * 1024)).toFixed(2)} MB/s`);
+
+        return averageBandwidth;
+    }
+
+    /**
+     * 停止带宽测试服务器
+     */
+    public stopBandwidthTestServer(): void {
+        if (this.bandwidthTestServer) {
+            this.bandwidthTestServer.close();
+            this.bandwidthTestServer = null;
+        }
+    }
 }
 
 // 修改设备检测策略，完全使用TCP检测
@@ -216,6 +359,38 @@ export const registerNetworkHandlers = () => {
             console.error('设备状态检查失败:', error);
             return { success: false };
         }
+    });
+
+    // 添加带宽测试IPC处理程序
+    ipcMain.handle('network:measureBandwidth', async (_event, ip, port) => {
+        try {
+            console.log(`收到带宽测试请求: ${ip}:${port || 8766}`);
+            const networkService = new NetworkService("temp-id", "temp-name", 0);
+
+            // 启动带宽测试服务器(如果需要接收测试请求)
+            networkService.startBandwidthTestServer();
+
+            // 执行带宽测试
+            const bandwidth = await networkService.getAverageBandwidth(ip, port || 8766);
+
+            return {
+                success: true,
+                bandwidth: bandwidth,
+                bandwidthMbps: bandwidth / (1024 * 1024),
+                unit: 'bytes/second'
+            };
+        } catch (error: unknown) {
+            console.error('带宽测试失败:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+            };
+        }
+    });
+
+    // 获取本地服务带宽测试端口
+    ipcMain.handle('network:getBandwidthTestPort', () => {
+        return 8766; // 返回默认带宽测试端口
     });
 };
 

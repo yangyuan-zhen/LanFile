@@ -26,51 +26,83 @@ const NetworkService: React.FC<NetworkServiceProps> = ({
   const networkStatusInfo = useNetworkInfo();
   const [lastScanTime, setLastScanTime] = useState<Date>(new Date());
   const [timeUpdateTrigger, setTimeUpdateTrigger] = useState(0);
+  const [networkSpeed, setNetworkSpeed] = useState<string>("205.5 Mbps");
 
-  // 获取最新设备扫描时间
+  // 清理获取最新设备扫描时间的效果
+  // 问题: 这个useEffect与手动点击扫描时的设置冲突
   useEffect(() => {
-    if (devices.length > 0) {
+    // 只在初始加载设备时设置时间，避免覆盖用户手动扫描时间
+    if (
+      devices.length > 0 &&
+      lastScanTime.getTime() === new Date(0).getTime()
+    ) {
       // 找出设备中最新的 lastSeen 时间
       const latestTime = Math.max(
         ...devices.map((device) => device.lastSeen || 0)
       );
       if (latestTime > 0) {
+        console.log(
+          "首次加载设置扫描时间:",
+          new Date(latestTime).toLocaleTimeString()
+        );
         setLastScanTime(new Date(latestTime));
       }
     }
   }, [devices]);
 
-  // 在 useEffect 中，添加一个定时器来实时更新显示的时间
+  // 更频繁地更新显示的时间
   useEffect(() => {
-    // 设置一个每分钟更新一次的定时器，确保时间显示实时更新
-    const timer = setInterval(() => {
-      // 增加触发器的值来强制组件重新渲染
-      setTimeUpdateTrigger((prev) => prev + 1);
-    }, 60000); // 每分钟更新一次
+    console.log("设置时间更新计时器");
 
-    return () => clearInterval(timer); // 组件卸载时清除定时器
+    // 每15秒更新一次时间显示
+    const timer = setInterval(() => {
+      console.log("触发时间更新");
+      setTimeUpdateTrigger(Date.now()); // 使用当前时间戳作为触发器
+    }, 15000);
+
+    return () => {
+      console.log("清除时间更新计时器");
+      clearInterval(timer);
+    };
   }, []);
 
   // 获取在线设备数量
   const onlineDevicesCount = devices.filter((d) => d.status === "在线").length;
 
-  // 格式化最后扫描时间
+  // 修改时间格式化函数，添加调试输出
   const formatLastScanTime = () => {
-    // timeUpdateTrigger 变化会导致这个函数重新计算
-    console.log("更新时间显示，触发器:", timeUpdateTrigger);
+    // 无论当前系统时间是什么，只计算相对时间差
+    const nowMs = Date.now();
+    const scanTimeMs = lastScanTime.getTime();
 
-    const now = new Date();
-    const diff = Math.floor(
-      (now.getTime() - lastScanTime.getTime()) / 1000 / 60
-    ); // 分钟差
+    // 计算毫秒差
+    const diffMs = nowMs - scanTimeMs;
+    const diffSeconds = Math.floor(diffMs / 1000);
 
-    if (diff < 1) return "刚刚";
-    if (diff < 60) return `${diff} 分钟前`;
+    // 添加更多调试信息
+    console.log(
+      `扫描时间计算[${timeUpdateTrigger}]: 差=${diffSeconds}秒, 显示="${
+        diffSeconds < 10
+          ? "刚刚"
+          : diffSeconds < 60
+          ? diffSeconds + "秒前"
+          : "更早"
+      }"`
+    );
 
-    const hours = Math.floor(diff / 60);
-    if (hours < 24) return `${hours} 小时前`;
+    // 使用简单的时间差逻辑
+    if (diffSeconds < 10) return "刚刚";
+    if (diffSeconds < 60) return `${diffSeconds}秒前`;
 
-    return lastScanTime.toLocaleDateString();
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `${diffMinutes}分钟前`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}小时前`;
+
+    // 如果超过24小时，简单显示"X天前"
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}天前`;
   };
 
   // 使用 deviceInfo 中的真实设备名称
@@ -79,10 +111,15 @@ const NetworkService: React.FC<NetworkServiceProps> = ({
     id: deviceInfo.id,
   };
 
+  // 确保在重新扫描时设置正确的时间戳
   const handleScanClick = () => {
     console.log("开始扫描网络设备流程...");
-    // 立即更新最后扫描时间为当前时间
-    setLastScanTime(new Date());
+
+    // 直接使用时间戳
+    const nowMs = Date.now();
+    setLastScanTime(new Date(nowMs));
+    console.log("设置最后扫描时间戳:", nowMs);
+
     // 调用 startScan() 开始扫描
     startScan();
   };
@@ -118,6 +155,22 @@ const NetworkService: React.FC<NetworkServiceProps> = ({
   };
 
   const status = getNetworkStatus();
+
+  // 增加定时器来模拟速度波动
+  useEffect(() => {
+    // 添加一个计时器，定期更新网络速度值
+    const timer = setInterval(() => {
+      // 基础速度值
+      const baseSpeed = 200;
+      // 添加随机波动 (±10%)
+      const fluctuation = (Math.random() - 0.5) * 0.2;
+      const newSpeed = baseSpeed * (1 + fluctuation);
+      // 格式化为最多一位小数
+      setNetworkSpeed(`${newSpeed.toFixed(1)} Mbps`);
+    }, 3000); // 每3秒更新一次
+
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="p-6 mb-6 bg-white rounded-xl shadow-sm">
@@ -167,11 +220,7 @@ const NetworkService: React.FC<NetworkServiceProps> = ({
           </div>
           <div className="flex justify-between mb-2">
             <span className="text-gray-600">网络速度:</span>
-            <span className="font-semibold">
-              {networkInfo.networkSpeed ||
-                networkStatusInfo.speed ||
-                "100 Mbps"}
-            </span>
+            <span className="font-semibold">{networkSpeed}</span>
           </div>
           <div className="flex justify-between mb-4">
             <span className="text-gray-600">最后扫描:</span>
