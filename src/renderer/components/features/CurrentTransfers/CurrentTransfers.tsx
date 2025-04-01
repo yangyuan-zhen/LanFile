@@ -332,6 +332,11 @@ export const CurrentTransfers: React.FC = () => {
               {activeCount} 进行中
             </Badge>
           )}
+          {completedCount > 0 && (
+            <Badge ml={2} colorScheme="green" borderRadius="full">
+              {completedCount} 已完成
+            </Badge>
+          )}
         </Flex>
       </Flex>
 

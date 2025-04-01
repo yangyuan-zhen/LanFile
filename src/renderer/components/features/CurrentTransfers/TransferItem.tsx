@@ -220,7 +220,9 @@ export const TransferItem: React.FC<TransferItemProps> = ({
 
       {/* 进度信息显示 */}
       <Flex justifyContent="space-between" fontSize="sm">
-        <Text fontWeight="medium">{progress}%</Text>
+        <Text fontWeight="medium">
+          {typeof progress === "number" ? progress.toFixed(0) : "0"}%
+        </Text>
         <Text>
           {formatSize(transfer.size * (progress / 100))} /{" "}
           {formatSize(transfer.size)}
