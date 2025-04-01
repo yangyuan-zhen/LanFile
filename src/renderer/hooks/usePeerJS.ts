@@ -765,15 +765,38 @@ export const usePeerJS = () => {
             });
 
             if (result.success) {
+                console.log(`[usePeerJS] 文件保存成功，路径: ${result.filePath}`);
+
+                // 更新传输对象，添加savedPath
                 setTransfers(prev =>
                     prev.map(t => t.id === transferId ?
-                        { ...t, progress: 100, status: 'completed', savedPath: result.filePath } : t)
+                        {
+                            ...t,
+                            progress: 100,
+                            status: 'completed',
+                            savedPath: result.filePath  // 确保这里设置了保存路径
+                        } : t)
                 );
 
-                window.dispatchEvent(new CustomEvent('file-transfer-complete', {
+                // 同时更新缓存
+                const existingTransfer = transferCache.current[transferId];
+                if (existingTransfer) {
+                    transferCache.current[transferId] = {
+                        ...existingTransfer,
+                        progress: 100,
+                        status: 'completed',
+                        savedPath: result.filePath
+                    };
+                }
+
+                // 触发传输完成事件
+                window.dispatchEvent(new CustomEvent('transferEvent', {
                     detail: {
-                        fileName: fileInfoData.name,
-                        transferId: transferId
+                        type: 'complete',
+                        transfer: {
+                            ...transferCache.current[transferId],
+                            savedPath: result.filePath
+                        }
                     }
                 }));
             } else {

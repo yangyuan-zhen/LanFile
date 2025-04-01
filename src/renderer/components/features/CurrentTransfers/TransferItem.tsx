@@ -118,20 +118,27 @@ export const TransferItem: React.FC<TransferItemProps> = ({
   );
 
   const getDeviceDisplay = (transfer: FileTransfer) => {
-    if (transfer.deviceName && transfer.deviceName !== "未知设备") {
-      return transfer.deviceName;
+    // 添加安全检查，确保所有使用的属性都有值
+    const deviceName = transfer?.deviceName || "未知设备";
+    const peerId = transfer?.peerId || "";
+
+    // 避免对undefined值调用match方法
+    const shortPeerId = peerId?.substring(0, 8) || "";
+
+    let deviceIcon = "laptop";
+
+    // 使用可选链操作符避免undefined错误
+    if (deviceName?.match(/phone|mobile|android|iphone/i)) {
+      deviceIcon = "smartphone";
+    } else if (deviceName?.match(/tablet|ipad/i)) {
+      deviceIcon = "tablet";
     }
 
-    // 从peerId中提取IP地址 (假设peerId格式包含IP信息)
-    const ipMatch = transfer.peerId.match(
-      /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/
-    );
-    if (ipMatch) {
-      return ipMatch[0];
-    }
-
-    // 如果没有IP格式，显示截断的peerId
-    return transfer.peerId.substring(0, 8) + "...";
+    return {
+      name: deviceName,
+      id: shortPeerId,
+      icon: deviceIcon,
+    };
   };
 
   return (
@@ -160,7 +167,7 @@ export const TransferItem: React.FC<TransferItemProps> = ({
             </Tooltip>
             <Text fontSize="sm" color="gray.500">
               {transfer.direction === "upload" ? "发送至" : "接收自"}:{" "}
-              {getDeviceDisplay(transfer)}
+              {getDeviceDisplay(transfer).name}
             </Text>
           </Box>
         </Flex>
