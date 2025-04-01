@@ -43,8 +43,18 @@ export const CurrentTransfers: React.FC = () => {
         // 创建新传输ID Map
         const prevMap = new Map(prevTransfers.map((t) => [t.id, t]));
 
+        // 添加调试日志
+        console.log(
+          "[CurrentTransfers] 合并前现有传输:",
+          [...prevMap.keys()].join(", ") || "无"
+        );
+
         // 遍历事件传输，将新传输添加到列表或更新现有传输
         eventTransfers.forEach((transfer) => {
+          console.log(
+            `[CurrentTransfers] 处理事件传输: ${transfer.id} (${transfer.progress}%)`
+          );
+
           prevMap.set(transfer.id, {
             ...(prevMap.get(transfer.id) || {}),
             ...transfer,
@@ -53,10 +63,12 @@ export const CurrentTransfers: React.FC = () => {
           });
         });
 
-        return Array.from(prevMap.values());
+        const newTransfers = Array.from(prevMap.values());
+        console.log("[CurrentTransfers] 合并后传输数量:", newTransfers.length);
+        return newTransfers;
       });
     }
-  }, [eventTransfers]);
+  }, [eventTransfers, setTransfers]);
 
   // 加强对活动传输的监听，确保更平滑的状态更新
   useEffect(() => {
@@ -106,7 +118,7 @@ export const CurrentTransfers: React.FC = () => {
   useEffect(() => {
     const intervalId = setInterval(() => {
       setRefreshKey((prev) => prev + 1);
-    }, 200); // 提高刷新频率以更新进度条
+    }, 200); // 目前每200毫秒刷新一次，太频繁了
     return () => clearInterval(intervalId);
   }, []);
 

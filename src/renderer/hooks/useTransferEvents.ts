@@ -28,25 +28,34 @@ export const useTransferEvents = () => {
     const [transfers, setTransfers] = useState<FileTransfer[]>([]);
 
     useEffect(() => {
-        const unsubscribe = transferEventBus.subscribe((event) => {
-            console.log('[TransferEvents] 收到传输事件:', event.type, event.transfer.id);
+        const handleTransferEvent = (event: CustomEvent) => {
+            const { type, transfer } = event.detail;
 
+            if (!transfer || !transfer.id) {
+                console.warn('[TransferEvents] 收到无效传输事件', event.detail);
+                return;
+            }
+
+            console.log(`[TransferEvents] 处理传输事件: ${type} ${transfer.id} (${transfer.progress || 0}%)`);
+
+            // 更重要的是保证transfer对象完整
             setTransfers(prev => {
-                // 处理不同事件类型
-                switch (event.type) {
-                    case 'new':
-                        return [...prev, event.transfer];
-                    case 'progress':
-                    case 'complete':
-                    case 'error':
-                        return prev.map(t => t.id === event.transfer.id ? event.transfer : t);
-                    default:
-                        return prev;
+                const exists = prev.some(t => t.id === transfer.id);
+
+                if (exists) {
+                    // 更新现有传输
+                    return prev.map(t => t.id === transfer.id ? { ...t, ...transfer } : t);
+                } else {
+                    // 添加新传输
+                    console.log(`[TransferEvents] 添加新传输: ${transfer.id}`);
+                    return [...prev, transfer];
                 }
             });
-        });
+        };
 
-        return unsubscribe;
+        // 添加事件监听器
+        window.addEventListener('transferEvent', handleTransferEvent as EventListener);
+        return () => window.removeEventListener('transferEvent', handleTransferEvent as EventListener);
     }, []);
 
     return { transfers };
