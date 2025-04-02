@@ -59,13 +59,13 @@
    ```
    npm install
    ```
-4. 启动开发环境
+4. 构建应用
    ```
-   npm run dev
+   npm run build
    ```
 5. 构建应用
    ```
-   npm run build
+   npm run dev
    ```
 
 ## 项目目录结构
